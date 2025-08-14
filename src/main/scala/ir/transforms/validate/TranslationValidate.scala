@@ -97,53 +97,54 @@ case class InvariantDescription(
    * be ignored as far as translation validation is concerned.
    */
   introducedAsserts: Set[String] = Set()
-)
+) {
+  def compose(i: InvariantDescription) = {
+    InvariantDescription(
+      composeDRFun(renamingSrcTgt, i.renamingSrcTgt),
+      composeDRFun(i.renamingTgtSrc, renamingTgtSrc),
+      Map()
+    )
+  }
+
+}
 
 type CutLabel = String
 type BlockID = String
 type ProcID = String
 
-//def composeDR(a: TransformDataRelationFun, b: TransformDataRelationFun, aFF: TransformTargetTargetFlowFact, bFF: TransformTargetTargetFlowFact) = {
-//
-//  class subst(bl: Option[BlockID]) extends CILVisitor {
-//    def sub(v: Variable | Memory) = {
-//      b(bl)(v) match {
-//        case Some(e) => ChangeTo(e)
-//        case None => throw Exception("none")
-//      }
-//    }
-//
-//    override def vexpr(e: Expr) = e match {
-//      case v: Variable => sub(v)
-//      case v: Memory => sub(v)
-//      case _ => DoChildren()
-//    }
-//  }
-//
-//  val atx = aFF.map {
-//    case (proc, bs) => proc -> bs.map {
-//      case (v, e) => (a(None)(v), vexpr(subst(None)(e))) match
-//    }
-//  }
-//
-//  def toSource(bl: Option[BlockID])(e: Expr) = {
-//    try {
-//        Some(visit_expr(subst(bl), e))
-//      } catch {
-//        case x => None
-//      }
-//
-//  }
-//
-//
-//  def composed(bl : Option[BlockID])(v: Variable | Memory) = {
-//    a(bl)(v) match {
-//      case Some(e) =>       case None => None
-//    }
-//  }
-//
-//  composed
-//}
+def composeDRFun(a: TransformDataRelationFun, b: TransformDataRelationFun): TransformDataRelationFun = {
+
+  class subst(funct: TransformDataRelationFun)(p: ProcID, bl: Option[BlockID]) extends CILVisitor {
+
+    def sub(v: Variable | Memory) = {
+      funct(p, bl)(v) match {
+        case e :: Nil => ChangeTo(e)
+        case Nil => throw Exception("none")
+      }
+    }
+    override def vexpr(e: Expr) = e match {
+      case v: Variable => sub(v)
+      case v: Memory => sub(v)
+      case _ => DoChildren()
+    }
+  }
+
+  def toSource(funct: TransformDataRelationFun)(p: ProcID, bl: Option[BlockID])(e: Expr): Option[Expr] = {
+    try {
+      Some(visit_expr(subst(funct)(p, bl), e))
+    } catch {
+      case x => None
+    }
+  }
+
+  def composed(p: ProcID, bl: Option[BlockID])(v: Variable | Memory) = {
+    a(p, bl)(v).flatMap { case e: Expr =>
+      toSource(b)(p, bl)(e)
+    }
+  }
+
+  composed
+}
 
 enum FormalParam {
   case Global(v: Memory | GlobalVar)
@@ -294,6 +295,9 @@ object TranslationValidator {
 
     def transfer(s: Set[Variable], a: Command): Set[Variable] = {
       a match {
+        case SideEffectStatement(_, _, lhs, rhs) => {
+          (s -- lhs.map(_._2)) ++ rhs.flatMap(_._2.variables)
+        }
         case SideEffect(SideEffectStatement(_, _, lhs, rhs)) => {
           (s -- lhs.map(_._2)) ++ rhs.flatMap(_._2.variables)
         }
@@ -326,16 +330,12 @@ object TranslationValidator {
     }
   }
 
-  def getLiveVars(
-    p: Procedure,
-    frames: Map[String, CallParamMapping]
-  ): (Map[Block, Set[Variable]], Map[Block, Set[Variable]]) = {
+  def getLiveVars(p: Procedure, frames: Map[String, CallParamMapping]): Map[BlockID, Set[Variable]] = {
     transforms.reversePostOrder(p)
     val liveVarsDom = IntraLiveVarsDomainSideEffect(frames)
     val liveVarsSolver = transforms.worklistSolver(liveVarsDom)
     val (b, a) = liveVarsSolver.solveProc(p, backwards = true)
-    (b, a)
-
+    b.map((k, v) => (k.label, v)).toMap
   }
 
   /**
@@ -627,10 +627,8 @@ object TranslationValidator {
         val tgtCut = targetInfo.cutBlockLabels(label)
         val srcCut = sourceInfo.cutBlockLabels(label)
 
-        val srcLives = sourceInfo.liveVars.get(srcCut).toList.flatten
-        val tgtLives = targetInfo.liveVars.get(tgtCut).toList.flatten
-
-        val tgtDefines = targetInfo.defines(tgtCut)
+        val srcLives = sourceInfo.liveVars.get(srcCut).toSet.flatten
+        val tgtLives = targetInfo.liveVars.get(tgtCut).toSet.flatten
 
         val invSrc = srcLives.map(s => s -> renamingSrcTgt(sourceInfo.name, Some(srcCut))(s)).flatMap {
           case (l, r) => {
@@ -648,7 +646,7 @@ object TranslationValidator {
           }
         }
 
-        Inv.CutPoint(label, invSrc ++ invTgt, Some(s"INVARIANT at $label"))
+        Inv.CutPoint(label, (invSrc.toSet ++ invTgt).toList, Some(s"INVARIANT at $label"))
       }
     }).toList
 
@@ -962,9 +960,9 @@ object TranslationValidator {
 
     val invEverywhere = cuts.toList.map(label => Inv.CutPoint(label, alwaysInv, Some(s"GlobalConstraint$label")))
 
-    val factsInvariant = getFlowFactsInvariant(sourceInfo, targetInfo, invariant.flowFacts(sourceInfo.name))
+    // val factsInvariant = getFlowFactsInvariant(sourceInfo, targetInfo, invariant.flowFacts(sourceInfo.name))
 
-    val concreteInvariant = equalVarsInvariant ++ factsInvariant ++ invEverywhere
+    val concreteInvariant = equalVarsInvariant ++ invEverywhere
 
     concreteInvariant
   }
@@ -1226,7 +1224,7 @@ object TranslationValidator {
     def procToTrInplace(p: Procedure, params: Map[String, CallParamMapping], introducedAsserts: Set[String]) = {
 
       ir.transforms.reversePostOrder(p)
-      val liveVars: Map[String, Set[Variable]] = getLiveVars(p, params)._1.map((k, v) => (k.label, v)).toMap
+      val liveVars: Map[String, Set[Variable]] = getLiveVars(p, params)
 
       val cuts = TransitionSystem.toTransitionSystemInPlace(p)
 
@@ -1239,8 +1237,11 @@ object TranslationValidator {
       ProcInfo(p.name, p, liveVars, cuts, params(p.name), (_, _) => ???, Map())
     }
 
-    def ssaProcInfo(p: ProcInfo) = {
+    def ssaProcInfo(p: ProcInfo, params: Map[String, CallParamMapping]) = {
       ir.transforms.reversePostOrder(p.transition)
+
+      // val liveVars: Map[String, Set[Variable]] = getLiveVars(p.transition, params)
+
       val (renameSSA, defines) = SSADAG.ssaTransform(p.transition, p.liveVars)
 
       p.copy(ssaRenamingFun = renameSSA, ssaDefines = defines)
@@ -1267,8 +1268,8 @@ object TranslationValidator {
         for ((sourceSplit, targetSplit) <- splitProcs) {
           splits += 1
 
-          val sourceSSA = ssaProcInfo(sourceSplit)
-          val targetSSA = ssaProcInfo(targetSplit)
+          val sourceSSA = ssaProcInfo(sourceSplit, sourceParams)
+          val targetSSA = ssaProcInfo(targetSplit, targetParams)
 
           val res = validateSMTSingleProc(
             result,
@@ -1285,8 +1286,8 @@ object TranslationValidator {
         }
 
       } else {
-        val sourceSSA = ssaProcInfo(source)
-        val targetSSA = ssaProcInfo(target)
+        val sourceSSA = ssaProcInfo(source, sourceParams)
+        val targetSSA = ssaProcInfo(target, targetParams)
 
         val res = validateSMTSingleProc(
           result,

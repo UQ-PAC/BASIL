@@ -160,3 +160,11 @@ A litmus-test for the soundness of the verification is to generate the unsat cor
 If the verification is substantive, the unsat core should contain the entire transition system:
 assertions named `source$number` and `tgt$number`.
 
+
+# Split Optimisation
+
+For large procedures we break down the proof based on the entry cut. Because we always ahve the precondition
+that we start in the same entry cut, for each possible entry we select the edge corresponding to that
+entry and remove all other outgoing edges from the entry point. This assumption is then fully propogated
+through by a dead code elimination. (In fact we remove the edge before the SSA pass so the flow is removed from the program).
+

@@ -68,6 +68,8 @@ def parameters(config: TVJob, p: Program) = {
 
 ## Introducing Assumptions via Later-Verified Assertions
 
+see also: [lifter-assertions](assumptions.md)
+
 For transforms that introduce assumptions by adding assertions to be discharged later, the
 framework allows these to be temporarily ignored during validation. 
 
