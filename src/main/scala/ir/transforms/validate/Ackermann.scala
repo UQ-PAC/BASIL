@@ -64,6 +64,10 @@ case class SideEffectStatement(
   // lhs  := name(rhs)
   // rhs is mapping formal -> actual
   //  for globals the formal param is the captured global var or memory
+
+  override def cloneStatement() = {
+    SideEffectStatement(stmt, name, lhs, rhs)
+  }
 }
 
 object SideEffectStatementOfStatement {

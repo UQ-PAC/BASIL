@@ -55,7 +55,9 @@ case class TVJob(
   outputPath: Option[String],
   verify: Option[util.SMT.Solver] = None,
   results: List[TVResult] = List(),
-  debugDumpAlways: Boolean = false
+  debugDumpAlways: Boolean = false,
+  /* minimum number of statements in source and target combined to trigger case analysis */
+  splitLargeProceduresThreshold: Option[Int] = Some(60)
 ) {
 
   lazy val noneFailed = {
@@ -580,13 +582,11 @@ object TranslationValidator {
   def getEqualVarsInvariantRenaming(
     // block label -> variable -> renamed variable
     i: InterproceduralInfo,
-    afterProc: Procedure,
     sourceInfo: ProcInfo,
     targetInfo: ProcInfo,
     renamingSrcTgt: TransformDataRelationFun = (_, _) => e => Seq(e),
     renamingTgtSrc: TransformDataRelationFun = (_, _) => e => Seq(e)
   ) = {
-    val p = afterProc
 
     val globalsTgt = globalsForSourceProc(i, sourceInfo)(renamingSrcTgt(sourceInfo.name, None)).toList
     val globals = globalsTgt.collect { case (a, Some(b)) => CompatArg(toVariable(a), toVariable(b)) }.toList
@@ -632,7 +632,7 @@ object TranslationValidator {
 
         val tgtDefines = targetInfo.defines(tgtCut)
 
-        val invSrc = srcLives.map(s => s -> renamingSrcTgt(afterProc.name, Some(srcCut))(s)).flatMap {
+        val invSrc = srcLives.map(s => s -> renamingSrcTgt(sourceInfo.name, Some(srcCut))(s)).flatMap {
           case (l, r) => {
             r.filter(_.variables.forall(v => tgtLives.contains(v))).map { case e =>
               CompatArg(toVariable(l), toVariable(e))
@@ -640,7 +640,7 @@ object TranslationValidator {
           }
         }
 
-        val invTgt = tgtLives.map(s => s -> renamingTgtSrc(afterProc.name, Some(tgtCut))(s)).flatMap {
+        val invTgt = tgtLives.map(s => s -> renamingTgtSrc(sourceInfo.name, Some(tgtCut))(s)).flatMap {
           case (l, r) => {
             r.filter(_.variables.forall(v => srcLives.contains(v))).map { case e =>
               CompatArg(toVariable(e), toVariable(l))
@@ -658,12 +658,10 @@ object TranslationValidator {
 
   def getFlowFactsInvariant(
     // block label -> variable -> renamed variable
-    afterProc: Procedure,
     source: ProcInfo,
     target: ProcInfo,
     flowFactTgtTgt: Map[Variable, Expr]
   ) = {
-    val p = afterProc
 
     val cuts = (target.cutBlockLabels.keys ++ source.cutBlockLabels.keys).toSet.toList
 
@@ -938,29 +936,16 @@ object TranslationValidator {
 
   }
 
-  private def validateSMTSingleProc(
-    config: TVJob,
+  def inferInvariant(
     interproc: InterproceduralInfo,
-    runName: String,
-    procTransformed: Procedure,
     invariant: InvariantDescription,
     sourceInfo: ProcInfo,
     targetInfo: ProcInfo
-  ): TVResult = {
-    val runNamePrefix = runName + "-" + procTransformed.name
-    val proc = procTransformed
-
-    tvLogger.info("Generating TV for : " + runNamePrefix)
-
-    val timer = PerformanceTimer(runNamePrefix, LogLevel.DEBUG, tvLogger)
-
-    val source = sourceInfo.transition // afterProg.get.procedures.find(_.name == proc.name).get
-    val target = targetInfo.transition // beforeProg.get.procedures.find(_.name == proc.name).get
+  ): List[Inv] = {
 
     val equalVarsInvariant =
       getEqualVarsInvariantRenaming(
         interproc,
-        proc,
         sourceInfo,
         targetInfo,
         invariant.renamingSrcTgt,
@@ -977,28 +962,60 @@ object TranslationValidator {
 
     val invEverywhere = cuts.toList.map(label => Inv.CutPoint(label, alwaysInv, Some(s"GlobalConstraint$label")))
 
-    val factsInvariant = getFlowFactsInvariant(proc, sourceInfo, targetInfo, invariant.flowFacts(proc.name))
+    val factsInvariant = getFlowFactsInvariant(sourceInfo, targetInfo, invariant.flowFacts(sourceInfo.name))
 
     val concreteInvariant = equalVarsInvariant ++ factsInvariant ++ invEverywhere
 
+    concreteInvariant
+  }
+
+  private def validateSMTSingleProc(
+    config: TVJob,
+    interproc: InterproceduralInfo,
+    runName: String,
+    splitName: String,
+    procTransformed: Procedure,
+    invariant: InvariantDescription,
+    concreteInvariant: List[Inv],
+    sourceInfo: ProcInfo,
+    targetInfo: ProcInfo
+  ): TVResult = {
+    val runNamePrefix = runName + "-" + procTransformed.name + "-" + splitName
+    val proc = procTransformed
+
+    tvLogger.info("Generating TV for : " + runNamePrefix)
+
+    val timer = PerformanceTimer(runNamePrefix, LogLevel.DEBUG, tvLogger)
+
+    val source = sourceInfo.transition // afterProg.get.procedures.find(_.name == proc.name).get
+    val target = targetInfo.transition // beforeProg.get.procedures.find(_.name == proc.name).get
+
+    // val preInv = invariant
+
     val ackInv =
       Ackermann.instantiateAxioms(
-        source.entryBlock.get,
-        target.entryBlock.get,
+        sourceInfo.transition.entryBlock.get,
+        targetInfo.transition.entryBlock.get,
         exprInSource,
         exprInTarget,
         invariant.renamingSrcTgt
       )
-    timer.checkPoint("ackermann")
 
-    // val preInv = invariant
-
-    val preInv = concreteInvariant.map(
+    val preInv = (concreteInvariant.map(
       invToPredicateInState(
         e => sourceInfo.renameSSA(sourceInfo.cuts.cutLabelBlockInTr("ENTRY").label, e),
         e => targetInfo.renameSSA(targetInfo.cuts.cutLabelBlockInTr("ENTRY").label, e)
       )
-    )
+    ) ++ Seq(
+      Assume(
+        BinaryExpr(
+          EQ,
+          exprInSource(TransitionSystem.programCounterVar),
+          exprInTarget(TransitionSystem.programCounterVar)
+        ),
+        Some("GLOBALINVSOURCE")
+      )
+    ))
 
     val primedInv = concreteInvariant
       .map(
@@ -1014,6 +1031,7 @@ object TranslationValidator {
 
     SSADAG.passify(source)
     SSADAG.passify(target)
+
     timer.checkPoint("passify")
 
     // build smt query
@@ -1033,18 +1051,13 @@ object TranslationValidator {
     count = 0
     for (e <- preInv) {
       count += 1
-      try {
-        val l = e.comment match {
-          case None => Some(s"inv$count")
-          case Some(s) => Some(s"${s.replace(' ', '_')}_inv$count")
-        }
-        b.addAssert(e.body, Some(s"inv$count"))
-        prover.map(_.addConstraint(e.body))
-        npe.map(_.statements.append(Assert(e.body, l)))
-      } catch
-        ex => {
-          throw Exception(s"$ex Failed to gen smt for ?\n  $e :: \n $e")
-        }
+      val l = e.comment match {
+        case None => Some(s"inv$count")
+        case Some(s) => Some(s"${s.replace(' ', '_')}_inv$count")
+      }
+      b.addAssert(e.body, Some(s"inv$count"))
+      prover.map(_.addConstraint(e.body))
+      npe.map(_.statements.append(Assert(e.body, l)))
     }
 
     count = 0
@@ -1212,6 +1225,7 @@ object TranslationValidator {
 
     def procToTrInplace(p: Procedure, params: Map[String, CallParamMapping], introducedAsserts: Set[String]) = {
 
+      ir.transforms.reversePostOrder(p)
       val liveVars: Map[String, Set[Variable]] = getLiveVars(p, params)._1.map((k, v) => (k.label, v)).toMap
 
       val cuts = TransitionSystem.toTransitionSystemInPlace(p)
@@ -1220,9 +1234,16 @@ object TranslationValidator {
 
       TransitionSystem.removeUnreachableBlocks(p)
 
-      val (renameSSA, defines) = SSADAG.transform(params, p, liveVars)
+      SSADAG.convertToMonadicSideEffect(params, p)
 
-      ProcInfo(p.name, p, liveVars, cuts, params(p.name), renameSSA, defines)
+      ProcInfo(p.name, p, liveVars, cuts, params(p.name), (_, _) => ???, Map())
+    }
+
+    def ssaProcInfo(p: ProcInfo) = {
+      ir.transforms.reversePostOrder(p.transition)
+      val (renameSSA, defines) = SSADAG.ssaTransform(p.transition, p.liveVars)
+
+      p.copy(ssaRenamingFun = renameSSA, ssaDefines = defines)
     }
 
     var result = config
@@ -1233,12 +1254,121 @@ object TranslationValidator {
       val source = procToTrInplace(sourceProc, sourceParams, invariant.introducedAsserts)
       val target = procToTrInplace(targetProc, targetParams, Set())
 
-      val res = validateSMTSingleProc(result, interproc, runName, proc, invariant, source, target)
+      val concreteInvariant = inferInvariant(interproc, invariant, source, target)
 
-      result = result.copy(results = res :: result.results)
+      if (
+        config.splitLargeProceduresThreshold
+          .exists(_ <= (procComplexity(source.transition) + procComplexity(target.transition)))
+      ) {
+
+        var splits = 0
+        val splitProcs = chooseCuts(source, target)
+        tvLogger.info(s"Splitting ${proc.name} into ${splitProcs.size} elements")
+        for ((sourceSplit, targetSplit) <- splitProcs) {
+          splits += 1
+
+          val sourceSSA = ssaProcInfo(sourceSplit)
+          val targetSSA = ssaProcInfo(targetSplit)
+
+          val res = validateSMTSingleProc(
+            result,
+            interproc,
+            runName,
+            "split-" + splits,
+            proc,
+            invariant,
+            concreteInvariant,
+            sourceSSA,
+            targetSSA
+          )
+          result = result.copy(results = res :: result.results)
+        }
+
+      } else {
+        val sourceSSA = ssaProcInfo(source)
+        val targetSSA = ssaProcInfo(target)
+
+        val res = validateSMTSingleProc(
+          result,
+          interproc,
+          runName,
+          "thesplit",
+          proc,
+          invariant,
+          concreteInvariant,
+          sourceSSA,
+          targetSSA
+        )
+        result = result.copy(results = res :: result.results)
+      }
     })
 
     result
+  }
+
+  def procComplexity(p: Procedure) = {
+    p.foldLeft(1)((a, _) => a + 1)
+  }
+
+  def chooseCuts(source: ProcInfo, target: ProcInfo) = {
+
+    require(source.cutBlockLabels.keys.toSet == target.cutBlockLabels.keys.toSet)
+
+    def findCut(b: Block, thecuts: Map[BlockID, String]) = {
+      var search: Block = b
+
+      while (!thecuts.contains(search.label)) {
+        assert(search.nextBlocks.size == 1)
+
+        search = search.nextBlocks.head
+
+      }
+
+      thecuts(search.label) -> b
+    }
+
+    val sourceCuts = source.cutBlockLabels.map((lbl, block) => (block, lbl)).toMap
+    val targetCuts = target.cutBlockLabels.map((lbl, block) => (block, lbl)).toMap
+
+    val nextS = source.transition.entryBlock.get.nextBlocks.map(findCut(_, sourceCuts))
+    val nextT = target.transition.entryBlock.get.nextBlocks.map(findCut(_, targetCuts))
+
+    assert(nextS.map(_._1).toSet.size == nextT.map(_._1).toSet.size)
+    assert(nextS.map(_._2).toSet.size == nextT.map(_._2).toSet.size)
+    val targetBlockForCut = nextT.toMap
+
+    /**
+     * slice: the only target of proc.entryBlock to keep
+     *  - must be a successor of proc.transition.entryBlock
+     */
+    def cloneWithSlice(slice: BlockID, proc: ProcInfo) = {
+      val np = ir.dsl.IRToDSL.cloneSingleProcedure(proc.transition)
+
+      val bl = proc.transition.blocks.find(_.label == slice).get
+
+      val jump = np.mainProcedure.entryBlock.get.jump match {
+        case g: GoTo => g
+        case _ => throw Exception("unexpected")
+      }
+
+      val toRemove = jump.targets.filterNot(_.label == slice).toList
+      toRemove.foreach(jump.removeTarget)
+
+      TransitionSystem.removeUnreachableBlocks(np.mainProcedure)
+      proc.copy(transition = np.mainProcedure)
+    }
+
+    nextS.map {
+      case (cutLabel, sourceBlock) => {
+        val newsource = cloneWithSlice(sourceBlock.label, source)
+
+        val targetBlock = targetBlockForCut(cutLabel).label
+
+        val newtarget = cloneWithSlice(targetBlock, target)
+
+        (newsource, newtarget)
+      }
+    }
   }
 
   def forTransform[T](

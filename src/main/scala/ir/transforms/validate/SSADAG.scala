@@ -16,7 +16,6 @@ object SSADAG {
   * Returns the SSA renaming for each block entry in the CFA.
   */
   def transform(frames: Map[String, CallParamMapping], p: Procedure, liveVarsBefore: Map[String, Set[Variable]]) = {
-    convertToMonadicSideEffect(frames, p)
 
     ssaTransform(p, liveVarsBefore)
   }
@@ -44,6 +43,7 @@ object SSADAG {
     class MonadicConverter(frames: Map[String, CallParamMapping]) extends CILVisitor {
       val SF = SideEffectStatementOfStatement(frames)
       override def vstmt(s: Statement) = s match {
+        case a @ SF(s) if a.isInstanceOf[Assume] => ChangeTo(List(a, s))
         case SF(s) => ChangeTo(List(s))
         case _ => SkipChildren()
       }
@@ -200,14 +200,6 @@ object SSADAG {
           case a @ SideEffectStatement(s, n, lhs, rhs) => {
             // note this matches some assume statements
             // where checkSecurity = true
-
-            s match {
-              case a: Assume =>
-                renameRHS(renaming.get)(a)
-                blockDoneCond = (a.body) :: blockDoneCond
-              case _ => ()
-            }
-
             val rn = lhs
               .map((formal, v) => {
                 val freshDef = freshName(v)
@@ -246,8 +238,11 @@ object SSADAG {
     }
 
     tvLogger.debug("Phi node count: " + phis)
-    val renameBeforeLabels = renameBefore.map((b, r) => b.label -> r)
+    val renameBeforeLabels = renameBefore.map((b, r) => b.label -> r).toMap
 
-    ((b, c) => visit_expr(RenameRHS(renameBeforeLabels(b).get), c), renameBeforeLabels.toMap)
+    (
+      (b, c) => renameBeforeLabels.get(b).map(b => visit_expr(RenameRHS(b.get), c)).getOrElse(c),
+      renameBeforeLabels.toMap
+    )
   }
 }

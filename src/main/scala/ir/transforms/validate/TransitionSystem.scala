@@ -57,12 +57,13 @@ object TransitionSystem {
 
     cutPoints = cutPoints.updated("EXIT", synthExit)
 
+    cutPoints = cutPoints.updated("ENTRY", synthEntry)
+
     p.addBlocks(Seq(synthEntry, synthExit))
 
     p.entryBlock.foreach(e => {
       e.statements.prepend(pcGuard("ENTRY"))
       synthEntryJump.addTarget(e)
-      cutPoints = cutPoints.updated("ENTRY", e)
       cutPointRealBlockBegin = cutPointRealBlockBegin.updated("ENTRY", e)
     })
 
@@ -168,6 +169,8 @@ object TransitionSystem {
     val loops = analysis.LoopDetector.identify_loops(p.entryBlock.get)
     val floops = loops.identifiedLoops.toList.sortBy(_.header.label)
     val cutPoints = procToTransition(p, floops)
+    p.formalInParam.clear()
+    p.formalOutParam.clear()
 
     cutPoints
   }
