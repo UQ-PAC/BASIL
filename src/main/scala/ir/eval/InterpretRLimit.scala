@@ -1,7 +1,6 @@
 package ir.eval
 
-import ir.*
-import util.IRContext
+import ir.{IRContext, *}
 import util.functional.*
 import util.functional.State.*
 

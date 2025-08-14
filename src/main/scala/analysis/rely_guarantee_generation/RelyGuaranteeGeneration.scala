@@ -2,6 +2,7 @@ package analysis
 
 import ir.*
 import ir.transforms.*
+import util.StaticAnalysisLogger
 
 import scala.collection.mutable.Queue
 
@@ -149,3 +150,27 @@ class GuarGenSummaryGenerator[T, S](dom: InterferenceProductDomain[T, S])
     // we want to expand the previous postcondition by joining this one
     dom.pureJoin(prevSummary, resAfter(p.returnBlock.get))
 }
+
+def getGenerateRgConditionsTransform(threads: List[Procedure]): Transform =
+  Transform(
+    "GenerateRgConditions",
+    (ctx, man) => {
+      type StateLatticeElement = LatticeMap[Variable, analysis.Interval]
+      type InterferenceLatticeElement = Map[Variable, StateLatticeElement]
+      val stateLattice = IntervalLatticeExtension()
+      val stateTransfer = SignedIntervalDomain().transfer
+      val intDom = ConditionalWritesDomain[StateLatticeElement](stateLattice, stateTransfer)
+      val relyGuarantees =
+        RelyGuaranteeGenerator[InterferenceLatticeElement, StateLatticeElement](intDom).generate(threads)
+      // fixme: these should not be printed to stdout
+      for ((p, (rely, guar)) <- relyGuarantees) {
+        StaticAnalysisLogger.info("--- " + p.procName + " " + "-" * 50 + "\n")
+        StaticAnalysisLogger.info("Rely:")
+        StaticAnalysisLogger.info(intDom.toString(rely) + "\n")
+        StaticAnalysisLogger.info("Guarantee:")
+        StaticAnalysisLogger.info(intDom.toString(guar) + "\n")
+      }
+      man.ClobberAll
+    },
+    notice = "Generating Rely-Guarantee Conditions"
+  )

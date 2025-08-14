@@ -1,9 +1,8 @@
 package test_util
 
 import boogie.SpecGlobal
-import ir.{Program, cilvisitor, transforms}
+import ir.{IRContext, Program, cilvisitor, transforms}
 import specification.Specification
-import util.IRContext
 
 def programToContext(
   program: Program,

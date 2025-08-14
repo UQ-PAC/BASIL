@@ -5,8 +5,8 @@ import ir.*
 import ir.cilvisitor.{CILVisitor, DoChildren, SkipChildren, visit_expr}
 import ir.eval.BitVectorEval.bv2SignedInt
 import ir.transforms.{AbstractDomain, worklistSolver}
+import util.SVALogger as Logger
 import util.assertion.*
-import util.{IRContext, SVALogger as Logger}
 
 import scala.annotation.tailrec
 import scala.collection.{SortedMap, mutable}

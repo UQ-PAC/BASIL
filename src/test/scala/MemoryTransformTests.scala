@@ -1,3 +1,4 @@
+import analysis.{AnalysisPipelineMRA, StaticAnalysisContext}
 import boogie.SpecGlobal
 import ir.*
 import ir.Endian.LittleEndian
@@ -16,7 +17,7 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
 
     val emptySpec = Specification(Set(), Set(), Map(), List(), List(), List(), Set())
     val emptyContext = IRContext(List(), Set(), Set(), Set(), Map(), emptySpec, program)
-    RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
+    AnalysisPipelineMRA.runToFixpoint(StaticAnalysisConfig(), emptyContext)
   }
 
   def runTest(relativePath: String): BASILResult = {
