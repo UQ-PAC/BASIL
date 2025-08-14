@@ -4,6 +4,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
 import translating.{BAPToIR, ReadELFData}
 import util.{ILLoadingConfig, LogLevel, Logger}
+
 import scala.sys.process.*
 
 @test_util.tags.UnitTest

@@ -11,7 +11,7 @@ import specification.{ExternalFunction, FuncEntry, SymbolTableEntry}
 import util.DSAPhase.*
 import util.LogLevel.INFO
 import util.assertion.*
-import util.{DSConfig, DSALogger, DSAPhase, PerformanceTimer}
+import util.{DSALogger, DSAPhase, DSConfig, PerformanceTimer}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer

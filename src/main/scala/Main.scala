@@ -1,8 +1,8 @@
 // package scala
 
 import gtirb.GTIRBReadELF
-import mainargs.{Flag, ParserForClass, arg, main}
 import ir.{FrontendMode, IRLoading}
+import mainargs.{Flag, ParserForClass, arg, main}
 import util.boogie_interaction.BoogieResultKind
 import util.{
   AnalysisResultDotLogger,

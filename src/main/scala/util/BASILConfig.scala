@@ -1,7 +1,6 @@
 package util
 
-import ir.IRContext
-import ir.FrontendMode
+import ir.{FrontendMode, IRContext}
 
 enum ProcRelyVersion {
   case Function, IfCommandContradiction
