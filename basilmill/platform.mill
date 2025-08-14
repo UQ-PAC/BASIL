@@ -24,6 +24,7 @@ object Platform {
 
   def detectArch() = System.getProperty("os.arch") match {
     case "amd64" => Right(Arch.X86_64)
+    case "x86_64" => Right(Arch.X86_64)
     case "aarch64" => Right(Arch.Aarch64)
     case "x86_64" => Right(Arch.X86_64)
     case x => Left("unknown arch: " + x)
