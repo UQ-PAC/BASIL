@@ -1,388 +1,402 @@
-var {:extern} Gamma_R0: bool;
-var {:extern} Gamma_R1: bool;
-var {:extern} Gamma_R16: bool;
-var {:extern} Gamma_R17: bool;
-var {:extern} Gamma_R19: bool;
-var {:extern} Gamma_R2: bool;
-var {:extern} Gamma_R29: bool;
-var {:extern} Gamma_R3: bool;
-var {:extern} Gamma_R30: bool;
-var {:extern} Gamma_R31: bool;
-var {:extern} Gamma_mem: [bv64]bool;
-var {:extern} Gamma_stack: [bv64]bool;
-var {:extern} R0: bv64;
-var {:extern} R1: bv64;
-var {:extern} R16: bv64;
-var {:extern} R17: bv64;
-var {:extern} R19: bv64;
-var {:extern} R2: bv64;
-var {:extern} R29: bv64;
-var {:extern} R3: bv64;
-var {:extern} R30: bv64;
-var {:extern} R31: bv64;
-var {:extern} mem: [bv64]bv8;
-var {:extern} stack: [bv64]bv8;
+var {:extern} $Gamma_R0: bool;
+var {:extern} $Gamma_R1: bool;
+var {:extern} $Gamma_R16: bool;
+var {:extern} $Gamma_R17: bool;
+var {:extern} $Gamma_R19: bool;
+var {:extern} $Gamma_R2: bool;
+var {:extern} $Gamma_R29: bool;
+var {:extern} $Gamma_R3: bool;
+var {:extern} $Gamma_R30: bool;
+var {:extern} $Gamma_R31: bool;
+var {:extern} $Gamma_mem: [bv64]bool;
+var {:extern} $Gamma_stack: [bv64]bool;
+var {:extern} $R0: bv64;
+var {:extern} $R1: bv64;
+var {:extern} $R16: bv64;
+var {:extern} $R17: bv64;
+var {:extern} $R19: bv64;
+var {:extern} $R2: bv64;
+var {:extern} $R29: bv64;
+var {:extern} $R3: bv64;
+var {:extern} $R30: bv64;
+var {:extern} $R31: bv64;
+var {:extern} $mem: [bv64]bv8;
+var {:extern} $stack: [bv64]bv8;
+const {:extern} $_DYNAMIC_addr: bv64;
+axiom ($_DYNAMIC_addr == 69008bv64);
+const {:extern} $_GLOBAL_OFFSET_TABLE__addr: bv64;
+axiom ($_GLOBAL_OFFSET_TABLE__addr == 69584bv64);
 const {:extern} $_IO_stdin_used_addr: bv64;
 axiom ($_IO_stdin_used_addr == 2264bv64);
-function {:extern} L(mem$in: [bv64]bv8, index: bv64) returns (bool) {
+const {:extern} $__FRAME_END___addr: bv64;
+axiom ($__FRAME_END___addr == 2600bv64);
+const {:extern} $__abi_tag_addr: bv64;
+axiom ($__abi_tag_addr == 632bv64);
+const {:extern} $__do_global_dtors_aux_fini_array_entry_addr: bv64;
+axiom ($__do_global_dtors_aux_fini_array_entry_addr == 69000bv64);
+const {:extern} $__frame_dummy_init_array_entry_addr: bv64;
+axiom ($__frame_dummy_init_array_entry_addr == 68992bv64);
+const {:extern} $completed.0_addr: bv64;
+axiom ($completed.0_addr == 69648bv64);
+function {:extern} L(#mem$in: [bv64]bv8, #index: bv64) returns (bool) {
   false
 }
 
 function {:extern} {:bvbuiltin "bvadd"} bvadd32(bv32, bv32) returns (bv32);
 function {:extern} {:bvbuiltin "bvadd"} bvadd64(bv64, bv64) returns (bv64);
-function {:extern} gamma_load64(gammaMap: [bv64]bool, index: bv64) returns (bool) {
-  (gammaMap[bvadd64(index, 7bv64)] && (gammaMap[bvadd64(index, 6bv64)] && (gammaMap[bvadd64(index, 5bv64)] && (gammaMap[bvadd64(index, 4bv64)] && (gammaMap[bvadd64(index, 3bv64)] && (gammaMap[bvadd64(index, 2bv64)] && (gammaMap[bvadd64(index, 1bv64)] && gammaMap[index])))))))
+function {:extern} gamma_load64(#gammaMap: [bv64]bool, #index: bv64) returns (bool) {
+  (#gammaMap[bvadd64(#index, 7bv64)] && (#gammaMap[bvadd64(#index, 6bv64)] && (#gammaMap[bvadd64(#index, 5bv64)] && (#gammaMap[bvadd64(#index, 4bv64)] && (#gammaMap[bvadd64(#index, 3bv64)] && (#gammaMap[bvadd64(#index, 2bv64)] && (#gammaMap[bvadd64(#index, 1bv64)] && #gammaMap[#index])))))))
 }
 
-function {:extern} gamma_load8(gammaMap: [bv64]bool, index: bv64) returns (bool) {
-  gammaMap[index]
+function {:extern} gamma_load8(#gammaMap: [bv64]bool, #index: bv64) returns (bool) {
+  #gammaMap[#index]
 }
 
-function {:extern} gamma_store64(gammaMap: [bv64]bool, index: bv64, value: bool) returns ([bv64]bool) {
-  gammaMap[index := value][bvadd64(index, 1bv64) := value][bvadd64(index, 2bv64) := value][bvadd64(index, 3bv64) := value][bvadd64(index, 4bv64) := value][bvadd64(index, 5bv64) := value][bvadd64(index, 6bv64) := value][bvadd64(index, 7bv64) := value]
+function {:extern} gamma_store64(#gammaMap: [bv64]bool, #index: bv64, #value: bool) returns ([bv64]bool) {
+  #gammaMap[#index := #value][bvadd64(#index, 1bv64) := #value][bvadd64(#index, 2bv64) := #value][bvadd64(#index, 3bv64) := #value][bvadd64(#index, 4bv64) := #value][bvadd64(#index, 5bv64) := #value][bvadd64(#index, 6bv64) := #value][bvadd64(#index, 7bv64) := #value]
 }
 
-function {:extern} gamma_store8(gammaMap: [bv64]bool, index: bv64, value: bool) returns ([bv64]bool) {
-  gammaMap[index := value]
+function {:extern} gamma_store8(#gammaMap: [bv64]bool, #index: bv64, #value: bool) returns ([bv64]bool) {
+  #gammaMap[#index := #value]
 }
 
-function {:extern} memory_load64_le(memory: [bv64]bv8, index: bv64) returns (bv64) {
-  (memory[bvadd64(index, 7bv64)] ++ (memory[bvadd64(index, 6bv64)] ++ (memory[bvadd64(index, 5bv64)] ++ (memory[bvadd64(index, 4bv64)] ++ (memory[bvadd64(index, 3bv64)] ++ (memory[bvadd64(index, 2bv64)] ++ (memory[bvadd64(index, 1bv64)] ++ memory[index])))))))
+function {:extern} memory_load64_le(#memory: [bv64]bv8, #index: bv64) returns (bv64) {
+  (#memory[bvadd64(#index, 7bv64)] ++ (#memory[bvadd64(#index, 6bv64)] ++ (#memory[bvadd64(#index, 5bv64)] ++ (#memory[bvadd64(#index, 4bv64)] ++ (#memory[bvadd64(#index, 3bv64)] ++ (#memory[bvadd64(#index, 2bv64)] ++ (#memory[bvadd64(#index, 1bv64)] ++ #memory[#index])))))))
 }
 
-function {:extern} memory_load8_le(memory: [bv64]bv8, index: bv64) returns (bv8) {
-  memory[index]
+function {:extern} memory_load8_le(#memory: [bv64]bv8, #index: bv64) returns (bv8) {
+  #memory[#index]
 }
 
-function {:extern} memory_store64_le(memory: [bv64]bv8, index: bv64, value: bv64) returns ([bv64]bv8) {
-  memory[index := value[8:0]][bvadd64(index, 1bv64) := value[16:8]][bvadd64(index, 2bv64) := value[24:16]][bvadd64(index, 3bv64) := value[32:24]][bvadd64(index, 4bv64) := value[40:32]][bvadd64(index, 5bv64) := value[48:40]][bvadd64(index, 6bv64) := value[56:48]][bvadd64(index, 7bv64) := value[64:56]]
+function {:extern} memory_store64_le(#memory: [bv64]bv8, #index: bv64, #value: bv64) returns ([bv64]bv8) {
+  #memory[#index := #value[8:0]][bvadd64(#index, 1bv64) := #value[16:8]][bvadd64(#index, 2bv64) := #value[24:16]][bvadd64(#index, 3bv64) := #value[32:24]][bvadd64(#index, 4bv64) := #value[40:32]][bvadd64(#index, 5bv64) := #value[48:40]][bvadd64(#index, 6bv64) := #value[56:48]][bvadd64(#index, 7bv64) := #value[64:56]]
 }
 
-function {:extern} memory_store8_le(memory: [bv64]bv8, index: bv64, value: bv8) returns ([bv64]bv8) {
-  memory[index := value[8:0]]
+function {:extern} memory_store8_le(#memory: [bv64]bv8, #index: bv64, #value: bv8) returns ([bv64]bv8) {
+  #memory[#index := #value[8:0]]
 }
 
 function {:extern} {:bvbuiltin "zero_extend 32"} zero_extend32_32(bv32) returns (bv64);
 function {:extern} {:bvbuiltin "zero_extend 56"} zero_extend56_8(bv8) returns (bv64);
-procedure {:extern} rely();
-  modifies Gamma_mem, mem;
-  ensures (Gamma_mem == old(Gamma_mem));
-  ensures (mem == old(mem));
-  free ensures (memory_load64_le(mem, 2264bv64) == 131073bv64);
-  free ensures (memory_load64_le(mem, 2272bv64) == 8241983568019286100bv64);
-  free ensures (memory_load64_le(mem, 2280bv64) == 7575166128241079840bv64);
-  free ensures (memory_load64_le(mem, 2288bv64) == 11420940909171bv64);
-  free ensures (memory_load64_le(mem, 2296bv64) == 2338615504306268244bv64);
-  free ensures (memory_load64_le(mem, 2304bv64) == 2924860384375657bv64);
-  free ensures (memory_load64_le(mem, 2312bv64) == 7017575154564032596bv64);
-  free ensures (memory_load64_le(mem, 2320bv64) == 7089063228440191084bv64);
-  free ensures (memory_load64_le(mem, 2328bv64) == 2675202446017455468bv64);
-  free ensures (memory_load8_le(mem, 2336bv64) == 100bv8);
-  free ensures (memory_load8_le(mem, 2337bv64) == 10bv8);
-  free ensures (memory_load8_le(mem, 2338bv64) == 0bv8);
-  free ensures (memory_load64_le(mem, 68992bv64) == 2192bv64);
-  free ensures (memory_load64_le(mem, 69000bv64) == 2112bv64);
-  free ensures (memory_load64_le(mem, 69616bv64) == 1792bv64);
-  free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
+procedure {:extern} p$rely();
+  modifies $Gamma_mem, $mem;
+  ensures ($Gamma_mem == old($Gamma_mem));
+  ensures ($mem == old($mem));
+  free ensures (memory_load64_le($mem, 2264bv64) == 131073bv64);
+  free ensures (memory_load64_le($mem, 2272bv64) == 8241983568019286100bv64);
+  free ensures (memory_load64_le($mem, 2280bv64) == 7575166128241079840bv64);
+  free ensures (memory_load64_le($mem, 2288bv64) == 11420940909171bv64);
+  free ensures (memory_load64_le($mem, 2296bv64) == 2338615504306268244bv64);
+  free ensures (memory_load64_le($mem, 2304bv64) == 2924860384375657bv64);
+  free ensures (memory_load64_le($mem, 2312bv64) == 7017575154564032596bv64);
+  free ensures (memory_load64_le($mem, 2320bv64) == 7089063228440191084bv64);
+  free ensures (memory_load64_le($mem, 2328bv64) == 2675202446017455468bv64);
+  free ensures (memory_load8_le($mem, 2336bv64) == 100bv8);
+  free ensures (memory_load8_le($mem, 2337bv64) == 10bv8);
+  free ensures (memory_load8_le($mem, 2338bv64) == 0bv8);
+  free ensures (memory_load64_le($mem, 68992bv64) == 2192bv64);
+  free ensures (memory_load64_le($mem, 69000bv64) == 2112bv64);
+  free ensures (memory_load64_le($mem, 69616bv64) == 1792bv64);
+  free ensures (memory_load64_le($mem, 69640bv64) == 69640bv64);
 
-procedure {:extern} rely_transitive();
-  modifies Gamma_mem, mem;
-  ensures (Gamma_mem == old(Gamma_mem));
-  ensures (mem == old(mem));
+procedure {:extern} p$rely_transitive();
+  modifies $Gamma_mem, $mem;
+  ensures ($Gamma_mem == old($Gamma_mem));
+  ensures ($mem == old($mem));
 
-implementation {:extern} rely_transitive()
+implementation {:extern} p$rely_transitive()
 {
-  call rely();
-  call rely();
+  call p$rely();
+  call p$rely();
 }
 
-procedure {:extern} rely_reflexive();
+procedure {:extern} p$rely_reflexive();
 
-procedure {:extern} guarantee_reflexive();
-  modifies Gamma_mem, mem;
+procedure {:extern} p$guarantee_reflexive();
+  modifies $Gamma_mem, $mem;
 
-procedure __printf_chk_1696();
-  modifies Gamma_R16, Gamma_R17, R16, R17;
-  free requires (memory_load64_le(mem, 2264bv64) == 131073bv64);
-  free requires (memory_load64_le(mem, 2272bv64) == 8241983568019286100bv64);
-  free requires (memory_load64_le(mem, 2280bv64) == 7575166128241079840bv64);
-  free requires (memory_load64_le(mem, 2288bv64) == 11420940909171bv64);
-  free requires (memory_load64_le(mem, 2296bv64) == 2338615504306268244bv64);
-  free requires (memory_load64_le(mem, 2304bv64) == 2924860384375657bv64);
-  free requires (memory_load64_le(mem, 2312bv64) == 7017575154564032596bv64);
-  free requires (memory_load64_le(mem, 2320bv64) == 7089063228440191084bv64);
-  free requires (memory_load64_le(mem, 2328bv64) == 2675202446017455468bv64);
-  free requires (memory_load8_le(mem, 2336bv64) == 100bv8);
-  free requires (memory_load8_le(mem, 2337bv64) == 10bv8);
-  free requires (memory_load8_le(mem, 2338bv64) == 0bv8);
-  free requires (memory_load64_le(mem, 68992bv64) == 2192bv64);
-  free requires (memory_load64_le(mem, 69000bv64) == 2112bv64);
-  free requires (memory_load64_le(mem, 69616bv64) == 1792bv64);
-  free requires (memory_load64_le(mem, 69640bv64) == 69640bv64);
-  free ensures (memory_load64_le(mem, 2264bv64) == 131073bv64);
-  free ensures (memory_load64_le(mem, 2272bv64) == 8241983568019286100bv64);
-  free ensures (memory_load64_le(mem, 2280bv64) == 7575166128241079840bv64);
-  free ensures (memory_load64_le(mem, 2288bv64) == 11420940909171bv64);
-  free ensures (memory_load64_le(mem, 2296bv64) == 2338615504306268244bv64);
-  free ensures (memory_load64_le(mem, 2304bv64) == 2924860384375657bv64);
-  free ensures (memory_load64_le(mem, 2312bv64) == 7017575154564032596bv64);
-  free ensures (memory_load64_le(mem, 2320bv64) == 7089063228440191084bv64);
-  free ensures (memory_load64_le(mem, 2328bv64) == 2675202446017455468bv64);
-  free ensures (memory_load8_le(mem, 2336bv64) == 100bv8);
-  free ensures (memory_load8_le(mem, 2337bv64) == 10bv8);
-  free ensures (memory_load8_le(mem, 2338bv64) == 0bv8);
-  free ensures (memory_load64_le(mem, 68992bv64) == 2192bv64);
-  free ensures (memory_load64_le(mem, 69000bv64) == 2112bv64);
-  free ensures (memory_load64_le(mem, 69616bv64) == 1792bv64);
-  free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
+procedure p$malloc_1680();
+  modifies $Gamma_R16, $Gamma_R17, $R16, $R17;
+  free requires (memory_load64_le($mem, 2264bv64) == 131073bv64);
+  free requires (memory_load64_le($mem, 2272bv64) == 8241983568019286100bv64);
+  free requires (memory_load64_le($mem, 2280bv64) == 7575166128241079840bv64);
+  free requires (memory_load64_le($mem, 2288bv64) == 11420940909171bv64);
+  free requires (memory_load64_le($mem, 2296bv64) == 2338615504306268244bv64);
+  free requires (memory_load64_le($mem, 2304bv64) == 2924860384375657bv64);
+  free requires (memory_load64_le($mem, 2312bv64) == 7017575154564032596bv64);
+  free requires (memory_load64_le($mem, 2320bv64) == 7089063228440191084bv64);
+  free requires (memory_load64_le($mem, 2328bv64) == 2675202446017455468bv64);
+  free requires (memory_load8_le($mem, 2336bv64) == 100bv8);
+  free requires (memory_load8_le($mem, 2337bv64) == 10bv8);
+  free requires (memory_load8_le($mem, 2338bv64) == 0bv8);
+  free requires (memory_load64_le($mem, 68992bv64) == 2192bv64);
+  free requires (memory_load64_le($mem, 69000bv64) == 2112bv64);
+  free requires (memory_load64_le($mem, 69616bv64) == 1792bv64);
+  free requires (memory_load64_le($mem, 69640bv64) == 69640bv64);
+  free ensures (memory_load64_le($mem, 2264bv64) == 131073bv64);
+  free ensures (memory_load64_le($mem, 2272bv64) == 8241983568019286100bv64);
+  free ensures (memory_load64_le($mem, 2280bv64) == 7575166128241079840bv64);
+  free ensures (memory_load64_le($mem, 2288bv64) == 11420940909171bv64);
+  free ensures (memory_load64_le($mem, 2296bv64) == 2338615504306268244bv64);
+  free ensures (memory_load64_le($mem, 2304bv64) == 2924860384375657bv64);
+  free ensures (memory_load64_le($mem, 2312bv64) == 7017575154564032596bv64);
+  free ensures (memory_load64_le($mem, 2320bv64) == 7089063228440191084bv64);
+  free ensures (memory_load64_le($mem, 2328bv64) == 2675202446017455468bv64);
+  free ensures (memory_load8_le($mem, 2336bv64) == 100bv8);
+  free ensures (memory_load8_le($mem, 2337bv64) == 10bv8);
+  free ensures (memory_load8_le($mem, 2338bv64) == 0bv8);
+  free ensures (memory_load64_le($mem, 68992bv64) == 2192bv64);
+  free ensures (memory_load64_le($mem, 69000bv64) == 2112bv64);
+  free ensures (memory_load64_le($mem, 69616bv64) == 1792bv64);
+  free ensures (memory_load64_le($mem, 69640bv64) == 69640bv64);
 
-procedure #free_1744();
-  modifies Gamma_R16, Gamma_R17, R16, R17;
-  free requires (memory_load64_le(mem, 2264bv64) == 131073bv64);
-  free requires (memory_load64_le(mem, 2272bv64) == 8241983568019286100bv64);
-  free requires (memory_load64_le(mem, 2280bv64) == 7575166128241079840bv64);
-  free requires (memory_load64_le(mem, 2288bv64) == 11420940909171bv64);
-  free requires (memory_load64_le(mem, 2296bv64) == 2338615504306268244bv64);
-  free requires (memory_load64_le(mem, 2304bv64) == 2924860384375657bv64);
-  free requires (memory_load64_le(mem, 2312bv64) == 7017575154564032596bv64);
-  free requires (memory_load64_le(mem, 2320bv64) == 7089063228440191084bv64);
-  free requires (memory_load64_le(mem, 2328bv64) == 2675202446017455468bv64);
-  free requires (memory_load8_le(mem, 2336bv64) == 100bv8);
-  free requires (memory_load8_le(mem, 2337bv64) == 10bv8);
-  free requires (memory_load8_le(mem, 2338bv64) == 0bv8);
-  free requires (memory_load64_le(mem, 68992bv64) == 2192bv64);
-  free requires (memory_load64_le(mem, 69000bv64) == 2112bv64);
-  free requires (memory_load64_le(mem, 69616bv64) == 1792bv64);
-  free requires (memory_load64_le(mem, 69640bv64) == 69640bv64);
-  free ensures (memory_load64_le(mem, 2264bv64) == 131073bv64);
-  free ensures (memory_load64_le(mem, 2272bv64) == 8241983568019286100bv64);
-  free ensures (memory_load64_le(mem, 2280bv64) == 7575166128241079840bv64);
-  free ensures (memory_load64_le(mem, 2288bv64) == 11420940909171bv64);
-  free ensures (memory_load64_le(mem, 2296bv64) == 2338615504306268244bv64);
-  free ensures (memory_load64_le(mem, 2304bv64) == 2924860384375657bv64);
-  free ensures (memory_load64_le(mem, 2312bv64) == 7017575154564032596bv64);
-  free ensures (memory_load64_le(mem, 2320bv64) == 7089063228440191084bv64);
-  free ensures (memory_load64_le(mem, 2328bv64) == 2675202446017455468bv64);
-  free ensures (memory_load8_le(mem, 2336bv64) == 100bv8);
-  free ensures (memory_load8_le(mem, 2337bv64) == 10bv8);
-  free ensures (memory_load8_le(mem, 2338bv64) == 0bv8);
-  free ensures (memory_load64_le(mem, 68992bv64) == 2192bv64);
-  free ensures (memory_load64_le(mem, 69000bv64) == 2112bv64);
-  free ensures (memory_load64_le(mem, 69616bv64) == 1792bv64);
-  free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
+procedure p$#free_1744();
+  modifies $Gamma_R16, $Gamma_R17, $R16, $R17;
+  free requires (memory_load64_le($mem, 2264bv64) == 131073bv64);
+  free requires (memory_load64_le($mem, 2272bv64) == 8241983568019286100bv64);
+  free requires (memory_load64_le($mem, 2280bv64) == 7575166128241079840bv64);
+  free requires (memory_load64_le($mem, 2288bv64) == 11420940909171bv64);
+  free requires (memory_load64_le($mem, 2296bv64) == 2338615504306268244bv64);
+  free requires (memory_load64_le($mem, 2304bv64) == 2924860384375657bv64);
+  free requires (memory_load64_le($mem, 2312bv64) == 7017575154564032596bv64);
+  free requires (memory_load64_le($mem, 2320bv64) == 7089063228440191084bv64);
+  free requires (memory_load64_le($mem, 2328bv64) == 2675202446017455468bv64);
+  free requires (memory_load8_le($mem, 2336bv64) == 100bv8);
+  free requires (memory_load8_le($mem, 2337bv64) == 10bv8);
+  free requires (memory_load8_le($mem, 2338bv64) == 0bv8);
+  free requires (memory_load64_le($mem, 68992bv64) == 2192bv64);
+  free requires (memory_load64_le($mem, 69000bv64) == 2112bv64);
+  free requires (memory_load64_le($mem, 69616bv64) == 1792bv64);
+  free requires (memory_load64_le($mem, 69640bv64) == 69640bv64);
+  free ensures (memory_load64_le($mem, 2264bv64) == 131073bv64);
+  free ensures (memory_load64_le($mem, 2272bv64) == 8241983568019286100bv64);
+  free ensures (memory_load64_le($mem, 2280bv64) == 7575166128241079840bv64);
+  free ensures (memory_load64_le($mem, 2288bv64) == 11420940909171bv64);
+  free ensures (memory_load64_le($mem, 2296bv64) == 2338615504306268244bv64);
+  free ensures (memory_load64_le($mem, 2304bv64) == 2924860384375657bv64);
+  free ensures (memory_load64_le($mem, 2312bv64) == 7017575154564032596bv64);
+  free ensures (memory_load64_le($mem, 2320bv64) == 7089063228440191084bv64);
+  free ensures (memory_load64_le($mem, 2328bv64) == 2675202446017455468bv64);
+  free ensures (memory_load8_le($mem, 2336bv64) == 100bv8);
+  free ensures (memory_load8_le($mem, 2337bv64) == 10bv8);
+  free ensures (memory_load8_le($mem, 2338bv64) == 0bv8);
+  free ensures (memory_load64_le($mem, 68992bv64) == 2192bv64);
+  free ensures (memory_load64_le($mem, 69000bv64) == 2112bv64);
+  free ensures (memory_load64_le($mem, 69616bv64) == 1792bv64);
+  free ensures (memory_load64_le($mem, 69640bv64) == 69640bv64);
 
-procedure main_1792();
-  modifies Gamma_R0, Gamma_R1, Gamma_R16, Gamma_R17, Gamma_R19, Gamma_R2, Gamma_R29, Gamma_R3, Gamma_R30, Gamma_R31, Gamma_mem, Gamma_stack, R0, R1, R16, R17, R19, R2, R29, R3, R30, R31, mem, stack;
-  free requires (memory_load64_le(mem, 69632bv64) == 0bv64);
-  free requires (memory_load64_le(mem, 69640bv64) == 69640bv64);
-  free requires (memory_load64_le(mem, 2264bv64) == 131073bv64);
-  free requires (memory_load64_le(mem, 2272bv64) == 8241983568019286100bv64);
-  free requires (memory_load64_le(mem, 2280bv64) == 7575166128241079840bv64);
-  free requires (memory_load64_le(mem, 2288bv64) == 11420940909171bv64);
-  free requires (memory_load64_le(mem, 2296bv64) == 2338615504306268244bv64);
-  free requires (memory_load64_le(mem, 2304bv64) == 2924860384375657bv64);
-  free requires (memory_load64_le(mem, 2312bv64) == 7017575154564032596bv64);
-  free requires (memory_load64_le(mem, 2320bv64) == 7089063228440191084bv64);
-  free requires (memory_load64_le(mem, 2328bv64) == 2675202446017455468bv64);
-  free requires (memory_load8_le(mem, 2336bv64) == 100bv8);
-  free requires (memory_load8_le(mem, 2337bv64) == 10bv8);
-  free requires (memory_load8_le(mem, 2338bv64) == 0bv8);
-  free requires (memory_load64_le(mem, 68992bv64) == 2192bv64);
-  free requires (memory_load64_le(mem, 69000bv64) == 2112bv64);
-  free requires (memory_load64_le(mem, 69616bv64) == 1792bv64);
-  free requires (memory_load64_le(mem, 69640bv64) == 69640bv64);
-  free ensures (Gamma_R19 == old(Gamma_R19));
-  free ensures (Gamma_R29 == old(Gamma_R29));
-  free ensures (Gamma_R31 == old(Gamma_R31));
-  free ensures (R19 == old(R19));
-  free ensures (R29 == old(R29));
-  free ensures (R31 == old(R31));
-  free ensures (memory_load64_le(mem, 2264bv64) == 131073bv64);
-  free ensures (memory_load64_le(mem, 2272bv64) == 8241983568019286100bv64);
-  free ensures (memory_load64_le(mem, 2280bv64) == 7575166128241079840bv64);
-  free ensures (memory_load64_le(mem, 2288bv64) == 11420940909171bv64);
-  free ensures (memory_load64_le(mem, 2296bv64) == 2338615504306268244bv64);
-  free ensures (memory_load64_le(mem, 2304bv64) == 2924860384375657bv64);
-  free ensures (memory_load64_le(mem, 2312bv64) == 7017575154564032596bv64);
-  free ensures (memory_load64_le(mem, 2320bv64) == 7089063228440191084bv64);
-  free ensures (memory_load64_le(mem, 2328bv64) == 2675202446017455468bv64);
-  free ensures (memory_load8_le(mem, 2336bv64) == 100bv8);
-  free ensures (memory_load8_le(mem, 2337bv64) == 10bv8);
-  free ensures (memory_load8_le(mem, 2338bv64) == 0bv8);
-  free ensures (memory_load64_le(mem, 68992bv64) == 2192bv64);
-  free ensures (memory_load64_le(mem, 69000bv64) == 2112bv64);
-  free ensures (memory_load64_le(mem, 69616bv64) == 1792bv64);
-  free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
+procedure p$__printf_chk_1696();
+  modifies $Gamma_R16, $Gamma_R17, $R16, $R17;
+  free requires (memory_load64_le($mem, 2264bv64) == 131073bv64);
+  free requires (memory_load64_le($mem, 2272bv64) == 8241983568019286100bv64);
+  free requires (memory_load64_le($mem, 2280bv64) == 7575166128241079840bv64);
+  free requires (memory_load64_le($mem, 2288bv64) == 11420940909171bv64);
+  free requires (memory_load64_le($mem, 2296bv64) == 2338615504306268244bv64);
+  free requires (memory_load64_le($mem, 2304bv64) == 2924860384375657bv64);
+  free requires (memory_load64_le($mem, 2312bv64) == 7017575154564032596bv64);
+  free requires (memory_load64_le($mem, 2320bv64) == 7089063228440191084bv64);
+  free requires (memory_load64_le($mem, 2328bv64) == 2675202446017455468bv64);
+  free requires (memory_load8_le($mem, 2336bv64) == 100bv8);
+  free requires (memory_load8_le($mem, 2337bv64) == 10bv8);
+  free requires (memory_load8_le($mem, 2338bv64) == 0bv8);
+  free requires (memory_load64_le($mem, 68992bv64) == 2192bv64);
+  free requires (memory_load64_le($mem, 69000bv64) == 2112bv64);
+  free requires (memory_load64_le($mem, 69616bv64) == 1792bv64);
+  free requires (memory_load64_le($mem, 69640bv64) == 69640bv64);
+  free ensures (memory_load64_le($mem, 2264bv64) == 131073bv64);
+  free ensures (memory_load64_le($mem, 2272bv64) == 8241983568019286100bv64);
+  free ensures (memory_load64_le($mem, 2280bv64) == 7575166128241079840bv64);
+  free ensures (memory_load64_le($mem, 2288bv64) == 11420940909171bv64);
+  free ensures (memory_load64_le($mem, 2296bv64) == 2338615504306268244bv64);
+  free ensures (memory_load64_le($mem, 2304bv64) == 2924860384375657bv64);
+  free ensures (memory_load64_le($mem, 2312bv64) == 7017575154564032596bv64);
+  free ensures (memory_load64_le($mem, 2320bv64) == 7089063228440191084bv64);
+  free ensures (memory_load64_le($mem, 2328bv64) == 2675202446017455468bv64);
+  free ensures (memory_load8_le($mem, 2336bv64) == 100bv8);
+  free ensures (memory_load8_le($mem, 2337bv64) == 10bv8);
+  free ensures (memory_load8_le($mem, 2338bv64) == 0bv8);
+  free ensures (memory_load64_le($mem, 68992bv64) == 2192bv64);
+  free ensures (memory_load64_le($mem, 69000bv64) == 2112bv64);
+  free ensures (memory_load64_le($mem, 69616bv64) == 1792bv64);
+  free ensures (memory_load64_le($mem, 69640bv64) == 69640bv64);
 
-implementation main_1792()
+procedure p$printCharValue_2208();
+  modifies $Gamma_R0, $Gamma_R1, $Gamma_R16, $Gamma_R17, $Gamma_R2, $Gamma_R3, $Gamma_mem, $R0, $R1, $R16, $R17, $R2, $R3, $mem;
+  free requires (memory_load64_le($mem, 2264bv64) == 131073bv64);
+  free requires (memory_load64_le($mem, 2272bv64) == 8241983568019286100bv64);
+  free requires (memory_load64_le($mem, 2280bv64) == 7575166128241079840bv64);
+  free requires (memory_load64_le($mem, 2288bv64) == 11420940909171bv64);
+  free requires (memory_load64_le($mem, 2296bv64) == 2338615504306268244bv64);
+  free requires (memory_load64_le($mem, 2304bv64) == 2924860384375657bv64);
+  free requires (memory_load64_le($mem, 2312bv64) == 7017575154564032596bv64);
+  free requires (memory_load64_le($mem, 2320bv64) == 7089063228440191084bv64);
+  free requires (memory_load64_le($mem, 2328bv64) == 2675202446017455468bv64);
+  free requires (memory_load8_le($mem, 2336bv64) == 100bv8);
+  free requires (memory_load8_le($mem, 2337bv64) == 10bv8);
+  free requires (memory_load8_le($mem, 2338bv64) == 0bv8);
+  free requires (memory_load64_le($mem, 68992bv64) == 2192bv64);
+  free requires (memory_load64_le($mem, 69000bv64) == 2112bv64);
+  free requires (memory_load64_le($mem, 69616bv64) == 1792bv64);
+  free requires (memory_load64_le($mem, 69640bv64) == 69640bv64);
+  free ensures (memory_load64_le($mem, 2264bv64) == 131073bv64);
+  free ensures (memory_load64_le($mem, 2272bv64) == 8241983568019286100bv64);
+  free ensures (memory_load64_le($mem, 2280bv64) == 7575166128241079840bv64);
+  free ensures (memory_load64_le($mem, 2288bv64) == 11420940909171bv64);
+  free ensures (memory_load64_le($mem, 2296bv64) == 2338615504306268244bv64);
+  free ensures (memory_load64_le($mem, 2304bv64) == 2924860384375657bv64);
+  free ensures (memory_load64_le($mem, 2312bv64) == 7017575154564032596bv64);
+  free ensures (memory_load64_le($mem, 2320bv64) == 7089063228440191084bv64);
+  free ensures (memory_load64_le($mem, 2328bv64) == 2675202446017455468bv64);
+  free ensures (memory_load8_le($mem, 2336bv64) == 100bv8);
+  free ensures (memory_load8_le($mem, 2337bv64) == 10bv8);
+  free ensures (memory_load8_le($mem, 2338bv64) == 0bv8);
+  free ensures (memory_load64_le($mem, 68992bv64) == 2192bv64);
+  free ensures (memory_load64_le($mem, 69000bv64) == 2112bv64);
+  free ensures (memory_load64_le($mem, 69616bv64) == 1792bv64);
+  free ensures (memory_load64_le($mem, 69640bv64) == 69640bv64);
+
+implementation p$printCharValue_2208()
 {
-  var #1: bv64;
-  var Gamma_#1: bool;
-  var Gamma_load20: bool;
-  var Gamma_load21: bool;
-  var Gamma_load22: bool;
-  var load20: bv64;
-  var load21: bv64;
-  var load22: bv64;
-  lmain:
-    assume {:captureState "lmain"} true;
-    #1, Gamma_#1 := bvadd64(R31, 18446744073709551584bv64), Gamma_R31;
-    stack, Gamma_stack := memory_store64_le(stack, #1, R29), gamma_store64(Gamma_stack, #1, Gamma_R29);
-    assume {:captureState "%00000222"} true;
-    stack, Gamma_stack := memory_store64_le(stack, bvadd64(#1, 8bv64), R30), gamma_store64(Gamma_stack, bvadd64(#1, 8bv64), Gamma_R30);
-    assume {:captureState "%00000228"} true;
-    R31, Gamma_R31 := #1, Gamma_#1;
-    R0, Gamma_R0 := 1bv64, true;
-    R29, Gamma_R29 := R31, Gamma_R31;
-    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 16bv64), R19), gamma_store64(Gamma_stack, bvadd64(R31, 16bv64), Gamma_R19);
-    assume {:captureState "%0000023f"} true;
-    R30, Gamma_R30 := 1812bv64, true;
-    call malloc_1680();
-    goto l00000249;
-  l00000249:
-    assume {:captureState "l00000249"} true;
-    R1, Gamma_R1 := 65bv64, true;
-    call rely();
-    assert (L(mem, R0) ==> Gamma_R1);
-    mem, Gamma_mem := memory_store8_le(mem, R0, R1[8:0]), gamma_store8(Gamma_mem, R0, Gamma_R1);
-    assume {:captureState "%00000254"} true;
-    R19, Gamma_R19 := R0, Gamma_R0;
-    R30, Gamma_R30 := 1828bv64, true;
-    call printCharValue_2208();
-    goto l0000029a;
-  l0000029a:
-    assume {:captureState "l0000029a"} true;
-    R2, Gamma_R2 := 42bv64, true;
-    R1, Gamma_R1 := 0bv64, true;
-    R0, Gamma_R0 := 1bv64, true;
-    R1, Gamma_R1 := bvadd64(R1, 2296bv64), Gamma_R1;
-    R30, Gamma_R30 := 1848bv64, true;
-    call __printf_chk_1696();
-    goto l000002b6;
-  l000002b6:
-    assume {:captureState "l000002b6"} true;
-    R1, Gamma_R1 := 0bv64, true;
-    R1, Gamma_R1 := bvadd64(R1, 2312bv64), Gamma_R1;
-    R2, Gamma_R2 := 10bv64, true;
-    R0, Gamma_R0 := 1bv64, true;
-    R30, Gamma_R30 := 1868bv64, true;
-    call __printf_chk_1696();
-    goto l000002d2;
-  l000002d2:
-    assume {:captureState "l000002d2"} true;
-    R0, Gamma_R0 := R19, Gamma_R19;
-    R30, Gamma_R30 := 1876bv64, true;
-    call #free_1744();
-    goto l000002e0;
-  l000002e0:
-    assume {:captureState "l000002e0"} true;
-    R0, Gamma_R0 := 0bv64, true;
-    load20, Gamma_load20 := memory_load64_le(stack, bvadd64(R31, 16bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 16bv64));
-    R19, Gamma_R19 := load20, Gamma_load20;
-    load21, Gamma_load21 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
-    R29, Gamma_R29 := load21, Gamma_load21;
-    load22, Gamma_load22 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
-    R30, Gamma_R30 := load22, Gamma_load22;
-    R31, Gamma_R31 := bvadd64(R31, 32bv64), Gamma_R31;
-    goto main_1792_basil_return;
-  main_1792_basil_return:
-    assume {:captureState "main_1792_basil_return"} true;
+  var #Gamma_load24: bool;
+  var #load24: bv8;
+  b#printCharValue_entry:
+    assume {:captureState "printCharValue_entry"} true;
+    $R3, $Gamma_R3 := $R0, $Gamma_R0;
+    $R0, $Gamma_R0 := 1bv64, true;
+    $R1, $Gamma_R1 := 0bv64, true;
+    $R1, $Gamma_R1 := bvadd64($R1, 2272bv64), $Gamma_R1;
+    call p$rely();
+    #load24, #Gamma_load24 := memory_load8_le($mem, $R3), (gamma_load8($Gamma_mem, $R3) || L($mem, $R3));
+    $R2, $Gamma_R2 := zero_extend56_8(#load24), #Gamma_load24;
+    $R2, $Gamma_R2 := zero_extend32_32(bvadd32($R2[32:0], $R0[32:0])), ($Gamma_R0 && $Gamma_R2);
+    $R2, $Gamma_R2 := zero_extend32_32((0bv24 ++ $R2[8:0])), $Gamma_R2;
+    call p$rely();
+    assert (L($mem, $R3) ==> $Gamma_R2);
+    $mem, $Gamma_mem := memory_store8_le($mem, $R3, $R2[8:0]), gamma_store8($Gamma_mem, $R3, $Gamma_R2);
+    assume {:captureState "%00000293"} true;
+    call p$__printf_chk_1696();
+    goto b#printCharValue_basil_return_1;
+  b#printCharValue_basil_return_1:
+    assume {:captureState "printCharValue_basil_return_1"} true;
     return;
 }
 
-procedure malloc_1680();
-  modifies Gamma_R16, Gamma_R17, R16, R17;
-  free requires (memory_load64_le(mem, 2264bv64) == 131073bv64);
-  free requires (memory_load64_le(mem, 2272bv64) == 8241983568019286100bv64);
-  free requires (memory_load64_le(mem, 2280bv64) == 7575166128241079840bv64);
-  free requires (memory_load64_le(mem, 2288bv64) == 11420940909171bv64);
-  free requires (memory_load64_le(mem, 2296bv64) == 2338615504306268244bv64);
-  free requires (memory_load64_le(mem, 2304bv64) == 2924860384375657bv64);
-  free requires (memory_load64_le(mem, 2312bv64) == 7017575154564032596bv64);
-  free requires (memory_load64_le(mem, 2320bv64) == 7089063228440191084bv64);
-  free requires (memory_load64_le(mem, 2328bv64) == 2675202446017455468bv64);
-  free requires (memory_load8_le(mem, 2336bv64) == 100bv8);
-  free requires (memory_load8_le(mem, 2337bv64) == 10bv8);
-  free requires (memory_load8_le(mem, 2338bv64) == 0bv8);
-  free requires (memory_load64_le(mem, 68992bv64) == 2192bv64);
-  free requires (memory_load64_le(mem, 69000bv64) == 2112bv64);
-  free requires (memory_load64_le(mem, 69616bv64) == 1792bv64);
-  free requires (memory_load64_le(mem, 69640bv64) == 69640bv64);
-  free ensures (memory_load64_le(mem, 2264bv64) == 131073bv64);
-  free ensures (memory_load64_le(mem, 2272bv64) == 8241983568019286100bv64);
-  free ensures (memory_load64_le(mem, 2280bv64) == 7575166128241079840bv64);
-  free ensures (memory_load64_le(mem, 2288bv64) == 11420940909171bv64);
-  free ensures (memory_load64_le(mem, 2296bv64) == 2338615504306268244bv64);
-  free ensures (memory_load64_le(mem, 2304bv64) == 2924860384375657bv64);
-  free ensures (memory_load64_le(mem, 2312bv64) == 7017575154564032596bv64);
-  free ensures (memory_load64_le(mem, 2320bv64) == 7089063228440191084bv64);
-  free ensures (memory_load64_le(mem, 2328bv64) == 2675202446017455468bv64);
-  free ensures (memory_load8_le(mem, 2336bv64) == 100bv8);
-  free ensures (memory_load8_le(mem, 2337bv64) == 10bv8);
-  free ensures (memory_load8_le(mem, 2338bv64) == 0bv8);
-  free ensures (memory_load64_le(mem, 68992bv64) == 2192bv64);
-  free ensures (memory_load64_le(mem, 69000bv64) == 2112bv64);
-  free ensures (memory_load64_le(mem, 69616bv64) == 1792bv64);
-  free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
+procedure p$main_1792();
+  modifies $Gamma_R0, $Gamma_R1, $Gamma_R16, $Gamma_R17, $Gamma_R19, $Gamma_R2, $Gamma_R29, $Gamma_R3, $Gamma_R30, $Gamma_R31, $Gamma_mem, $Gamma_stack, $R0, $R1, $R16, $R17, $R19, $R2, $R29, $R3, $R30, $R31, $mem, $stack;
+  free requires (memory_load64_le($mem, 69632bv64) == 0bv64);
+  free requires (memory_load64_le($mem, 69640bv64) == 69640bv64);
+  free requires (memory_load64_le($mem, 2264bv64) == 131073bv64);
+  free requires (memory_load64_le($mem, 2272bv64) == 8241983568019286100bv64);
+  free requires (memory_load64_le($mem, 2280bv64) == 7575166128241079840bv64);
+  free requires (memory_load64_le($mem, 2288bv64) == 11420940909171bv64);
+  free requires (memory_load64_le($mem, 2296bv64) == 2338615504306268244bv64);
+  free requires (memory_load64_le($mem, 2304bv64) == 2924860384375657bv64);
+  free requires (memory_load64_le($mem, 2312bv64) == 7017575154564032596bv64);
+  free requires (memory_load64_le($mem, 2320bv64) == 7089063228440191084bv64);
+  free requires (memory_load64_le($mem, 2328bv64) == 2675202446017455468bv64);
+  free requires (memory_load8_le($mem, 2336bv64) == 100bv8);
+  free requires (memory_load8_le($mem, 2337bv64) == 10bv8);
+  free requires (memory_load8_le($mem, 2338bv64) == 0bv8);
+  free requires (memory_load64_le($mem, 68992bv64) == 2192bv64);
+  free requires (memory_load64_le($mem, 69000bv64) == 2112bv64);
+  free requires (memory_load64_le($mem, 69616bv64) == 1792bv64);
+  free requires (memory_load64_le($mem, 69640bv64) == 69640bv64);
+  free ensures ($Gamma_R19 == old($Gamma_R19));
+  free ensures ($Gamma_R29 == old($Gamma_R29));
+  free ensures ($Gamma_R31 == old($Gamma_R31));
+  free ensures ($R19 == old($R19));
+  free ensures ($R29 == old($R29));
+  free ensures ($R31 == old($R31));
+  free ensures (memory_load64_le($mem, 2264bv64) == 131073bv64);
+  free ensures (memory_load64_le($mem, 2272bv64) == 8241983568019286100bv64);
+  free ensures (memory_load64_le($mem, 2280bv64) == 7575166128241079840bv64);
+  free ensures (memory_load64_le($mem, 2288bv64) == 11420940909171bv64);
+  free ensures (memory_load64_le($mem, 2296bv64) == 2338615504306268244bv64);
+  free ensures (memory_load64_le($mem, 2304bv64) == 2924860384375657bv64);
+  free ensures (memory_load64_le($mem, 2312bv64) == 7017575154564032596bv64);
+  free ensures (memory_load64_le($mem, 2320bv64) == 7089063228440191084bv64);
+  free ensures (memory_load64_le($mem, 2328bv64) == 2675202446017455468bv64);
+  free ensures (memory_load8_le($mem, 2336bv64) == 100bv8);
+  free ensures (memory_load8_le($mem, 2337bv64) == 10bv8);
+  free ensures (memory_load8_le($mem, 2338bv64) == 0bv8);
+  free ensures (memory_load64_le($mem, 68992bv64) == 2192bv64);
+  free ensures (memory_load64_le($mem, 69000bv64) == 2112bv64);
+  free ensures (memory_load64_le($mem, 69616bv64) == 1792bv64);
+  free ensures (memory_load64_le($mem, 69640bv64) == 69640bv64);
 
-procedure printCharValue_2208();
-  modifies Gamma_R0, Gamma_R1, Gamma_R16, Gamma_R17, Gamma_R2, Gamma_R3, Gamma_mem, R0, R1, R16, R17, R2, R3, mem;
-  free requires (memory_load64_le(mem, 2264bv64) == 131073bv64);
-  free requires (memory_load64_le(mem, 2272bv64) == 8241983568019286100bv64);
-  free requires (memory_load64_le(mem, 2280bv64) == 7575166128241079840bv64);
-  free requires (memory_load64_le(mem, 2288bv64) == 11420940909171bv64);
-  free requires (memory_load64_le(mem, 2296bv64) == 2338615504306268244bv64);
-  free requires (memory_load64_le(mem, 2304bv64) == 2924860384375657bv64);
-  free requires (memory_load64_le(mem, 2312bv64) == 7017575154564032596bv64);
-  free requires (memory_load64_le(mem, 2320bv64) == 7089063228440191084bv64);
-  free requires (memory_load64_le(mem, 2328bv64) == 2675202446017455468bv64);
-  free requires (memory_load8_le(mem, 2336bv64) == 100bv8);
-  free requires (memory_load8_le(mem, 2337bv64) == 10bv8);
-  free requires (memory_load8_le(mem, 2338bv64) == 0bv8);
-  free requires (memory_load64_le(mem, 68992bv64) == 2192bv64);
-  free requires (memory_load64_le(mem, 69000bv64) == 2112bv64);
-  free requires (memory_load64_le(mem, 69616bv64) == 1792bv64);
-  free requires (memory_load64_le(mem, 69640bv64) == 69640bv64);
-  free ensures (memory_load64_le(mem, 2264bv64) == 131073bv64);
-  free ensures (memory_load64_le(mem, 2272bv64) == 8241983568019286100bv64);
-  free ensures (memory_load64_le(mem, 2280bv64) == 7575166128241079840bv64);
-  free ensures (memory_load64_le(mem, 2288bv64) == 11420940909171bv64);
-  free ensures (memory_load64_le(mem, 2296bv64) == 2338615504306268244bv64);
-  free ensures (memory_load64_le(mem, 2304bv64) == 2924860384375657bv64);
-  free ensures (memory_load64_le(mem, 2312bv64) == 7017575154564032596bv64);
-  free ensures (memory_load64_le(mem, 2320bv64) == 7089063228440191084bv64);
-  free ensures (memory_load64_le(mem, 2328bv64) == 2675202446017455468bv64);
-  free ensures (memory_load8_le(mem, 2336bv64) == 100bv8);
-  free ensures (memory_load8_le(mem, 2337bv64) == 10bv8);
-  free ensures (memory_load8_le(mem, 2338bv64) == 0bv8);
-  free ensures (memory_load64_le(mem, 68992bv64) == 2192bv64);
-  free ensures (memory_load64_le(mem, 69000bv64) == 2112bv64);
-  free ensures (memory_load64_le(mem, 69616bv64) == 1792bv64);
-  free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
-
-implementation printCharValue_2208()
+implementation p$main_1792()
 {
-  var Gamma_load24: bool;
-  var load24: bv8;
-  lprintCharValue:
-    assume {:captureState "lprintCharValue"} true;
-    R3, Gamma_R3 := R0, Gamma_R0;
-    R0, Gamma_R0 := 1bv64, true;
-    R1, Gamma_R1 := 0bv64, true;
-    R1, Gamma_R1 := bvadd64(R1, 2272bv64), Gamma_R1;
-    call rely();
-    load24, Gamma_load24 := memory_load8_le(mem, R3), (gamma_load8(Gamma_mem, R3) || L(mem, R3));
-    R2, Gamma_R2 := zero_extend56_8(load24), Gamma_load24;
-    R2, Gamma_R2 := zero_extend32_32(bvadd32(R2[32:0], R0[32:0])), (Gamma_R0 && Gamma_R2);
-    R2, Gamma_R2 := zero_extend32_32((0bv24 ++ R2[8:0])), Gamma_R2;
-    call rely();
-    assert (L(mem, R3) ==> Gamma_R2);
-    mem, Gamma_mem := memory_store8_le(mem, R3, R2[8:0]), gamma_store8(Gamma_mem, R3, Gamma_R2);
-    assume {:captureState "%00000293"} true;
-    call __printf_chk_1696();
-    goto printCharValue_2208_basil_return;
-  printCharValue_2208_basil_return:
-    assume {:captureState "printCharValue_2208_basil_return"} true;
+  var ##1: bv64;
+  var #Gamma_#1: bool;
+  var #Gamma_load20: bool;
+  var #Gamma_load21: bool;
+  var #Gamma_load22: bool;
+  var #load20: bv64;
+  var #load21: bv64;
+  var #load22: bv64;
+  b#main_entry:
+    assume {:captureState "main_entry"} true;
+    ##1, #Gamma_#1 := bvadd64($R31, 18446744073709551584bv64), $Gamma_R31;
+    $stack, $Gamma_stack := memory_store64_le($stack, ##1, $R29), gamma_store64($Gamma_stack, ##1, $Gamma_R29);
+    assume {:captureState "%00000222"} true;
+    $stack, $Gamma_stack := memory_store64_le($stack, bvadd64(##1, 8bv64), $R30), gamma_store64($Gamma_stack, bvadd64(##1, 8bv64), $Gamma_R30);
+    assume {:captureState "%00000228"} true;
+    $R31, $Gamma_R31 := ##1, #Gamma_#1;
+    $R0, $Gamma_R0 := 1bv64, true;
+    $R29, $Gamma_R29 := $R31, $Gamma_R31;
+    $stack, $Gamma_stack := memory_store64_le($stack, bvadd64($R31, 16bv64), $R19), gamma_store64($Gamma_stack, bvadd64($R31, 16bv64), $Gamma_R19);
+    assume {:captureState "%0000023f"} true;
+    $R30, $Gamma_R30 := 1812bv64, true;
+    call p$malloc_1680();
+    goto b#main_11;
+  b#main_11:
+    assume {:captureState "main_11"} true;
+    $R1, $Gamma_R1 := 65bv64, true;
+    call p$rely();
+    assert (L($mem, $R0) ==> $Gamma_R1);
+    $mem, $Gamma_mem := memory_store8_le($mem, $R0, $R1[8:0]), gamma_store8($Gamma_mem, $R0, $Gamma_R1);
+    assume {:captureState "%00000254"} true;
+    $R19, $Gamma_R19 := $R0, $Gamma_R0;
+    $R30, $Gamma_R30 := 1828bv64, true;
+    call p$printCharValue_2208();
+    goto b#main_9;
+  b#main_9:
+    assume {:captureState "main_9"} true;
+    $R2, $Gamma_R2 := 42bv64, true;
+    $R1, $Gamma_R1 := 0bv64, true;
+    $R0, $Gamma_R0 := 1bv64, true;
+    $R1, $Gamma_R1 := bvadd64($R1, 2296bv64), $Gamma_R1;
+    $R30, $Gamma_R30 := 1848bv64, true;
+    call p$__printf_chk_1696();
+    goto b#main_7;
+  b#main_7:
+    assume {:captureState "main_7"} true;
+    $R1, $Gamma_R1 := 0bv64, true;
+    $R1, $Gamma_R1 := bvadd64($R1, 2312bv64), $Gamma_R1;
+    $R2, $Gamma_R2 := 10bv64, true;
+    $R0, $Gamma_R0 := 1bv64, true;
+    $R30, $Gamma_R30 := 1868bv64, true;
+    call p$__printf_chk_1696();
+    goto b#main_5;
+  b#main_5:
+    assume {:captureState "main_5"} true;
+    $R0, $Gamma_R0 := $R19, $Gamma_R19;
+    $R30, $Gamma_R30 := 1876bv64, true;
+    call p$#free_1744();
+    goto b#main_3;
+  b#main_3:
+    assume {:captureState "main_3"} true;
+    $R0, $Gamma_R0 := 0bv64, true;
+    #load20, #Gamma_load20 := memory_load64_le($stack, bvadd64($R31, 16bv64)), gamma_load64($Gamma_stack, bvadd64($R31, 16bv64));
+    $R19, $Gamma_R19 := #load20, #Gamma_load20;
+    #load21, #Gamma_load21 := memory_load64_le($stack, $R31), gamma_load64($Gamma_stack, $R31);
+    $R29, $Gamma_R29 := #load21, #Gamma_load21;
+    #load22, #Gamma_load22 := memory_load64_le($stack, bvadd64($R31, 8bv64)), gamma_load64($Gamma_stack, bvadd64($R31, 8bv64));
+    $R30, $Gamma_R30 := #load22, #Gamma_load22;
+    $R31, $Gamma_R31 := bvadd64($R31, 32bv64), $Gamma_R31;
+    goto b#main_basil_return_1;
+  b#main_basil_return_1:
+    assume {:captureState "main_basil_return_1"} true;
     return;
 }
 

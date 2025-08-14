@@ -9,7 +9,6 @@ import ir.eval.*
 import ir.transforms.*
 import translating.*
 import translating.PrettyPrinter.*
-import util.DSAConfig.Prereq
 import util.LogLevel.INFO
 import util.{DebugDumpIRLogger, Logger}
 
@@ -24,8 +23,6 @@ import cilvisitor.*
 /** This file contains the main program execution. See RunUtils.loadAndTranslate for the high-level process.
   */
 
-/** Stores the results of the static analyses.
-  */
 /** Results of the main program execution.
   */
 case class BASILResult(
@@ -34,9 +31,6 @@ case class BASILResult(
   dsa: Option[DSAContext],
   boogie: ArrayBuffer[BProgram]
 )
-
-/** Tools for loading the IR program into an IRContext.
-  */
 
 object RunUtils {
 
@@ -62,6 +56,7 @@ object RunUtils {
     var ctx = q.context.getOrElse(IRLoading.load(q.loading))
     postLoad(ctx) // allows extracting information from the original loaded program
 
+    assert(ir.invariant.checkTypeCorrect(ctx.program))
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
@@ -101,7 +96,7 @@ object RunUtils {
       assert(invariant.correctCalls(ctx.program))
     }
     assert(invariant.correctCalls(ctx.program))
-    ir.invariant.checkTypeCorrect(ctx.program)
+    assert(ir.invariant.checkTypeCorrect(ctx.program))
 
     assert(ir.invariant.programDiamondForm(ctx.program))
     assert(invariant.singleCallBlockEnd(ctx.program))
@@ -148,16 +143,26 @@ object RunUtils {
     assert(ir.invariant.programDiamondForm(ctx.program))
     var dsaContext: Option[DSAContext] = None
     if (conf.dsaConfig.isDefined) {
-      val dsaResults = IntervalDSA(ctx).dsa(conf.dsaConfig.get)
+      updateWithCallSCC(ctx.program)
+      val dsaResults = IntervalDSA(ctx, conf.dsaConfig.get).dsa()
       dsaContext = Some(dsaResults)
 
-      if q.memoryTransform && conf.dsaConfig.get != Prereq then // need more than prereq
+      if q.memoryTransform && conf.dsaConfig.get.phase == DSAPhase.TD then // need more than prereq
         val memTransferTimer = PerformanceTimer("Mem Transfer Timer", INFO)
         visit_prog(MemoryTransform(dsaResults.topDown, dsaResults.globals), ctx.program)
         memTransferTimer.checkPoint("Performed Memory Transform")
     }
 
     if q.summariseProcedures then genProcSummaries(ctx, analysisManager)
+
+    if (!conf.staticAnalysis.exists(!_.irreducibleLoops) && conf.generateLoopInvariants) {
+      if (!conf.staticAnalysis.exists(_.irreducibleLoops)) {
+        AnalysisPipelineMRA.reducibleLoops(ctx.program)
+      }
+
+      StaticAnalysisLogger.info("[!] Generating Loop Invariants")
+      FullLoopInvariantGenerator(ctx.program).addInvariants()
+    }
 
     if (q.runInterpret) {
       Logger.info("Start interpret")

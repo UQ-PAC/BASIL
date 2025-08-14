@@ -2,8 +2,8 @@ package ir
 
 import analysis.AnalysisManager
 import boogie.{Scope, SpecGlobal}
+import ir.dsl.*
 import ir.dsl.given
-import ir.dsl.{IfThenBlocks, *}
 import ir.eval.*
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite

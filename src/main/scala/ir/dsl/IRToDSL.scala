@@ -20,9 +20,9 @@ object IRToDSL {
   def localVarToTuple(x: LocalVar) = (x.name, x.irType)
 
   def convertJump(x: Jump): EventuallyJump = x match {
-    case Unreachable(label) => EventuallyUnreachable(label)
-    case Return(label, out) => EventuallyReturn(out.map(keyToString).to(ArraySeq), label)
-    case GoTo(targs, label) => EventuallyGoto(targs.map(t => DelayNameResolve(t.label)).toList, label)
+    case Unreachable(label) => EventuallyUnreachable(label, x.comment)
+    case Return(label, out) => EventuallyReturn(out.map(keyToString).to(ArraySeq), label, x.comment)
+    case GoTo(targs, label) => EventuallyGoto(targs.map(t => DelayNameResolve(t.label)).toList, label, x.comment)
   }
 
   def convertNonCallStatement(x: NonCallStatement): EventuallyStatement = clonedStmt(x)
@@ -31,7 +31,8 @@ object IRToDSL {
     case DirectCall(targ, outs, actuals, label) =>
       // XXX: be aware of ordering, .map() on a SortedMap may return a HashMap.
       directCall(outs.to(ArraySeq).map(keyToString), targ.name, actuals.to(ArraySeq).map(keyToString), label)
-    case IndirectCall(targ, label) => indirectCall(targ)
+        .copy(comment = x.comment)
+    case IndirectCall(targ, label) => indirectCall(targ).copy(label = label, comment = x.comment)
   }
 
   def convertStatement(x: Statement) = x match {

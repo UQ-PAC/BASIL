@@ -16,33 +16,23 @@ def escape(s: String) = {
   n
 }
 
-private def wrap(_input: String, width: Integer = 20, first: Boolean = true): String = {
-  val input = _input
+def wrap(input: String, maxWidth: Integer = 100, slack: Integer = 20) = {
+  val preferSplit = Set(')', '(', ',', ' ', ':')
 
-  def cannotSplit(c: Char) = {
-    c.isLetterOrDigit || "_$".contains(c)
+  def wr(acc: (Int, StringBuilder, Boolean), c: Char) = {
+    val (l, str, first) = acc
+    val nl = "\\l  "
+    c match {
+      case '\n' => (0, str ++= "\\l", false)
+      case '\r' => (l, str, false)
+      case ' ' if l == 0 => (0, str, first)
+      case chr if preferSplit.contains(chr) && (l >= (maxWidth - slack)) => (0, str += chr ++= nl, false)
+      case chr if l >= maxWidth => (0, str += chr ++= nl, false)
+      case chr => (l + 1, str += chr, false)
+    }
   }
 
-  val index = input.indexOf('\n')
-  if (input.length() <= width) {
-    input.replace("\n", "\\l") + "\\l"
-  } else if (index != -1 && index <= width) {
-    val splitPoint = input.indexOf('\n')
-    val (line, rest) = (input.substring(0, splitPoint).replace("\n", "\\l"), input.substring(splitPoint + 1))
-    (if !first then "    " else "") + line + "\\l" + wrap(rest, width = width, true)
-  } else {
-    var splitPoint = width
-    while (cannotSplit(input.charAt(splitPoint)) && splitPoint > width / 3) {
-      // search backwards for a non alphanumeric charcter to split on
-      splitPoint -= 1
-    }
-    if (cannotSplit(input.charAt(splitPoint))) {
-      // didn't find a character to split on
-      splitPoint = width
-    }
-    val (line, rest) = (input.substring(0, splitPoint).replace("\n", "\\l"), input.substring(splitPoint))
-    (if !first then "    " else "") + line + "\\l" + wrap(rest, width = width, false)
-  }
+  input.foldLeft((0, new StringBuilder(), true))(wr)._2.result
 }
 
 /** Super-class for elements of a Graphviz dot file.

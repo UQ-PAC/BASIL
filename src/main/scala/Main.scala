@@ -1,14 +1,16 @@
 // package scala
 
+import gtirb.GTIRBReadELF
 import mainargs.{Flag, ParserForClass, arg, main}
-import util.DSAConfig.{Checks, Prereq, Standard}
+import ir.{FrontendMode, IRLoading}
 import util.boogie_interaction.BoogieResultKind
 import util.{
   AnalysisResultDotLogger,
   BASILConfig,
   BoogieGeneratorConfig,
   BoogieMemoryAccessMode,
-  DSAConfig,
+  DSAPhase,
+  DSConfig,
   DebugDumpIRLogger,
   ILLoadingConfig,
   LogLevel,
@@ -17,7 +19,8 @@ import util.{
   PCTrackingOption,
   ProcRelyVersion,
   RunUtils,
-  StaticAnalysisConfig
+  StaticAnalysisConfig,
+  writeToFile
 }
 
 import scala.language.postfixOps
@@ -125,6 +128,8 @@ object Main {
     gtirbInputDirName: Option[String],
     @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file (.adt requires --relf)")
     inputFileName: Option[String],
+    @arg(name = "lifter", doc = "Use builtin aslp lifter (only supports gtirb input)")
+    liftOffline: Flag,
     @arg(
       name = "relf",
       short = 'r',
@@ -142,6 +147,12 @@ object Main {
       doc = "Switch version of procedure rely/guarantee checks to emit. (function|ifblock)"
     )
     procedureRG: Option[String],
+    @arg(
+      name = "gts-relf",
+      doc =
+        "Use .gts file for obtaining ELF symbol information (overrides --relf) (defaults to true if using GTIRB input and no --relf)"
+    )
+    useGTIRBReadELF: Flag,
     @arg(name = "verbose", short = 'v', doc = "Show extra debugging logs (the same as -vl log)")
     verbose: Flag,
     @arg(
@@ -155,6 +166,8 @@ object Main {
     interpret: Flag,
     @arg(name = "dump-il", doc = "Dump the Intermediate Language to text.")
     dumpIL: Option[String],
+    @arg(name = "dump-relf", doc = "Dump Basil's representation of the readelf information to the given file and exit.")
+    dumpRelf: Option[String],
     @arg(name = "main-procedure-name", short = 'm', doc = "Name of the main procedure to begin analysis at.")
     mainProcedureName: String = "main",
     @arg(
@@ -180,11 +193,13 @@ object Main {
     threadSplit: Flag,
     @arg(name = "parameter-form", doc = "Lift registers to local variables passed by parameter")
     parameterForm: Flag,
-    @arg(
-      name = "summarise-procedures",
-      doc = "Generates summaries of procedures which are used in pre/post-conditions (requires --analyse flag)"
-    )
+    @arg(name = "summarise-procedures", doc = "Generates summaries of procedures which are used in pre/post-conditions")
     summariseProcedures: Flag,
+    @arg(
+      name = "generate-loop-invariants",
+      doc = "Generates loop invariants on loop headers (will not run with --no-irreducible-loops)"
+    )
+    generateLoopInvariants: Flag,
     @arg(
       name = "generate-rely-guarantees",
       doc = "Generates rely-guarantee conditions for each procedure that contains a return node."
@@ -221,18 +236,25 @@ object Main {
       doc = "Disable producing irreducible loops when --analyse is passed (does nothing without --analyse)"
     )
     noIrreducibleLoops: Flag,
-    @arg(
-      name = "dsa",
-      doc =
-        "Perform Data Structure Analysis if no version is specified perform constraint generation (requires --simplify and --relf flags) (none|norm|field|set|all)"
-    )
+    @arg(name = "dsa", doc = "Perform Data Structure Analysis (requires --simplify flag) (pre|local|bu|td)")
     dsaType: Option[String],
+    @arg(name = "dsa-checks", doc = "Perform additional dsa checks (requires --dsa (local|bu|td)")
+    dsaChecks: Flag,
+    @arg(name = "dsa-split", doc = "split the globals for dsa (requires --dsa (pre|local|bu|td)")
+    dsaSplitGlobals: Flag,
+    @arg(
+      name = "dsa-eqv",
+      doc = "allow cells from same node to be merged without collapsing (requires --dsa (local|bu|td)"
+    )
+    dsaEqCells: Flag,
+    @arg(name = "dsa-assert", doc = "insert assertions to check globals offset to top fall within global region bounds")
+    dsaAssert: Flag,
     @arg(name = "memory-transform", doc = "Transform memory access to region accesses")
     memoryTransform: Flag,
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
     noif: Flag,
-    @arg(name = "nodebug", doc = "Disable runtume debug assertions")
-    nodebug: Flag
+    @arg(name = "nodebug", doc = "Disable runtime debug assertions")
+    noDebug: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -257,9 +279,7 @@ object Main {
     }
 
     Logger.setLevel(LogLevel.INFO, false)
-    if (conf.verbose.value) {
-      Logger.setLevel(LogLevel.DEBUG, true)
-    }
+    if (conf.verbose.value) { Logger.setLevel(LogLevel.DEBUG, true) }
     DebugDumpIRLogger.setLevel(LogLevel.OFF)
     AnalysisResultDotLogger.setLevel(LogLevel.OFF)
     for (v <- conf.verboseLog) {
@@ -305,17 +325,37 @@ object Main {
       None
     }
 
-    val dsa: Option[DSAConfig] = if (conf.simplify.value) {
-      conf.dsaType match
-        case Some("prereq") => Some(Prereq)
-        case Some("checks") => Some(Checks)
-        case Some("standard") => Some(Standard)
-        case None => None
-        case Some(_) =>
-          throw new IllegalArgumentException("Illegal option to dsa, allowed are: (prereq|standard|checks)")
-    } else {
-      None
+    val phase = conf.dsaType match
+      case Some("pre") => Some(DSAPhase.Pre)
+      case Some("local") => Some(DSAPhase.Local)
+      case Some("bu") => Some(DSAPhase.BU)
+      case Some("td") => Some(DSAPhase.TD)
+      case Some("") => Some(DSAPhase.TD)
+      case None => None
+      case Some(_) =>
+        throw new IllegalArgumentException("Illegal option to dsa, allowed are: (pre|local|bu|td)")
+
+    if (conf.dsaChecks.value || conf.dsaEqCells.value || conf.dsaSplitGlobals.value || conf.dsaAssert.value) &&
+      (phase.isEmpty || phase.get == DSAPhase.Pre)
+    then {
+      throw new IllegalArgumentException(s"--dsa (local|bu|td) required for the provided flag options")
     }
+    val dsa: Option[DSConfig] =
+      phase match {
+        case Some(value) =>
+          if conf.simplify.value then
+            Some(
+              DSConfig(
+                value,
+                conf.dsaSplitGlobals.value,
+                conf.dsaAssert.value,
+                conf.dsaEqCells.value,
+                conf.dsaChecks.value
+              )
+            )
+          else throw new IllegalArgumentException(s"enabling --dsa requires --simplify")
+        case _ => None
+      }
 
     val calleeSaved = conf.forceCalleeSaved match {
       case "auto" => dsa.isDefined
@@ -333,7 +373,7 @@ object Main {
     val boogieGeneratorConfig =
       BoogieGeneratorConfig(boogieMemoryAccessMode, true, rely, conf.threadSplit.value, conf.noif.value)
 
-    val loadingInputs = if (conf.bapInputDirName.isDefined) then {
+    var loadingInputs = if (conf.bapInputDirName.isDefined) then {
       loadDirectory(ChooseInput.Bap, conf.bapInputDirName.get)
 
     } else if (conf.gtirbInputDirName.isDefined) then {
@@ -348,6 +388,58 @@ object Main {
       )
     }
 
+    val isGTIRB = loadingInputs.frontendMode == FrontendMode.Gtirb
+
+    // NOTE: --dump-relf ignores --gts-relf, to ensure that the output ELF files are correctly named
+    conf.dumpRelf match {
+      case None => ()
+      case Some(relfOut) =>
+
+        val gtirbRelfFile = Some(loadingInputs.inputFile).filter(_ => isGTIRB)
+        val realRelfFile = loadingInputs.relfFile
+
+        Logger.setLevel(LogLevel.DEBUG)
+        val (relf, gtirb) = GTIRBReadELF.withWarnings {
+          (realRelfFile, gtirbRelfFile) match {
+            case (Some(relfFile), _) =>
+              val (a, b) = IRLoading.loadReadELFWithGTIRB(relfFile, loadingInputs)
+              (Some(a), b)
+            case (None, Some(_)) => (None, Some(IRLoading.loadGTIRBReadELF(loadingInputs)))
+            case _ => throw IllegalArgumentException("--dump-relf requires either --relf or a GTIRB input")
+          }
+        }
+
+        // skip writing files if the given path is an empty string. this checks compatibility and exits.
+        if (relfOut.trim.isEmpty)
+          return
+
+        relf match {
+          case Some(relf) =>
+            writeToFile(
+              relf.sorted.toScala
+                .replace("@GLIBC_2.17", "")
+                .replace("@GLIBC_2.38", "")
+                .replace("@GLIBC_2.34", ""),
+              relfOut + "-readelf.scala"
+            )
+          case None => Logger.warn(s"Failed to load .relf information, $relfOut-readelf.scala not written")
+        }
+        gtirb match {
+          case Some(relf) => writeToFile(relf.sorted.toScala, relfOut + "-gtsrelf.scala")
+          case None => Logger.warn(s"Failed to load GTIRB information, $relfOut-gtsrelf.scala not written")
+        }
+        return
+    }
+
+    // patch in gtirb-as-relf if directed or if relf is omitted but we are using gtirb.
+    // NOTE: this must be done early, because lots of later places make checks about loadingInputs.relfFile.
+    if (conf.useGTIRBReadELF.value || (isGTIRB && loadingInputs.relfFile.isEmpty)) {
+      if (!isGTIRB) {
+        throw IllegalArgumentException("--gts-relf requires a GTIRB input")
+      }
+      loadingInputs = loadingInputs.copy(relfFile = Some(loadingInputs.inputFile))
+    }
+
     if (loadingInputs.specFile.isDefined && loadingInputs.relfFile.isEmpty) {
       throw IllegalArgumentException("--spec requires --relf")
     }
@@ -355,8 +447,8 @@ object Main {
       throw IllegalArgumentException("BAP ADT input requires --relf")
     }
 
-    if (conf.nodebug.value) {
-      util.assertion.disableAssertions == true
+    if (conf.noDebug.value) {
+      util.assertion.disableAssertions = true
     }
 
     val q = BASILConfig(
@@ -366,12 +458,14 @@ object Main {
         procedureTrimDepth = conf.procedureDepth,
         parameterForm = conf.parameterForm.value,
         trimEarly = conf.trimEarly.value,
-        pcTracking = PCTrackingOption.valueOf(conf.pcTracking.getOrElse("none").capitalize)
+        pcTracking = PCTrackingOption.valueOf(conf.pcTracking.getOrElse("none").capitalize),
+        gtirbLiftOffline = conf.liftOffline.value
       ),
       runInterpret = conf.interpret.value,
       simplify = conf.simplify.value,
       validateSimp = conf.validateSimplify.value,
       summariseProcedures = conf.summariseProcedures.value,
+      generateLoopInvariants = conf.generateLoopInvariants.value,
       generateRelyGuarantees = conf.generateRelyGuarantees.value,
       staticAnalysis = staticAnalysis,
       boogieTranslation = boogieGeneratorConfig,
@@ -383,7 +477,9 @@ object Main {
 
     Logger.info(programNameVersionHeader)
 
-    val result = RunUtils.run(q)
+    val result = GTIRBReadELF.withWarnings {
+      RunUtils.run(q)
+    }
     if (conf.verify.value) {
       assert(result.boogie.nonEmpty)
       var failed = false

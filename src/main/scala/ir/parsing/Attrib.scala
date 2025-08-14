@@ -46,6 +46,21 @@ enum Attrib {
     case _ => None
   }
 
+  // TODO: distinguish allowable failures (e.g., missing optional key)
+  // from unacceptable ones (e.g., wrong type for a certain known key like address)
+
+  def get(k: String) = this.Map.flatMap(_.get(k))
+  def getInt(k: String) = this.Map
+    .flatMap(_.get(k))
+    .map(_.Int.getOrElse {
+      throw Exception(s"integer-like attribute value required for '$k'")
+    })
+  def getString(k: String) = this.Map
+    .flatMap(_.get(k))
+    .map(_.Str.getOrElse {
+      throw Exception(s"string attribute value required for '$k'")
+    })
+
   import translating.indent
 
   def field(p: String) = {
@@ -104,13 +119,6 @@ object Attrib {
         util.functional.sequence(values)
       case _ => None
     }
-  }
-}
-
-case class FunDecl(irType: ir.IRType, body: Option[ir.LambdaExpr])
-case class ProgSpec(val rely: List[ir.Expr] = List(), val guar: List[ir.Expr] = List()) {
-  def merge(o: ProgSpec) = {
-    ProgSpec(rely ++ o.rely, guar ++ o.guar)
   }
 }
 
@@ -186,22 +194,33 @@ case class SymbolTableInfo(
 
   def toAttrib = {
 
-    val goffs = Attrib.List(globalOffsets.toVector.map { case (l, r) =>
+    val goffs = Attrib.List(globalOffsets.toVector.sorted.map { case (l, r) =>
       Attrib.List(Vector(Attrib.Int(l), Attrib.Int(r)))
     })
 
     Attrib.Map(
       ListMap(
-        "externalFunctions" -> Attrib.List(externalFunctions.toVector.map(_.toAttrib)),
-        "globals" -> Attrib.List(globals.toVector.map(_.toAttrib)),
-        "funcEntries" -> Attrib.List(funcEntries.toVector.map(_.toAttrib)),
+        "externalFunctions" -> Attrib.List(externalFunctions.toVector.sorted.map(_.toAttrib)),
+        "globals" -> Attrib.List(globals.toVector.sorted.map(_.toAttrib)),
+        "funcEntries" -> Attrib.List(funcEntries.toVector.sorted.map(_.toAttrib)),
         "globalOffsets" -> goffs
       )
     )
   }
 
-  def mergeFromAttrib(a: Attrib) = {
+  def mergeFromAttrib(a: Attrib) =
+    SymbolTableInfo.fromAttrib(a).map(this.merge(_))
 
+}
+
+object SymbolTableInfo {
+  def from(e: ir.IRContext) = {
+    SymbolTableInfo(e.externalFunctions, e.globals, e.funcEntries, e.globalOffsets)
+  }
+
+  def empty = SymbolTableInfo(Set(), Set(), Set(), Map())
+
+  def fromAttrib(a: Attrib) = {
     import scala.util.chaining.scalaUtilChainingOps
 
     def logIfNone[T](str: => String)(x: Option[T]) = x match {
@@ -234,18 +253,8 @@ case class SymbolTableInfo(
           }
         )
         .toMap
-
-    } yield (this.merge(SymbolTableInfo(externalFunctions, globals, funcEntries, globalOffsets)))
+    } yield SymbolTableInfo(externalFunctions, globals, funcEntries, globalOffsets)
   }
-
-}
-
-object SymbolTableInfo {
-  def from(e: ir.IRContext) = {
-    SymbolTableInfo(e.externalFunctions, e.globals, e.funcEntries, e.globalOffsets)
-  }
-
-  def empty = SymbolTableInfo(Set(), Set(), Set(), Map())
 }
 
 /**
@@ -343,5 +352,4 @@ case object MemoryAttribData {
       } yield (strs)
     } yield (MemoryAttribData(name, address, size.toInt, readOnly, bytes))
   }
-
 }

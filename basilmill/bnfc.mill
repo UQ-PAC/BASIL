@@ -7,9 +7,6 @@ import os.Path
 import scalalib._
 import scala.util.{Try}
 
-import $file.basilmill.util.DownloadModule
-import $file.basilmill.jflexcup.JFlexCupModule
-
 /**
  * Module to process a BNFC (https://bnfc.digitalgrammars.com/) grammar
  * through the `bnfc` generator.
@@ -24,13 +21,13 @@ trait BNFCModule extends JavaModule {
   def bnfcBackendArg: T[String] // e.g., --jflex, --antlr
   def bnfcExtraArgs: T[Iterable[String]] = Iterable.empty[String]
 
-  def bnfcYylexFile = Task.Source {
+  def bnfcYylexFile = Task {
     PathRef(bnfcGenerated().path / bnfcPackageName / "Yylex")
   }
-  def bnfcCupFile = Task.Source {
+  def bnfcCupFile = Task {
     PathRef(bnfcGenerated().path / bnfcPackageName / "_cup.cup")
   }
-  def bnfcMakefile = Task.Source {
+  def bnfcMakefile = Task {
     PathRef(bnfcGenerated().path / "Makefile")
   }
 
@@ -41,7 +38,7 @@ trait BNFCModule extends JavaModule {
     // https://github.com/BNFC/bnfc/releases
 
     def local = Task.Input {
-      Try(os.proc("bnfc", "--version").call())
+      Try(os.proc("bnfc", "--version").call(destroyOnExit = false))
         .map(Function.const("bnfc"))
         .toEither
         .left.map(_.toString)
@@ -55,10 +52,12 @@ trait BNFCModule extends JavaModule {
       "-mac.binary"
     } else if (osName.startsWith("Windows")) {
       ".exe"
+    } else {
+      throw Exception("bnfc: unsupported os")
     }
   }
 
-  override def generatedSources = Task.Sources {
+  override def generatedSources = Task {
     super.generatedSources() ++ Seq(bnfcGenerated())
   }
 

@@ -8,7 +8,7 @@ import util.{
   BASILConfig,
   BASILResult,
   BoogieGeneratorConfig,
-  DSAConfig,
+  DSConfig,
   ILLoadingConfig,
   Logger,
   RunUtils,
@@ -29,8 +29,9 @@ case class TestConfig(
   logResults: Boolean = false,
   simplify: Boolean = false,
   summariseProcedures: Boolean = false,
-  dsa: Option[DSAConfig] = None,
-  memoryTransform: Boolean = false
+  dsa: Option[DSConfig] = None,
+  memoryTransform: Boolean = false,
+  useOfflineLifterForGtirbFrontend: Boolean = false
 ) {
   private val scaledtimespans = new ScaledTimeSpans {}
   def timeoutFlag =
@@ -48,9 +49,10 @@ trait BASILTest {
     staticAnalysisConf: Option[StaticAnalysisConfig],
     simplify: Boolean = false,
     summariseProcedures: Boolean = false,
-    dsa: Option[DSAConfig] = None,
+    dsa: Option[DSConfig] = None,
     memoryTransform: Boolean = false,
-    postLoad: IRContext => Unit = s => ()
+    postLoad: IRContext => Unit = s => (),
+    useOfflineLifterForGtirbFrontend: Boolean = false
   ): BASILResult = {
     val specFile = if (specPath.isDefined && File(specPath.get).exists) {
       specPath
@@ -58,8 +60,13 @@ trait BASILTest {
       None
     }
     val config = BASILConfig(
-      loading =
-        ILLoadingConfig(inputFile = inputPath, relfFile = Some(RELFPath), specFile = specFile, parameterForm = false),
+      loading = ILLoadingConfig(
+        inputFile = inputPath,
+        relfFile = Some(RELFPath),
+        specFile = specFile,
+        parameterForm = false,
+        gtirbLiftOffline = useOfflineLifterForGtirbFrontend
+      ),
       simplify = simplify,
       summariseProcedures = summariseProcedures,
       staticAnalysis = staticAnalysisConf,
@@ -99,11 +106,11 @@ trait BASILTest {
 
   def checkVerify(boogieResult: BoogieResult, expectVerify: Boolean): (Option[String], Boolean, Boolean) = {
     val failureMsg = boogieResult.kind match {
-      case BoogieResultKind.Verified(_, _) if expectVerify => None
-      case BoogieResultKind.AssertionFailed if !expectVerify => None
+      case BoogieResultKind.Verified(_, _) =>
+        Option.when(!expectVerify)("Expected verification failure, but got success.")
       case BoogieResultKind.Timeout => Some("SMT Solver timed out")
-      case BoogieResultKind.Verified(_, _) if !expectVerify => Some("Expected verification failure, but got success.")
-      case BoogieResultKind.AssertionFailed if expectVerify => Some("Expected verification success, but got failure.")
+      case BoogieResultKind.AssertionFailed =>
+        Option.when(expectVerify)("Expected verification success, but got failure.")
       case k: BoogieResultKind.Unknown => Some(k.toString)
     }
     (failureMsg, boogieResult.kind == BoogieResultKind.Verified, boogieResult.kind == BoogieResultKind.Timeout)

@@ -54,21 +54,24 @@ object IRLoading {
     */
   def load(q: ILLoadingConfig): IRContext = {
 
-    val mode = if q.inputFile.endsWith(".gts") then {
-      FrontendMode.Gtirb
-    } else if q.inputFile.endsWith(".adt") then {
-      FrontendMode.Bap
-    } else if (q.inputFile.endsWith(".il")) {
-      FrontendMode.Basil
-    } else {
-      throw Exception(s"input file name ${q.inputFile} must be an .adt or .gts file")
+    val mode = q.frontendMode
+    if (q.inputFile.endsWith(".gtirb") && !q.gtirbLiftOffline) {
+      throw IllegalArgumentException(".gtirb input requires --lifter")
     }
 
     val (mainAddress, makeContext) = q.relfFile match {
       case Some(relf) => {
-        // TODO: this tuple is large, should be a case class
-        val (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) =
+
+        // allow loading elf from inputFile if using GTIRB mode.
+        val relfData = if (relf == q.inputFile && mode == FrontendMode.Gtirb) {
+          Logger.info("[!] Using ELF data from GTIRB: " + q.inputFile)
+          IRLoading.loadGTIRBReadELF(q)
+        } else {
+          Logger.info("[!] Using ELF data from relf: " + relf)
           IRLoading.loadReadELF(relf, q)
+        }
+
+        val ReadELFData(symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) = relfData
 
         def continuation(ctx: IRContext) =
           val specification = IRLoading.loadSpecification(q.specFile, ctx.program, globals)
@@ -77,7 +80,9 @@ object IRLoading {
         (Some(mainAddress), continuation)
       }
       case None if mode == FrontendMode.Gtirb => {
-        Logger.warn("RELF not provided, recommended for GTIRB input")
+        Logger.warn(
+          "RELF input not provided, this is not recommended! To provide a RELF input, specify --relf or --gts-relf."
+        )
         (None, (x: IRContext) => x)
       }
       case None => {
@@ -86,7 +91,8 @@ object IRLoading {
     }
 
     val program: IRContext = (mode, mainAddress) match {
-      case (FrontendMode.Gtirb, _) => IRLoading.load(loadGTIRB(q.inputFile, mainAddress, Some(q.mainProcedureName)))
+      case (FrontendMode.Gtirb, _) =>
+        IRLoading.load(loadGTIRB(q.inputFile, mainAddress, q.gtirbLiftOffline, Some(q.mainProcedureName)))
       case (FrontendMode.Basil, _) => ir.parsing.ParseBasilIL.loadILFile(q.inputFile)
       case (FrontendMode.Bap, None) => throw Exception("relf is required when using BAP input")
       case (FrontendMode.Bap, Some(mainAddress)) => {
@@ -104,6 +110,7 @@ object IRLoading {
       case _ => {
         ir.transforms.PCTracking.applyPCTracking(q.pcTracking, ctx.program)
         ctx.program.procedures.foreach(_.normaliseBlockNames())
+        ir.transforms.clearParams(ctx.program)
       }
     }
     ctx
@@ -119,33 +126,79 @@ object IRLoading {
     BAPLoader().visitProject(parser.project())
   }
 
-  def loadGTIRB(fileName: String, mainAddress: Option[BigInt], mainName: Option[String] = None): Program = {
+  def skipGTIRBMagic(fileName: String): FileInputStream = {
     val fIn = FileInputStream(fileName)
+    (0 to 7).map(_ => fIn.read()).toList match {
+      case List('G', 'T', 'I', 'R', 'B', _, _, _) => fIn
+      case _ => {
+        fIn.close()
+        FileInputStream(fileName)
+      }
+    }
+  }
+
+  def loadGTIRB(
+    fileName: String,
+    mainAddress: Option[BigInt],
+    gtirbLiftOffline: Boolean,
+    mainName: Option[String] = None
+  ): Program = {
+    val fIn = skipGTIRBMagic(fileName)
     val ir = IR.parseFrom(fIn)
     val mods = ir.modules
     val cfg = ir.cfg.get
 
-    val semanticsJson = mods.map(_.auxData("ast").data.toStringUtf8)
+    val lifter =
+      if (gtirbLiftOffline) then OfflineLifterInsnLoader(mods)
+      else {
+        ParserMapInsnLoader(mods)
+      }
 
-    val semantics = semanticsJson.map(upickle.default.read[Map[String, List[InsnSemantics]]](_))
-
-    val parserMap: Map[String, List[InsnSemantics]] = semantics.flatten.toMap
-
-    val GTIRBConverter = GTIRBToIR(mods, parserMap, cfg, mainAddress, mainName)
+    val GTIRBConverter = GTIRBToIR(mods, lifter, cfg, mainAddress, mainName)
     GTIRBConverter.createIR()
   }
 
-  def loadReadELF(
-    fileName: String,
-    config: ILLoadingConfig
-  ): (List[ELFSymbol], Set[ExternalFunction], Set[SpecGlobal], Set[FuncEntry], Map[BigInt, BigInt], BigInt) = {
+  /** Loads ELF data from the GTIRB input file. */
+  def loadGTIRBReadELF(config: ILLoadingConfig): ReadELFData = {
+    val ir = IR.parseFrom(FileInputStream(config.inputFile))
+    if (ir.modules.length != 1) {
+      Logger.warn(s"GTIRB file ${config.inputFile} unexpectedly has ${ir.modules.length} modules")
+    }
+
+    val gtirb = GTIRBResolver(ir.modules.head)
+    val gtirbRelfLoader = GTIRBReadELF(gtirb)
+    gtirbRelfLoader.getReadELFData(config.mainProcedureName)
+  }
+
+  /**
+   * Loads ELF data from *both* .relf and .gts (if using GTIRB input). If both
+   * sources load successfully, compares them and warns on any differences.
+   */
+  def loadReadELFWithGTIRB(fileName: String, config: ILLoadingConfig): (ReadELFData, Option[ReadELFData]) = {
     val lexer = ReadELFLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(lexer)
     val parser = ReadELFParser(tokens)
     parser.setErrorHandler(BailErrorStrategy())
     parser.setBuildParseTree(true)
-    ReadELFLoader.visitSyms(parser.syms(), config)
+
+    val relf = ReadELFLoader.visitSyms(parser.syms(), config)
+
+    val gtirbRelf = if (config.inputFile.endsWith(".gts") || config.inputFile.endsWith(".gtirb")) {
+      val gtirbRelf = loadGTIRBReadELF(config)
+      GTIRBReadELF.checkReadELFCompatibility(gtirbRelf, relf)
+      Some(gtirbRelf)
+    } else {
+      None
+    }
+
+    (relf, gtirbRelf)
   }
+
+  /**
+   * Loads ELF data from .relf.
+   */
+  def loadReadELF(fileName: String, config: ILLoadingConfig) =
+    loadReadELFWithGTIRB(fileName, config)._1
 
   def emptySpecification(globals: Set[SpecGlobal]) =
     Specification(Set(), globals, Map(), List(), List(), List(), Set())

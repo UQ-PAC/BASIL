@@ -1,23 +1,10 @@
 package analysis.data_structure_analysis
 
-import ir.{
-  CFGPosition,
-  Call,
-  DirectCall,
-  Expr,
-  IndirectCall,
-  IntraProcIRCursor,
-  LocalVar,
-  MemoryLoad,
-  MemoryStore,
-  Procedure,
-  Variable,
-  computeDomain
-}
+import ir.{Call, DirectCall, Expr, IndirectCall, LocalVar, MemoryLoad, MemoryStore, Procedure, Statement, Variable}
 import util.ConstGenLogger
 
 sealed trait Constraint {
-  def source: CFGPosition
+  def source: Statement
   val label: String
   def eval(evaluator: Expr => Any = identity): String
 }
@@ -43,8 +30,8 @@ sealed trait BinaryConstraint extends Constraint {
     s"(${arg1.eval(evaluator)} <==> ${arg2.eval(evaluator)}"
 }
 
-case class AssignmentConstraint(pos: CFGPosition, ar1: Expr, ar2: Expr) extends BinaryConstraint {
-  override def source: CFGPosition = pos
+case class AssignmentConstraint(pos: Statement, ar1: Expr, ar2: Expr) extends BinaryConstraint {
+  override def source: Statement = pos
   override val label: String = labelToPC(Some(pos.toString))
   override val arg1: ConstraintArg = ConstraintArg(ar1)
   override val arg2: ConstraintArg = ConstraintArg(ar2)
@@ -106,10 +93,9 @@ case class IndirectCallConstraint(call: IndirectCall) extends CallConstraint[Ind
 
 def generateConstraints(proc: Procedure): Set[Constraint] = {
   ConstGenLogger.info(s"Generating Constraints for ${proc.name}")
-  val domain = computeDomain(IntraProcIRCursor, Set(proc))
   var constraints: Set[Constraint] = Set.empty
 
-  domain.foreach {
+  proc.foreach {
     case load: MemoryLoad =>
       constraints += MemoryReadConstraint(load)
     case write: MemoryStore =>

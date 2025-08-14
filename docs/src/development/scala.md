@@ -1,7 +1,7 @@
 
 # Scala Programming Advice
 
-- Tip: Reasonable Scala coding advice https://twitter.github.io/effectivescala/
+- Tip: Reasonable Scala coding advice [https://twitter.github.io/effectivescala/](https://twitter.github.io/effectivescala/)
 - Tip: You can bind names to destructuring pattern matches using the undocumented `@` syntax: 
   ```scala
   case class Person(name: String, age: Int)

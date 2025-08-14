@@ -52,18 +52,25 @@ package ir
  *   this produces a Basil IR DSL program ([[ir.dsl]]), ready to be resolved into
  *   a complete Basil IR program.
  *
+ * See [[ir.parsing.ParseBasilIL]] for various entry points which can load Basil IL
+ * from various data sources.
+ *
  * ## Step-by-step
  *
  * 1. A file or string is read into an [[java.io.FileReader]].
  * 2. This is lexed by [[basil_ir.Yylex]].
  * 3. The tokens are parsed by [[basil_ir.parser]].
- *    BNFC sets up the parser to produce an AST, so we obtain a [[basil_ir.Absyn.Program]] from the parser.
+ *    BNFC sets up the parser to produce an AST, so we obtain a [[basil_ir.Absyn.Module]] from the parser.
  * 4. Global declarations are obtained by passing the program AST to [[ir.parsing.BasilEarlyBNFCVisitor]].
  *    This results in a [[ir.parsing.Declarations]].
  * 5. The Basil IR program is obtained by passing the program AST,
  *    along with the global declarations, to [[ir.parsing.BasilMainBNFCVisitor]].
- *    This is returned in the form of an unresolved Basil DSL structure, [[ir.dsl.EventuallyProgram]].
- * 6. The DSL structure is resolved into a real Basil IR [[ir.Program]], ready for use.
+ *    The main visitor dispatches to [[ir.parsing.BlockBNFCVisitor]], [[ir.parsing.ExprBNFCVisitor]],
+ *    and others as needed.
+ *    The visitor returns an unresolved Basil DSL structure, [[ir.dsl.EventuallyProgram]].
+ * 6. In [[ir.parsing.ParseBasilIL.makeBasilIRContext]], the DSL structure is resolved into a
+ *    real Basil IR [[ir.Program]] and combined with the [[ir.parsing.Declarations]]
+ *    to produce a [[util.IRContext]].
  *
  */
 package object parsing {}

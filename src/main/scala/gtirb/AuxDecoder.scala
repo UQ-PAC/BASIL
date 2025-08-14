@@ -19,7 +19,8 @@ import java.util.Base64
  * The read methods return [[Decoder]] values which can be passed to the [[decode]] methods.
  *
  * [[AuxKind]] provides pre-defined decoders for some official AuxData fields. An [[AuxKind]] can be
- * passed to [[decodeAux]] to automatically extract and decode the given AuxData from a GTIRB [[Module]].
+ * passed to [[decodeAux]] to automatically extract and decode the given AuxData from a GTIRB
+ * [[com.grammatech.gtirb.proto.Module.Module]].
  *
  * Within a [[Decoder]], the internal state of the [[java.io.ByteArrayInputStream]] is used to keep
  * track of the current byte position.
@@ -28,7 +29,9 @@ object AuxDecoder {
 
   /**
    * [[AuxKind]] provides pre-defined decoders for some official AuxData fields. An [[AuxKind]] can be
-   * passed to [[decodeAux]] to automatically extract and decode the given AuxData from a GTIRB [[Module]].
+   * passed to [[decodeAux]] to automatically extract and decode the given AuxData from a GTIRB [[com.grammatech.gtirb.proto.Module.Module]].
+   * See the [Standard AuxData Schemata](https://grammatech.github.io/gtirb/md__aux_data.html) for a list of official AuxData fields
+   * and their types.
    */
   enum AuxKind[T](val name: String, val decoder: Decoder[T]) {
     case ElfSymbolTabIdxInfo
@@ -38,13 +41,16 @@ object AuxDecoder {
           "elfSymbolInfo",
           readMap(readUuid, readTuple(readUint(64), readString, readString, readString, readUint(64)))
         )
+    case SectionProperties
+        extends AuxKind("sectionProperties", readMap(readUuid, readTuple(readUint(64), readUint(64))))
     case FunctionEntries extends AuxKind("functionEntries", readMap(readUuid, readSet(readUuid)))
     case FunctionBlocks extends AuxKind("functionBlocks", readMap(readUuid, readSet(readUuid)))
     case FunctionNames extends AuxKind("functionNames", readMap(readUuid, readUuid))
+    case SymbolForwarding extends AuxKind("symbolForwarding", readMap(readUuid, readUuid))
   }
 
   type Input = ByteArrayInputStream
-  type Decoder[T] = Input => T
+  type Decoder[T] = ByteArrayInputStream => T
 
   def decodeAux[T](known: AuxKind[T])(mod: Module) =
     decode(known.decoder)(mod.auxData(known.name))
@@ -142,6 +148,17 @@ object AuxDecoder {
     val x5 = r5(bs)
     val x6 = r6(bs)
     (x1, x2, x3, x4, x5, x6)
+
+  // type ReadTuple[T <: Tuple] <: Tuple = T match
+  //   case Reader[out] *: rest => out *: ReadTuple[rest]
+  //   case EmptyTuple => EmptyTuple
+  //
+  // inline def readTuple[T <: Tuple](xs: T)(bs: Input): ReadTuple[T] =
+  //   inline xs match
+  //     case xs: (Reader[o] *: rest) =>
+  //       xs match
+  //         case h *: t => h(bs) *: readTuple[rest](t)(bs)
+  //     case _: EmptyTuple => EmptyTuple
 
   def readUuid(bs: Input) =
     // ByteString.copyFrom(readBytes(16)(bs))

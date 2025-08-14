@@ -6,6 +6,7 @@
 
 - [Information Flow Logic](infoflow-logic.md)
 - [Usage](usage.md) Basil binary lifting & usage guide
+  - [Quickly lifting a new example](quick-lifting.md)
 - [Compiler Explorer](compiler-explorer.md) guide to the compiler explorer basil interface
 
 # Basil IR Source Code
@@ -14,6 +15,11 @@
 - [Basil IR](development/basil-ir.md) Explanation of BASIL's intermediate representation
 - [Interpreter](development/interpreter.md) Explanation of IR interpreter
 - [Transform Passes](development/transforms.md) Explanation of ir transforms and simplifications
+- [Program annotations](development/summaries-invariants.md) Explanation of loop invariant and function summary generators
+
+# Analyses
+
+- [Data Structure Analysis](development/dsa.md) Basil Memory Analysis
 
 # Development
 
@@ -25,6 +31,8 @@
 
 # Devleopment Guidelines
 
+- [Testing](development/testing.md)
+  - [Integration (system) tests](development/integration-tests.md)
 - [Assertions](development/assertions.md)
 - [Scala](development/scala.md)
 

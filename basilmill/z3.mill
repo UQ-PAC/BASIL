@@ -1,0 +1,21 @@
+package build.basilmill
+
+import mill._
+import api._
+import javalib._
+import mainargs._
+import os.Path
+
+trait Z3Module extends NativeDepsModule {
+  val z3Version = "4.14.0"
+  val z3LibNames = List("libz3", "libz3java")
+
+  override def nativeMvnDeps(plat: Platform) = {
+    val soType = plat.os.libExtension
+    val arch = plat.arch.mavenName
+    z3LibNames.map(name =>
+      (name, mvn"org.sosy-lab:javasmt-solver-z3:$z3Version;classifier=$name-$arch;type=$soType")
+    ) ++ super.nativeMvnDeps(plat)
+  }
+}
+

@@ -3,8 +3,7 @@ package build.basilmill
 import os.Path
 import mill._
 import mill.scalalib._
-
-import $file.basilmill.basilversion.BasilVersion
+import mill.api.BuildCtx
 
 trait BasilDocs extends ScalaModule {
   this: BasilVersion =>
@@ -12,7 +11,7 @@ trait BasilDocs extends ScalaModule {
   def scalaDocOptions = Task {
     super.scalaDocOptions() ++ scalaDocExternalMappingOptions() ++ Seq(
       s"-source-links:github://UQ-PAC/BASIL/${gitCommit().getOrElse("main")}",
-      s"-doc-root-content:$millSourcePath/main/scala/rootdoc.scala"
+      s"-doc-root-content:$moduleDir/main/scala/rootdoc.scala"
     )
   }
 
@@ -31,11 +30,11 @@ trait BasilDocs extends ScalaModule {
   def docsModules = Task {
     // these doc paths are copied into the combined docs output.
     Map(
-      "api/basil" -> docJar(),
-      "api/bnfc" -> build.bnfc.docJar(),
-      "api/basil-antlr" -> build.basilAntlr.docJar(),
-      "api/basil-proto" -> build.basilProto.docJar(),
-      "api/java-cup" -> build.bnfc.cup.docJar(),
+      "api/basil" -> scalaDocGenerated(),
+      "api/bnfc" -> build.bnfc.javadocGenerated(),
+      "api/basil-antlr" -> build.basilAntlr.javadocGenerated(),
+      "api/basil-proto" -> build.basilProto.scalaDocGenerated(),
+      "api/java-cup" -> build.bnfc.cup.javadocGenerated(),
     )
   }
 
@@ -48,9 +47,9 @@ trait BasilDocs extends ScalaModule {
 
   def scalaDocExternalMappingOptions = Task {
     val defaultExternals = Seq(
-      ".*scala/.*::scaladoc3::https://scala-lang.org/api/3.3_LTS/",
-      "java/.*::javadoc::https://docs.oracle.com/en/java/javase/17/docs/api/java.base/",
-      ".*com/google/protobuf.*::javadoc::https://protobuf.dev/reference/java/api-docs/",
+      ".*/scala/.*::scaladoc3::https://scala-lang.org/api/3.3_LTS/",
+      ".*/java/.*::javadoc::https://docs.oracle.com/en/java/javase/17/docs/api/java.base/",
+      ".*/com/google/protobuf.*::javadoc::https://protobuf.dev/reference/java/api-docs/",
     )
     val externals = defaultExternals ++ docsRegexes().map {
       case (path, regex) => s"$regex::$baseUrl/$path"
@@ -59,11 +58,11 @@ trait BasilDocs extends ScalaModule {
   }
 
   def docsIndex = Task.Source {
-    PathRef(super.millSourcePath / "docs" / "static" / "index.html")
+    BuildCtx.workspaceRoot / "docs" / "static" / "index.html"
   }
 
   def allDocs = Task {
-    val dest = Task.dest
+    val dest = Task.dest / "BASIL"
 
     def copyDoc(p: Path, name: String) = {
       println(s"copying docs into $name from $p")
@@ -71,7 +70,7 @@ trait BasilDocs extends ScalaModule {
     }
 
     docsModules().foreach {
-      case (name, src) => copyDoc(src.path / ".." / "javadoc", name)
+      case (name, src) => copyDoc(src.path, name)
     }
     extraDocs().foreach {
       case (name, src) => copyDoc(src.path, name)
@@ -83,7 +82,7 @@ trait BasilDocs extends ScalaModule {
     os.walk(dest).foreach {
       case path if path.ext == "html" =>
         // HACK: fix mill bug causing incorrect scala source links https://github.com/com-lihaoyi/mill/issues/5221
-        val out = os.read(path).replace(super.millSourcePath.toString, "")
+        val out = os.read(path).replace(BuildCtx.workspaceRoot.toString, "")
         os.write.over(path, out)
       case path if path.last == "ux.js" =>
         val old = os.read(path)

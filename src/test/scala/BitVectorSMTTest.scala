@@ -1,9 +1,8 @@
 import ir.*
 import org.scalatest.*
 import org.scalatest.funsuite.*
-import translating.BasilIRToSMT2
 import translating.PrettyPrinter.*
-import util.z3.*
+import util.SMT.*
 
 @test_util.tags.UnitTest
 class BitVectorEvalTest extends AnyFunSuite {
@@ -57,11 +56,14 @@ class BitVectorEvalTest extends AnyFunSuite {
 
     // val query = checks.map(e => BasilIRToSMT2.exprUnsat(e, None, false))
 
+    val solver = SMTSolver(50)
+
     checks.foreach {
       case (l, exp) => {
         test("" + pp_expr(l)) {
-          val q = BasilIRToSMT2.exprUnsat(exp, None, false)
-          assert(util.z3.checkSATSMT2(q) == SatResult.UNSAT)
+          // val q = BasilIRToSMT2.exprUnsat(exp, None, false, false)
+          // assert(solver.smt2Sat(q) == SatResult.UNSAT)
+          assert(solver.exprSat(exp) == SatResult.UNSAT)
         }
       }
     }

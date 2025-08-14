@@ -7,8 +7,8 @@ var disableAssertions = false
  */
 inline def debugAssert(inline assertion: Boolean, inline message: String*): Unit = {
   // Conditionally inlined assertion and should not allocate anything except in evaluation or failure of [[assertion]]
-  if (!disableAssertions && !assertion) then {
-    if (message.nonEmpty) then {
+  if (!disableAssertions && !assertion) {
+    if (message.nonEmpty) {
       throw AssertionError(message.mkString(""))
     } else {
       throw AssertionError()
@@ -20,8 +20,8 @@ inline def debugAssert(inline assertion: Boolean, inline message: String*): Unit
  * Like (assert) but with a slightly different message. Shadows's scalas built-in require function..
  */
 inline def require(inline assertion: Boolean, inline message: String*): Unit = {
-  if (!disableAssertions && !assertion) then {
-    if (message.nonEmpty) then {
+  if (!disableAssertions && !assertion) {
+    if (message.nonEmpty) {
       throw AssertionError("Requirement failed: " + message.mkString(""))
     } else {
       throw AssertionError("Requirement failed.")

@@ -23,6 +23,13 @@ class ToScalaTest extends AnyFunSuite with CaptureOutput with TimeLimitedTests w
     super.beforeEach(testData)
   }
 
+  // XXX: work around https://github.com/scala/scala3/issues/23578 / https://github.com/scala/scala3/issues/22968
+  // until 3.3.7
+  inline def inlineAssertCompiles(s: String) =
+    assertCompiles(s)
+  inline def inlineAssertTypeError(s: String) =
+    assertTypeError(s)
+
   val program: Program = prog(
     proc(
       "main",
@@ -43,7 +50,7 @@ class ToScalaTest extends AnyFunSuite with CaptureOutput with TimeLimitedTests w
 
   val expected = """
 prog(
-  proc("main",
+  proc("main", returnBlockLabel = Some("returnBlock"))(
     block("first_call",
       LocalAssign(GlobalVar("R0", BitVecType(64)), BitVecLiteral(BigInt("1"), 64), None),
       LocalAssign(GlobalVar("R1", BitVecType(64)), BitVecLiteral(BigInt("1"), 64), None),
@@ -54,21 +61,15 @@ prog(
       directCall("callee2"),
       goto("returnBlock")
     ),
-    block("returnBlock",
-      ret
-    )
+    block("returnBlock", ret)
   ),
-  proc("callee1",
-    block("returnBlock",
-      ret
-    )
+  proc("callee1", returnBlockLabel = None)(
+    block("returnBlock", ret)
   ),
-  proc("callee2",
-    block("returnBlock",
-      ret
-    )
+  proc("callee2", returnBlockLabel = None)(
+    block("returnBlock", ret)
   ),
-  proc("empty procedure")
+  proc("empty procedure", returnBlockLabel = None)()
 )
   """
 
@@ -81,34 +82,28 @@ prog(
     goto("second_call")
   )
 
-  def `procedure:main` = proc("main",
+  def `procedure:main` = proc("main", returnBlockLabel = Some("returnBlock"))(
     `block:main.first_call`,
     block("second_call",
       directCall("callee2"),
       goto("returnBlock")
     ),
-    block("returnBlock",
-      ret
-    )
+    block("returnBlock", ret)
   )
 
-  def `procedure:callee1` = proc("callee1",
-    block("returnBlock",
-      ret
-    )
+  def `procedure:callee1` = proc("callee1", returnBlockLabel = None)(
+    block("returnBlock", ret)
   )
 
-  def `procedure:callee2` = proc("callee2",
-    block("returnBlock",
-      ret
-    )
+  def `procedure:callee2` = proc("callee2", returnBlockLabel = None)(
+    block("returnBlock", ret)
   )
 
   def program = prog(
     `procedure:main`,
     `procedure:callee1`,
     `procedure:callee2`,
-    proc("empty procedure")
+    proc("empty procedure", returnBlockLabel = None)()
   )
 
   program
@@ -152,9 +147,7 @@ prog(
 
     val expected = """
 {
-  def program = prog(
-    proc("main")
-  )
+  def program = prog(proc("main", returnBlockLabel = None)())
 
   program
 }
@@ -169,15 +162,11 @@ prog(
 
     val expected = """
 {
-  def `procedure:main` = proc("main",
-    block("entry",
-      ret
-    )
+  def `procedure:main` = proc("main", returnBlockLabel = None)(
+    block("entry", ret)
   )
 
-  def program = prog(
-    `procedure:main`
-  )
+  def program = prog(`procedure:main`)
 
   program
 }
@@ -206,21 +195,22 @@ prog(
         "printf",
         Seq("R9_in" -> BitVecType(64), "R0_in" -> BitVecType(64)),
         Seq("R9_out" -> BitVecType(64), "R0_out" -> BitVecType(64))
-      )
+      )()
     )
 
     val expected = """
 prog(
   proc("printf",
-    Seq(
+    in = Seq(
       "R0_in" -> BitVecType(64),
       "R9_in" -> BitVecType(64)
     ),
-    Seq(
+    out = Seq(
       "R0_out" -> BitVecType(64),
       "R9_out" -> BitVecType(64)
-    )
-  )
+    ),
+    returnBlockLabel = None
+  )()
 )
     """
 
@@ -228,6 +218,8 @@ prog(
   }
 
   test("return params") {
+    import scala.language.implicitConversions
+
     val p = prog(
       proc(
         "proc",
@@ -243,27 +235,25 @@ prog(
           )
         )
       ),
-      proc("printf", Seq("in" -> BitVecType(64)), Seq("out" -> BitVecType(64)))
+      proc("printf", Seq("in" -> BitVecType(64)), Seq("out" -> BitVecType(64)))()
     )
 
     val expected = """
 prog(
   proc("proc",
-    Seq(),
-    Seq(
+    in = Seq(),
+    out = Seq(
       "R0_out" -> BitVecType(64),
       "R1_out" -> BitVecType(64),
       "R31_out" -> BitVecType(64)
     ),
+    returnBlockLabel = None
+  )(
     block("get_two_1876_basil_return",
       directCall(
-        Seq(
-          "out" -> GlobalVar("R0", BitVecType(64))
-        ),
+        Seq("out" -> GlobalVar("R0", BitVecType(64))),
         "printf",
-        Seq(
-          "in" -> LocalVar("R0", BitVecType(64), 0)
-        )
+        Seq("in" -> LocalVar("R0", BitVecType(64), 0))
       ),
       ret(
         "R0_out" -> LocalVar("R0", BitVecType(64), 0),
@@ -273,13 +263,10 @@ prog(
     )
   ),
   proc("printf",
-    Seq(
-      "in" -> BitVecType(64)
-    ),
-    Seq(
-      "out" -> BitVecType(64)
-    )
-  )
+    in = Seq("in" -> BitVecType(64)),
+    out = Seq("out" -> BitVecType(64)),
+    returnBlockLabel = None
+  )()
 )
     """
 
@@ -288,7 +275,7 @@ prog(
 
   test("toscala macro compilation") {
     // derive with exclusions
-    assertCompiles("""
+    inlineAssertCompiles("""
 enum EAAA {
   case A
   case B
@@ -297,7 +284,7 @@ given ToScala[EAAA] = ToScala.deriveWithExclusions[EAAA, EAAA.A.type](ToScala.Ma
       """)
 
     // exclusion type should be a subtype of base type
-    assertTypeError("""
+    inlineAssertTypeError("""
 enum EAAA {
   case A
   case B
@@ -306,7 +293,7 @@ given ToScala[EAAA] = ToScala.deriveWithExclusions[EAAA, Any](???)
       """)
 
     // recursive
-    assertCompiles("""
+    inlineAssertCompiles("""
 given ToScala[Int] = ToScala.MakeString(_.toString)
 
 sealed trait Y derives ToScala
@@ -319,7 +306,7 @@ case class X3() extends X
 """)
 
     // missing instance for Double
-    assertTypeError("""
+    inlineAssertTypeError("""
 given ToScala[Int] = ToScala.MakeString(_.toString)
 
 sealed trait L derives ToScala
@@ -328,7 +315,7 @@ case class C(x: Int, l: L, d: Double) extends L
       """)
 
     // as above but with Double present
-    assertCompiles("""
+    inlineAssertCompiles("""
 given ToScala[Int] = ToScala.MakeString(_.toString)
 given ToScala[Double] = ToScala.MakeString(_.toString)
 
@@ -338,13 +325,13 @@ case class C(x: Int, l: L, d: Double) extends L
       """)
 
     // type that appears in its own constructor
-    assertTypeError("""
+    inlineAssertTypeError("""
 sealed trait T derives ToScala
 case class A(a: A) extends T
       """)
 
     // large number of cases
-    assertCompiles("""
+    inlineAssertCompiles("""
 sealed trait ASD derives ToScala
 case class A() extends ASD
 case class A1() extends ASD
@@ -477,7 +464,7 @@ prog(
       region = None
     )
   ),
-  proc("knownBitsExample_4196164")
+  proc("knownBitsExample_4196164", returnBlockLabel = None)()
 )
 """
 

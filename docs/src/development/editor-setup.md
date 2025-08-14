@@ -1,6 +1,6 @@
 # Development Environment
 
-This is a Scala 3 project built using the [mill](mill-build.com) build system, it can be run with `./mill run`.
+This is a Scala 3 project built using the [mill](https://mill-build.org) build system, it can be run with `./mill run`.
 
 ### Local Development
 
@@ -17,11 +17,12 @@ This can also be installed through [coursier](https://get-coursier.io/docs/cli-o
 
 # IDE Support
 
+
+[Mill page on IDE setup](https://mill-build.org/mill/cli/installation-ide.html#_ide_support)
+
 ## VSCode
 
 Mill supports the Metals language server and IntelliJ through Build Server Protocol (BSP), which is the recommended use.
-
-To use specifically Mill's bsp support, delete `.bsp`, run `./mill mill.bsp.BSP/install`. More information is available [here](https://mill-build.com/mill/Installation_IDE_Support.html#_build_server_protocol_bsp).
 
 When you open the project in VSCode for the first time, it will likely ask you to install Java, and Scala language support extensions.  There is a Scala extension called [`Metals`](https://scalameta.org/metals/docs/editors/vscode/) which may be useful.
 

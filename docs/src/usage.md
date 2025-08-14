@@ -26,11 +26,11 @@ Alternatively, Z3 is usually available in system packages. For manual Boogie ins
 ## Lifting a single binary
 
 Many lifted examples are provided in the [tests directory][tests],
-instructions are given [here](development/readme.md) as to how to add new tests.
+instructions are given [here](development/) as to how to add new tests.
 The instructions below are for if you want to use the BASIL tool with new binary files.
 
 BASIL takes as input:
-- a .gts file, containing the ddisasm CFG and the ASLp semantics, 
+- a .gts file, containing the ddisasm CFG and the ASLp semantics,
 - a .relf file, containing the symbol table, and
 - (optionally) a .spec file containing manually-written specifications
   (see [the secret\_write.spec][spec] for an example).
@@ -39,15 +39,15 @@ The steps below describe the dependencies required,
 then the steps to obtain these input files
 and run BASIL.
 
-<!-- These instructions are automated in [lift.sh](../../scripts/lift.sh). -->
+**See also:** [Quickly lifting a new example](quick-lifting.md)
 
-[tests]: /src/test/correct
-[spec]: /src/test/correct/secret_write/secret_write.spec
+[tests]: https://github.com/UQ-PAC/BASIL/tree/main/src/test/correct
+[spec]: https://github.com/UQ-PAC/BASIL/blob/main/src/test/correct/secret_write/secret_write.spec
 
 ### Requirements
 
-These instructions assume a Linux-GNU OS, BASIL itself will happily run on Windows, 
-and the lifting machinery is known to work under WSL. 
+These instructions assume a Linux-GNU OS, BASIL itself will happily run on Windows,
+and the lifting machinery is known to work under WSL.
 
 - AArch64 cross-compilation toolchain (e.g. GCC or clang)
 - AArch64 readelf (e.g. `aarch64-linux-gnu-readelf`)
@@ -72,13 +72,13 @@ ddisasm may also be installed through its provided Docker images or
 APT repository (as of Aug 2024, only supports Ubuntu 20.04).
 You can also, of course, build any of these tools manually.
 
-See also: [development: building](development/readme.md#building)
+See also: [development: building](development/#building)
 (primarily if you are interested in building BASIL manually).
 
 ### Preparation
 
 1. Compile a C program into an Aarch64 binary, for example:
-   
+
    ```bash
    aarch64-linux-gnu-gcc x.c
    ```
@@ -143,7 +143,7 @@ See also: [development: building](development/readme.md#building)
      }
    },
    ```
-   
+
 4. Obtain the symbol table with readelf.
    ```
    aarch64-linux-gnu-readelf -s -r -W a.out > a.relf
@@ -174,12 +174,12 @@ boogie /useArrayAxioms out.bpl
 
 The `/useArrayAxioms` flag is necessary for Boogie versions 2.16.8 and greater;
 for earlier versions it can be removed.
-This improves the verification speed by using Boogie's axiomatic encoding of arrays rather than Z3's. 
-The axiomatic encoding is faster (1) because it does not support extensionality, and (2) because it sacrifices completeness. 
-This makes the most difference in SAT (non-verifying) cases. 
+This improves the verification speed by using Boogie's axiomatic encoding of arrays rather than Z3's.
+The axiomatic encoding is faster (1) because it does not support extensionality, and (2) because it sacrifices completeness.
+This makes the most difference in SAT (non-verifying) cases.
 We don't have reason to believe array extensionality is necessary for any of our proofs.
 
-If using the built-in array theories, Z3's array extensionality reasoning can be disabled by 
+If using the built-in array theories, Z3's array extensionality reasoning can be disabled by
 passing the `smt.array.extensional=false` configuration to Z3 through Boogie's CLI:
 
 ```

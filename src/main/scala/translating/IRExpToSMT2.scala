@@ -267,7 +267,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     }
   }
 
-  def exprUnsat(e: Expr, name: Option[String] = None, getModel: Boolean = true): String = {
+  def exprUnsat(e: Expr, name: Option[String] = None, getModel: Boolean = true, genQuery: Boolean = true): String = {
     val assert = if (name.isDefined) {
       list(sym("assert"), list(sym("!"), BasilIRToSMT2.vexpr(e), sym(":named"), sym(name.get)))
     } else {
@@ -275,12 +275,15 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     }
 
     val (typedecls, decls) = BasilIRToSMT2.extractDecls(e)
-    val terms = list(sym("push")) :: (typedecls.toVector ++ decls).toList
-      ++ List(assert, list(sym("check-sat")))
-      ++ (if (getModel) then
-            List(list(sym("echo"), sym("\"" + name.getOrElse("") + "  ::  " + e + "\"")), list(sym("get-model")))
-          else List())
-      ++ List(list(sym("pop")))
+    val terms =
+      if genQuery then
+        list(sym("push")) :: (typedecls.toVector ++ decls).toList
+          ++ List(assert, list(sym("check-sat")))
+          ++ (if (getModel) then
+                List(list(sym("echo"), sym("\"" + name.getOrElse("") + "  ::  " + e + "\"")), list(sym("get-model")))
+              else List())
+          ++ List(list(sym("pop")))
+      else (typedecls.toVector ++ decls).toList :+ assert
 
     (terms.map(Sexp.print)).mkString("\n")
   }

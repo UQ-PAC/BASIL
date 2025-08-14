@@ -1,16 +1,15 @@
-name: Doc
+name: Docs
 on:
   workflow_dispatch:
   workflow_call:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 concurrency:
   group: "pages-${{ github.ref }}"
   cancel-in-progress: false
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
 
 jobs:
   build-docs:
@@ -21,14 +20,64 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+
+      - uses: coursier/cache-action@v6
+        with:
+          extraMillFiles: '**/*.mill'
+          ignoreJob: true
+          ignoreMatrix: true
+
+      - uses: actions/cache@v4
+        with:
+          path: out
+          key: |
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
+          restore-keys: |
+            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
+            build-${{ runner.os }}-
+            build-
+
+      - run: sudo apt-get update
       - run: sudo apt-get -y install latexmk texlive-latex-recommended texlive-lang-japanese texlive-latex-extra texlive-extra-utils poppler-utils
-      - run: ./mill --no-server allDocs
+      - run: |
+          ./mill --no-server allDocs
+          echo "dir=$(realpath out/allDocs.dest/BASIL)" >> "$GITHUB_OUTPUT"
+        id: allDocs
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: out/allDocs.dest
+          path: ${{ steps.allDocs.outputs.dir }}
+
+      - id: docArgs
+        run: echo "args=$(.github/workflows/check-doc-links.sh)" >> "$GITHUB_OUTPUT"
+        env:
+          LYCHEE_EXPORT_ARGS: "true"
+
+      - uses: lycheeverse/lychee-action@v2
+        id: lychee
+        with:
+          args: ${{ steps.docArgs.outputs.args}}
+          fail: false
+          failIfEmpty: true
+          jobSummary: false
+      - name: >-
+          $lychee_exit_code == 0
+        run: |
+          sed -i.bak 's|${{ steps.allDocs.outputs.dir }}||g' lychee/out.md
+          cat lychee/out.md
+          if ! [[ "$lychee_exit_code" == 0 ]]; then
+            cat lychee/out.md >> "$GITHUB_STEP_SUMMARY"
+            exit "$lychee_exit_code"
+          fi
+        env:
+          lychee_exit_code: ${{ steps.lychee.outputs.exit_code }}
 
   deploy-docs:
     if: github.ref_name == 'main'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

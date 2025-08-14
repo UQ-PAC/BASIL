@@ -1,7 +1,6 @@
 package ir
 
 import ir.*
-import ir.cilvisitor.*
 import ir.dsl.*
 import org.scalactic.*
 import org.scalatest.funsuite.AnyFunSuite
@@ -14,15 +13,21 @@ import scala.collection.immutable.*
 @test_util.tags.UnitTest
 class IRToDSLTest extends AnyFunSuite with CaptureOutput {
 
+  override def withFixture(test: NoArgTest) = {
+    DeepEquality.debug.withValue(true) {
+      super.withFixture(test)
+    }
+  }
+
   val mainproc = proc(
     "main",
     block(
       "l_main",
       LocalAssign(R0, bv64(10)),
-      LocalAssign(R1, bv64(10)),
-      directCall("p1"),
-      indirectCall(R0),
-      goto("returntarget")
+      LocalAssign(R1, bv64(10)).setComment(Some("comm:assign")),
+      directCall("p1").copy(comment = Some("comm:direct")),
+      indirectCall(R0).copy(comment = Some("comm:indirect")),
+      goto("returntarget").copy(comment = Some("comm:return~"))
     ),
     block("returntarget", ret)
   ).cloneable
@@ -49,29 +54,14 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
     assert(expected.pprint == actual.pprint, s"pretty printed equality")
   }
 
-  class StripLabel extends CILVisitor {
-    /* Strip features not preserved by serialiser */
-    override def vstmt(s: Statement) = s match {
-      case LocalAssign(a, b, c) => ChangeTo(List(LocalAssign(a, b, None)))
-      case MemoryAssign(l, r, lbl) => ChangeTo(List(MemoryAssign(l, r, None)))
-      case MemoryStore(m, i, v, e, s, lbl) => ChangeTo(List(MemoryStore(m, i, v, e, s, None)))
-      case MemoryLoad(l, m, i, e, s, lbl) => ChangeTo(List(MemoryLoad(l, m, i, e, s, None)))
-      case DirectCall(t, o, a, lbl) => ChangeTo(List(DirectCall(t, None, SortedMap.from(o), SortedMap.from(a))))
-      case Assert(b, com, lab) => ChangeTo(List(Assert(b)))
-      case Assume(b, com, lab, c) => ChangeTo(List(Assume(b, None, None, c)))
-      case _ => SkipChildren()
-    }
-  }
-
   /**
    * Asserts structural equality on the IR via after a round-trip through the parser
    */
-  def assertSerialisedParsedEqual(expected: Program) = {
-
-    visit_prog(StripLabel(), expected)
-
-    val actual = ir.parsing.ParseBasilIL.loadILString(expected.pprint).program
-    visit_prog(StripLabel(), actual)
+  inline def assertSerialisedParsedEqual(expected: Program) = {
+    val expectedStr = expected.pprint
+    val actual = ir.parsing.ParseBasilIL.loadILString(expectedStr).program
+    val actualStr = actual.pprint
+    assert(expectedStr == actualStr, "serialise-parse serialisation not equal")
     assert(
       expected.deepEqualsDbg(actual),
       s"serialise-parse deep equality ${expected.getClass.getSimpleName} != ${actual.getClass.getSimpleName}"
@@ -93,12 +83,12 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
     }
 
     val directcallstmt = p.preOrderIterator.collectFirst { case x: DirectCall => x }.head
-    assertResult(directCall("p1")) {
+    assertResult(directCall("p1").copy(comment = Some("comm:direct"))) {
       IRToDSL.convertStatement(directcallstmt)
     }
 
     val gotostmt = p.preOrderIterator.collectFirst { case x: GoTo => x }.head
-    assertResult(goto("returntarget")) {
+    assertResult(goto("returntarget").copy(comment = Some("comm:return~"))) {
       IRToDSL.convertJump(gotostmt)
     }
 
@@ -108,7 +98,7 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
     }
 
     val indircall = p.preOrderIterator.collectFirst { case x: IndirectCall => x }.head
-    assertResult(indirectCall(R0)) {
+    assertResult(indirectCall(R0).copy(comment = Some("comm:indirect"))) {
       IRToDSL.convertStatement(indircall)
     }
   }
@@ -183,15 +173,17 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
     val clonedProcs = cloned.procedures.map(p => p.name -> p).toMap
     for (p <- prog.procedures) {
       assert(clonedProcs.contains(p.name))
-      assert(p.formalInParam == clonedProcs(p.name).formalInParam)
-      assert(p.formalOutParam == clonedProcs(p.name).formalOutParam)
+      val cloned = clonedProcs(p.name)
+      assert(p.formalInParam == cloned.formalInParam)
+      assert(p.formalOutParam == cloned.formalOutParam)
 
-      val clonedBlocks = p.blocks.map(b => b.label -> b).toMap
+      val clonedBlocks = cloned.blocks.map(b => b.label -> b).toMap
 
       for (b <- p.blocks) {
         assert(clonedBlocks.contains(b.label))
         assert(b.deepEquals(clonedBlocks(b.label)))
       }
+      assertResult(p.returnBlock.map(_.label) == cloned.returnBlock.map(_.label))
     }
     assertDeepEquality(prog)(cloned)
     assertPrintedEquality(prog)(cloned)

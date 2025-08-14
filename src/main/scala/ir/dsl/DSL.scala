@@ -66,16 +66,18 @@ type NonCallStatement =
 
 type DSLStatement = NonCallStatement | EventuallyStatement | EventuallyJump
 
-def cloneStatement(x: NonCallStatement): NonCallStatement = x match {
-  case LocalAssign(a, b, c) => LocalAssign(a, b, c)
-  case MemoryAssign(a, b, c) => MemoryAssign(a, b, c)
-  case MemoryStore(a, b, c, d, e, f) => MemoryStore(a, b, c, d, e, f)
-  case MemoryLoad(a, b, c, d, e, f) => MemoryLoad(a, b, c, d, e, f)
-  case NOP(l) => NOP(l)
-  case Assert(a, b, c) => Assert(a, b, c)
-  case Assume(a, b, c, d) => Assume(a, b, c, d)
-  case a: SimulAssign => SimulAssign(a.assignments, a.label)
-}
+def cloneStatement(x: NonCallStatement): NonCallStatement =
+  val newstmt: NonCallStatement = x match {
+    case LocalAssign(a, b, c) => LocalAssign(a, b, c)
+    case MemoryAssign(a, b, c) => MemoryAssign(a, b, c)
+    case MemoryStore(a, b, c, d, e, f) => MemoryStore(a, b, c, d, e, f)
+    case MemoryLoad(a, b, c, d, e, f) => MemoryLoad(a, b, c, d, e, f)
+    case NOP(l) => NOP(l)
+    case Assert(a, b, c) => Assert(a, b, c)
+    case Assume(a, b, c, d) => Assume(a, b, c, d)
+    case a: SimulAssign => SimulAssign(a.assignments, a.label)
+  }
+  newstmt.setComment(x.comment)
 
 val R0: GlobalVar = Register("R0", 64)
 val R1: GlobalVar = Register("R1", 64)
@@ -141,11 +143,11 @@ trait EventuallyJump extends DeepEquality {
   def resolve(p: Program, proc: String): Jump = resolve(CachedLabelResolver(p), proc)
 }
 
-case class EventuallyIndirectCall(target: Variable, label: Option[String] = None)
+case class EventuallyIndirectCall(target: Variable, label: Option[String] = None, comment: Option[String] = None)
     extends EventuallyStatement
     with DefaultDeepEquality {
   override def resolve(p: CachedLabelResolver): Statement = {
-    IndirectCall(target, label)
+    IndirectCall(target, label).setComment(comment)
   }
 }
 
@@ -153,7 +155,8 @@ case class EventuallyCall(
   target: DelayNameResolve,
   lhs: Iterable[(String, Variable)],
   actualParams: Iterable[(String, Expr)],
-  label: Option[String] = None
+  label: Option[String] = None,
+  comment: Option[String] = None
 ) extends EventuallyStatement
     with DefaultDeepEquality {
   override def resolve(p: CachedLabelResolver): Statement = {
@@ -163,28 +166,36 @@ case class EventuallyCall(
     }
     val actual = SortedMap.from(actualParams.map((name, value) => t.formalInParam.find(_.name == name).get -> value))
     val callLhs = SortedMap.from(lhs.map((name, value) => t.formalOutParam.find(_.name == name).get -> value))
-    DirectCall(t, label, callLhs, actual)
+    DirectCall(t, label, callLhs, actual).setComment(comment)
   }
 }
 
-case class EventuallyGoto(targets: Iterable[DelayNameResolve], label: Option[String] = None)
-    extends EventuallyJump
+case class EventuallyGoto(
+  targets: Iterable[DelayNameResolve],
+  label: Option[String] = None,
+  comment: Option[String] = None
+) extends EventuallyJump
     with DefaultDeepEquality {
   override def resolve(p: CachedLabelResolver, proc: String): GoTo = {
     val tgs = targets.map(tn => tn.resolveBlock(p, proc).getOrElse(throw Exception(s"Cannot resolve $tn")))
-    GoTo(tgs, label)
+    GoTo(tgs, label).setComment(comment)
   }
 }
-case class EventuallyReturn(params: Iterable[(String, Expr)], label: Option[String] = None)
-    extends EventuallyJump
+case class EventuallyReturn(
+  params: Iterable[(String, Expr)],
+  label: Option[String] = None,
+  comment: Option[String] = None
+) extends EventuallyJump
     with DefaultDeepEquality {
   override def resolve(p: CachedLabelResolver, proc: String) = {
     val r = SortedMap.from(params.map((n, v) => p.procs(proc).formalOutParam.find(_.name == n).get -> v))
-    Return(label, r)
+    Return(label, r).setComment(comment)
   }
 }
-case class EventuallyUnreachable(label: Option[String] = None) extends EventuallyJump with DefaultDeepEquality {
-  override def resolve(p: CachedLabelResolver, proc: String) = Unreachable(label)
+case class EventuallyUnreachable(label: Option[String] = None, comment: Option[String] = None)
+    extends EventuallyJump
+    with DefaultDeepEquality {
+  override def resolve(p: CachedLabelResolver, proc: String) = Unreachable(label).setComment(comment)
 }
 
 def clonedStmt(s: NonCallStatement) = CloneableStatement(s)
@@ -341,8 +352,12 @@ case class EventuallyProcedure(
 
     val (tempBlocks, resolvers) = blocks.map(_.makeResolver).unzip
 
-    val entry = entryBlockLabel.flatMap(b => tempBlocks.find(_.label == b)).orElse(tempBlocks.headOption)
-    val returnBlock = returnBlockLabel.flatMap(b => tempBlocks.find(_.label == b))
+    def blockByName(label: String) = tempBlocks.find(_.label == label).getOrElse {
+      throw Exception(s"failed to find block with label '$label'")
+    }
+
+    val entry = entryBlockLabel.map(blockByName) orElse tempBlocks.headOption
+    val returnBlock = returnBlockLabel.map(blockByName)
 
     val tempProc: Procedure = Procedure(
       label,
@@ -363,7 +378,7 @@ case class EventuallyProcedure(
     def cont(prog: CachedLabelResolver) = {
       resolvers.foreach(_(prog, tempProc.name))
       jumps.foreach((b, j) => b.replaceJump(j.resolve(prog, tempProc.name)))
-      tempBlocks.headOption.foreach(b => tempProc.entryBlock = b)
+      entry.foreach(b => tempProc.entryBlock = b)
     }
 
     (tempProc, cont)
@@ -388,27 +403,52 @@ case class EventuallyProcedure(
   def cloneable = this.copy(blocks = blocks.map(_.cloneable))
 }
 
-def proc(label: String, blocks: EventuallyBlock*): EventuallyProcedure = {
-  EventuallyProcedure(label, SortedMap(), SortedMap(), blocks, blocks.headOption.map(_.label))
+case object Unspecified
+
+/**
+ * Main DSL entry point for constructing [[EventuallyProcedure]] values.
+ *
+ * Aside from `label`, all of the parameters are optional. By default,
+ * this function will attempt to infer the return block as the unique
+ * block containing a return statement. This can be disabled by giving
+ * an [[Option]] for `returnBlockLabel`.
+ *
+ * This is the only overload of [[proc]] which defines default parameter
+ * values. Other overloads have fewer parameter and defer to this function.
+ */
+def proc(
+  label: String,
+  in: Iterable[(String, IRType)] = Nil,
+  out: Iterable[(String, IRType)] = Nil,
+  returnBlockLabel: Option[String] | Unspecified.type = Unspecified
+)(blocks: EventuallyBlock*): EventuallyProcedure = {
+
+  val entryBlock = blocks.headOption
+
+  lazy val inferredReturn = {
+    val blocksWithReturn = blocks.filter(_.j.isInstanceOf[EventuallyReturn]).toSeq
+    blocksWithReturn match {
+      case Seq(b) if entryBlock.forall(_ ne b) => Some(b.label)
+      case _ => None
+    }
+  }
+
+  val _returnBlockLabel = returnBlockLabel match {
+    case Unspecified => inferredReturn
+    case x: Option[String] => x
+  }
+
+  EventuallyProcedure(label, in.to(SortedMap), out.to(SortedMap), blocks, entryBlock.map(_.label), _returnBlockLabel)
 }
+
+def proc(label: String, blocks: EventuallyBlock*): EventuallyProcedure = proc(label)(blocks: _*)
 
 def proc(
   label: String,
   in: Iterable[(String, IRType)],
   out: Iterable[(String, IRType)],
   blocks: Iterable[EventuallyBlock]
-): EventuallyProcedure = {
-  EventuallyProcedure(label, in.to(SortedMap), out.to(SortedMap), blocks.toSeq, blocks.headOption.map(_.label))
-}
-
-def proc(
-  label: String,
-  in: Iterable[(String, IRType)],
-  out: Iterable[(String, IRType)],
-  blocks: EventuallyBlock*
-): EventuallyProcedure = {
-  proc(label, in, out, blocks.toSeq)
-}
+): EventuallyProcedure = proc(label, in, out)(blocks.toSeq: _*)
 
 def mem: SharedMemory = SharedMemory("mem", 64, 8)
 

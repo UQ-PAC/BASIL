@@ -58,5 +58,5 @@ it additionally inserts assertions and specifications to make Boogie check infor
 5. Verification
     - The Boogie IR program is serialised, and run through the Boogie verifier.
 
-See [RunUtils.scala](../src/main/scala/util/RunUtils.scala) where this is organised, for more detail.
+See [RunUtils.scala](https://github.com/UQ-PAC/BASIL/tree/main/src/main/scala/util/RunUtils.scala) where this is organised, for more detail.
 

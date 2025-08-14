@@ -1,5 +1,6 @@
 package boogie
 import ir.*
+import ir.dsl.given
 import specification.*
 import util.assertion.*
 
@@ -730,6 +731,7 @@ case class GammaLoad(gammaMap: BMapVar, index: BExpr, bits: Int, accesses: Int) 
 }
 
 case class GammaStore(gammaMap: BMapVar, index: BExpr, value: BExpr, bits: Int, accesses: Int) extends BExpr {
+  require(accesses > 0)
   override def toString: String = s"$fnName($gammaMap, $index, $value)"
   val fnName: String = s"gamma_store$bits"
 
@@ -772,13 +774,11 @@ trait SpecVar extends BExpr {
   }
 }
 
-trait SpecGlobalOrAccess extends SpecVar with Ordered[SpecGlobalOrAccess] {
+trait SpecGlobalOrAccess extends SpecVar {
   val toAddrVar: BExpr
   val toOldVar: BVar
   val toOldGamma: BVar
   val size: Int
-
-  def compare(that: SpecGlobalOrAccess): Int = address.compare(that.address)
 }
 
 case class SpecGlobal(
@@ -787,7 +787,8 @@ case class SpecGlobal(
   arraySize: Option[Int],
   override val address: BigInt
 ) extends SymbolTableEntry,
-      SpecGlobalOrAccess {
+      SpecGlobalOrAccess,
+      util.ProductOrdered[SpecGlobal] derives ir.dsl.ToScala {
   override def specGlobals: Set[SpecGlobalOrAccess] = Set(this)
 
   def sanitisedName = util.StringEscape.escape(name)
