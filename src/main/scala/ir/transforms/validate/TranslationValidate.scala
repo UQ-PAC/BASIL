@@ -1224,7 +1224,7 @@ object TranslationValidator {
     def procToTrInplace(p: Procedure, params: Map[String, CallParamMapping], introducedAsserts: Set[String]) = {
 
       ir.transforms.reversePostOrder(p)
-      val liveVars: Map[String, Set[Variable]] = getLiveVars(p, params)
+      val liveVars: Map[String, Set[Variable]] = getLiveVars(p, params) + (PCMan.assertFailBlockLabel -> Set())
 
       val cuts = TransitionSystem.toTransitionSystemInPlace(p)
 

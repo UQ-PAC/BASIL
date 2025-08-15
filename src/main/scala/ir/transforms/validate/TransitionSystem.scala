@@ -9,6 +9,8 @@ object PCMan {
   val assumptionFailLabel = "ASSUMEFAIL"
   val assertionFailLabel = "ASSERTFAIL"
 
+  val assertFailBlockLabel = "ASSERTFAIL"
+
   val allocatedPCS = mutable.Map[String, BitVecLiteral]()
   var pcCounter = 0
   def PCSym(s: String) = {
@@ -208,7 +210,9 @@ object TransitionSystem {
   *
   */
   def totaliseAsserts(proc: Procedure, introdAsserts: Set[String] = Set()) = {
-    AssertsToPC(proc.returnBlock.get, introdAsserts).transform(proc)
+    val b = Block(assertFailBlockLabel)
+    proc.addBlock(b)
+    AssertsToPC(b, introdAsserts).transform(proc)
   }
 
   private class AssertsToPC(val exitBl: Block, introdAsserts: Set[String] = Set()) {
