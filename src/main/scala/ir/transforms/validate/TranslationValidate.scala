@@ -94,10 +94,7 @@ case class InvariantDescription(
   introducedAsserts: Set[String] = Set()
 ) {
   def compose(i: InvariantDescription) = {
-    InvariantDescription(
-      composeDRFun(renamingSrcTgt, i.renamingSrcTgt),
-      composeDRFun(i.renamingTgtSrc, renamingTgtSrc),
-    )
+    InvariantDescription(composeDRFun(renamingSrcTgt, i.renamingSrcTgt), composeDRFun(i.renamingTgtSrc, renamingTgtSrc))
   }
 
 }

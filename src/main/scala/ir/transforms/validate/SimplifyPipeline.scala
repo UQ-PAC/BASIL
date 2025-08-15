@@ -36,6 +36,7 @@ def dynamicSingleAssignment(config: TVJob, p: Program) = {
 }
 
 def dsaCopyPropCombined(config: TVJob, p: Program) = {
+  // not working reliably
 
   def dsa(p: Program) = transforms.OnePassDSA().applyTransform(p)
   def copyprop(p: Program) = {
@@ -261,13 +262,10 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   config = assumePreservedParams(config, p)
   transforms.applyRPO(p)
   config = simplifyCFGValidated(config, p)
-  // transforms.applyRPO(p)
-  // config = dynamicSingleAssignment(config, p)
-  // transforms.applyRPO(p)
-  // config = config.copy(outputPath=Some("tvsmt"))
-  // config = copyProp(config, p)
-
-  config = dsaCopyPropCombined(config, p)
+  transforms.applyRPO(p)
+  config = dynamicSingleAssignment(config, p)
+  transforms.applyRPO(p)
+  config = copyProp(config, p)
 
   transforms.applyRPO(p)
   config = guardCleanup(config, p)
