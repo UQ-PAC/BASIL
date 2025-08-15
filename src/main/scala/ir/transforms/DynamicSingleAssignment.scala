@@ -107,10 +107,12 @@ class OnePassDSA(
 
   }
 
-  def applyTransform(p: Program): Unit = {
-    for (proc <- p.procedures) {
-      applyTransform(proc)
-    }
+  def applyTransform(p: Program): Map[String, result] = {
+    p.procedures
+      .map(proc => {
+        proc.name -> applyTransform(proc)
+      })
+      .toMap
   }
 
   def createBlockBetween(b1: Block, b2: Block, label: String = "phi"): Block = {
@@ -280,7 +282,22 @@ class OnePassDSA(
     fixSuccessors(_st, count, liveBefore, liveAfter, block)
   }
 
-  def applyTransform(p: Procedure): Unit = {
+  type result = Map[String, (Map[Variable, Variable], Map[Variable, Variable])]
+
+  def stToResult(_st: mutable.Map[Block, BlockState]): result = {
+    _st.toMap.map((bl: Block, bs: BlockState) => {
+      bl.label -> (
+        bs.renamesBefore.toMap.map { case (v, idx) =>
+          (v, visit_rvar(StmtRenamer(Map(), Map(v -> idx)), v))
+        },
+        bs.renamesAfter.toMap.map { case (v, idx) =>
+          (v, visit_rvar(StmtRenamer(Map(), Map(v -> idx)), v))
+        }
+      )
+    })
+  }
+
+  def applyTransform(p: Procedure): result = {
     val _st = mutable.Map[Block, BlockState]()
     // ensure order is defined
     ir.transforms.reversePostOrder(p)
@@ -335,6 +352,7 @@ class OnePassDSA(
 
     reversePostOrder(p)
 
+    stToResult(_st)
   }
 
 }
