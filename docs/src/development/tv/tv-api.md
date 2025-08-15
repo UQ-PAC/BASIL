@@ -5,13 +5,58 @@ Translation validation is performed by the method `getValidationSMT` on the `Tra
 We now explain its signature in full, it is provided in full below for context.
 
 ```scala
-  def getValidationSMT(
-    config: TVJob,   // configuration
-    runName: String, // name of the run for bookkeeping
-    invariantRenamingSrcTgt: TransformDataRelationFun = _ => e => Some(e),
-    flowFacts: TransformTargetTargetFlowFact = _ => Map(),
-    introducedAsserts: Set[String] = Set()
-  ): TVJob
+
+
+case class TVJob(
+  outputPath: Option[String],
+  verify: Option[util.SMT.Solver] = None,
+  results: List[TVResult] = List(),
+  debugDumpAlways: Boolean = false,
+  /* minimum number of statements in source and target combined to trigger case analysis */
+  splitLargeProceduresThreshold: Option[Int] = Some(60)
+)
+
+object TranslationValidator:
+  def forTransform[T](
+    transformName: String,
+    transform: Program => T,
+    invariant: T => InvariantDescription = (_: T) => InvariantDescription()
+  ): ((Program, TVJob) => TVJob)
+```
+
+This returns a anonymous function which runs the provided transform on a program, passes its result to the invariant function
+to produce a description of the transform, then runs the tanslation validation, returning a copy of the `TVJob`
+including the additional validation results.
+
+The invariants are specified with the `InvariantDescription` type, which can be derived from the output of the transform functor.
+
+```scala
+
+/**
+ * Describes the mapping from a variable in one program to an expression in the other, at a specific block and procedure.
+ */
+type TransformDataRelationFun = (ProcID, Option[BlockID]) => (Variable | Memory) => Seq[Expr]
+
+case class InvariantDescription(
+  /** The way live variables at each cut in the source program relate to equivalent expressions or variables in the target.
+   *
+   * NOTE: !!! The first returned value of this is also used to map procedure call arguments in the source
+   * program to the equivalent arguments in the target program.
+   *  */
+  renamingSrcTgt: TransformDataRelationFun = (_, _) => e => Seq(e),
+
+  /**
+   * Describes how live variables at a cut in the target program relate to equivalent variables in the source.
+   *
+   */
+  renamingTgtSrc: TransformDataRelationFun = (_, _) => _ => Seq(),
+
+  /**
+   * Set of values of [ir.Assert.label] for assertions introduced in this pass, whose should
+   * be ignored as far as translation validation is concerned.
+   */
+  introducedAsserts: Set[String] = Set()
+) {
 ```
 
 ### Shape-Preserving Transforms
@@ -29,42 +74,25 @@ variable in the target.
 An example of this is the identity transform, which makes no changes:
 
 ```scala
-def identityTransform(config: TVJob, p: Program) : TVJob = {
-  def transform(p: Program) = ()
-  val (validator, _) = validatorForTransform(transform)(p)
-  validator.getValidationSMT(config, "Identity")
+def nop(p: Program) = {
+  // execute the transform and write validation queries to folder tvsmt
+  TranslationValidator.forTransform("NOP", p => p)(p, TVJob(Some("tvsmt")))
 }
 ```
+
+This validates with the default invariant `() => InvariantDescription`
 
 Even dead-code eliminiation can be handled with the default invariant.
 
 ### Non-Shape-Preserving 
 
 For sophisticated transforms more information may be provided to the validation framework
-to generate the verification invariant through the parameters `invariantRenamingSrcTgt` and `flowFacts`.
+to generate the verification invariant through the parameters `renamingSrcTgt` and `flowFacts`.
 
-1. target-to-source variable relations; to relate possibly renamed variables (`invariantRenamingSrcTgt` parameter)
-2. target-to-target variable relations; to describe static analysis facts motivating the transform (`flowFacts` parameter)
-
-An example which requires this is the parameter analysis which lifts all global variables to local variables and
-introduces procedure parameters, we provide the validator which a function which translates variables
-in the target program to expressions in the source program:
-
-```scala
-def parameters(config: TVJob, p: Program) = {
-  val (validator, _) = validatorForTransform(p => transforms.liftProcedureCallAbstraction(p, None))(p)
-
-  // describes how the source and target programs relate to eachother after the transform 
-  def sourceToTarget(b: Option[BlockID])(v: Variable | Memory): Option[Expr] = v match {
-    case LocalVar(s"${i}_in", t, 0) => Some(GlobalVar(s"$i", t))
-    case LocalVar(s"${i}_out", t, 0) => Some(GlobalVar(s"$i", t))
-    case LocalVar(n, t, 0) => Some(GlobalVar(n, t))
-    case g => Some(g)
-  }
-
-  validator.getValidationSMT(config, "Parameters", sourceToTarget)
-}
-```
+1. source-to-target variable relations; to relate possibly renamed variables (`renamingSrcTgt` parameter)
+  - !! This is also used to figure out how to match procedure call parameters between the target and source programs.
+2. source-to-target variable relations; used in copyprop to pass definitions across cuts for variables live in the
+  target program but not live in the source program.
 
 ## Introducing Assumptions via Later-Verified Assertions
 
@@ -78,10 +106,11 @@ of an assertion introduced by the transform. Since these traces will later be ve
 we can soundly ignore them in the translation validation.
 
 ```scala
-def assumePreservedParams(config: TVJob, p: Program) : TVJob = {
-  val (validator, asserts) = validatorForTransform(transforms.CalleePreservedParam.transform)(p)
-  validator.getValidationSMT(config, "AssumeCallPreserved", introducedAsserts = asserts.toSet)
-}
+TranslationValidator.forTransform(
+  "AssumeCallPreserved",
+  transforms.CalleePreservedParam.transform,
+  asserts => InvariantDescription(introducedAsserts = asserts.toSet)
+)
 ```
 
 # Soundness of Translation Validation

@@ -69,7 +69,6 @@ case class TVJob(
  * Describes the mapping from source variable to target expression at a given Block ID in the source program.
  */
 type TransformDataRelationFun = (ProcID, Option[BlockID]) => (Variable | Memory) => Seq[Expr]
-type TransformTargetTargetFlowFact = ProcID => Map[Variable, Expr]
 
 /**
  * Closures describing the reslationship between surce and target programs.
@@ -81,17 +80,13 @@ case class InvariantDescription(
    * program to the equivalent arguments in the target program.
    *  */
   renamingSrcTgt: TransformDataRelationFun = (_, _) => e => Seq(e),
+
   /**
    * Describes how live variables at a cut in the target program relate to equivalent variables in the source.
    *
    */
   renamingTgtSrc: TransformDataRelationFun = (_, _) => _ => Seq(),
-  /**
-   * Describes relations between variables within the target program
-   * (This is not tested and possibly generates non-useful invariants)
-   *
-   */
-  flowFacts: TransformTargetTargetFlowFact = _ => Map(),
+
   /**
    * Set of values of [ir.Assert.label] for assertions introduced in this pass, whose should
    * be ignored as far as translation validation is concerned.
@@ -102,7 +97,6 @@ case class InvariantDescription(
     InvariantDescription(
       composeDRFun(renamingSrcTgt, i.renamingSrcTgt),
       composeDRFun(i.renamingTgtSrc, renamingTgtSrc),
-      Map()
     )
   }
 
