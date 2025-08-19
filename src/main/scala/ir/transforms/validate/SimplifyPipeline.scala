@@ -251,12 +251,12 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   val p = ctx.program
   var config = mode match {
     case SimplifyMode.ValidatedSimplify(verifyMode, filePrefix) =>
-      TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = false)
+      TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = true)
     case _ => TVJob(None, None)
   }
   transforms.applyRPO(p)
-  // nop(config, p)
-  // Logger.writeToFile(File("beforeParams.il"), translating.PrettyPrinter.pp_prog(ctx.program))
+  nop(config, p)
+  Logger.writeToFile(File("beforeParams.il"), translating.PrettyPrinter.pp_prog(ctx.program))
   val (res, nctx) = parameters(config, ctx)
   config = res
   config = assumePreservedParams(config, p)

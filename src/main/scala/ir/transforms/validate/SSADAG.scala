@@ -27,9 +27,9 @@ object SSADAG {
         // FIXME: should probably go in the ackermann pass?
         ChangeTo(List())
       }
-      case SimulAssign(assignments, _) => {
-        ChangeTo(List(Assume(boolAnd(assignments.map(polyEqual)))))
-      }
+      //case SimulAssign(assignments, _) => {
+      //  ChangeTo(List(Assume(boolAnd(assignments.map(polyEqual)))))
+      //}
       case _ => SkipChildren()
     }
   }
@@ -51,6 +51,10 @@ object SSADAG {
 
     visit_proc(MonadicConverter(frames), p)
 
+  }
+
+  def blockDoneVar(b: BlockID) = {
+    LocalVar(b + "_done", BoolType)
   }
 
   def blockDoneVar(b: Block) = {
@@ -95,6 +99,12 @@ object SSADAG {
         case _ => DoChildren()
 
       }
+    }
+
+    def mkIte(cases : List[(Expr, Expr)]) = {
+      /* assume cases are total, i.e. last guard of cases can be discarded  */
+     val rt = cases.head._2.getType
+     FApplyExpr("ite", cases.flatMap { case (c, b) => List(c, b) }, rt)
     }
 
     def renameRHS(rename: Variable => Option[Variable])(c: Command): Command = c match {
@@ -158,17 +168,16 @@ object SSADAG {
             val grouped = defsToJoin.groupBy(_._2).map {
               case (ivar, blockset) => {
                 val blocks = blockset.map(_._1)
-                BinaryExpr(BoolIMPLIES, boolOr(blocks.map(blockDone)), polyEqual(ivar, fresh))
+                (boolOr(blocks.map(blockDone)), ivar)
               }
             }
 
-            val phicond = grouped.toList
+            val phiscond = Seq(LocalAssign(fresh, mkIte(grouped.toList), Some(phiLabel)))
+            //  if (phicond.length > 8) then {
+            //  phicond.map(b => Assume(b, None, Some(phiLabel)))
+            //} else Seq(Assume(boolAnd(phicond), None, Some(phiLabel)))
 
-            val phiscond = if (phicond.length > 8) then {
-              phicond.map(b => Assume(b, None, Some(phiLabel)))
-            } else Seq(Assume(boolAnd(phicond), None, Some(phiLabel)))
-
-            phis += phicond.length
+            // phis += grouped.length
             b.statements.prependAll(phiscond)
 
             nrenaming(v) = fresh
@@ -189,6 +198,8 @@ object SSADAG {
       val renaming = mutable.Map.from(renameBefore.getOrElse(b, Map()))
 
       def isPhi(s: Statement) = s match {
+        case a: LocalAssign if a.label.contains(phiLabel) => true
+        case a: Assert if a.label.contains(phiLabel) => true
         case a: Assume if a.label.contains(phiLabel) => true
         case _ => false
       }
@@ -233,7 +244,7 @@ object SSADAG {
 
       b.statements.append(LocalAssign(blockDone(b), c))
       if (b.label.contains("SYNTH_EXIT")) {
-        b.statements.append(Assert(blockDone(b), Some("blockdone")))
+        b.statements.append(LocalAssign(blockDone(b), TrueLiteral, Some("blockdone")))
       }
     }
 
