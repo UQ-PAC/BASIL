@@ -113,5 +113,6 @@ class GammaDomainTests extends AnyFunSuite, CaptureOutput {
     )
     val f = program.nameToProcedure("f")
     val wpDualResults = getWpDualResults(f)
+    // should have not panicked
   }
 }
