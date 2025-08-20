@@ -46,6 +46,7 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
   case object R_AARCH64_GLOB_DAT extends Elf64RelaType(1025)
   case object R_AARCH64_JUMP_SLOT extends Elf64RelaType(1026)
   case object R_AARCH64_RELATIVE extends Elf64RelaType(1027)
+  case object R_AARCH64_STATIC extends Elf64RelaType(257)
 
   protected def readRela(bs: AuxDecoder.Input) =
     import AuxDecoder.*
@@ -69,6 +70,8 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     case R_AARCH64_GLOB_DAT.value => R_AARCH64_GLOB_DAT
     case R_AARCH64_JUMP_SLOT.value => R_AARCH64_JUMP_SLOT
     case R_AARCH64_RELATIVE.value => R_AARCH64_RELATIVE
+    case R_AARCH64_STATIC.value => R_AARCH64_STATIC
+    case o => throw Exception(s"other value: $o")
   }
 
   /**

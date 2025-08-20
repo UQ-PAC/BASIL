@@ -251,7 +251,8 @@ object TranslationValidator {
     cuts: CutPointMap,
     callParams: CallParamMapping,
     private val ssaRenamingFun: ((String, Expr) => Expr),
-    private val ssaDefines: Map[BlockID, Map[Variable, Variable]]
+    private val ssaDefines: Map[BlockID, Map[Variable, Variable]],
+    cutRestict: Option[String] = None,
   ) {
 
     def defines(block: BlockID): Set[Variable] = {
@@ -1028,7 +1029,7 @@ object TranslationValidator {
     val solver = config.verify.map(solver => util.SMT.SMTSolver(Some(1000), solver))
     val prover = solver.map(_.getProver(true))
 
-    b.addCommand("set-logic", "QF_BV")
+    b.addCommand("set-logic", "QF_UFBV")
 
     var count = 0
 
@@ -1036,6 +1037,10 @@ object TranslationValidator {
       Some(combineProcs(source, target))
     } else None
     lazy val npe = newProg.map(_.mainProcedure.entryBlock.get)
+
+    val cutR = sourceInfo.cutRestict.foreach(cutLabel => {
+      b.addAssert(exprInSource(BinaryExpr(EQ, PCMan.PCSym(cutLabel), TransitionSystem.programCounterVar)))
+    })
 
     count = 0
     for (e <- preInv) {
@@ -1333,7 +1338,7 @@ object TranslationValidator {
      * slice: the only target of proc.entryBlock to keep
      *  - must be a successor of proc.transition.entryBlock
      */
-    def cloneWithSlice(slice: BlockID, proc: ProcInfo) = {
+    def cloneWithSlice(slice: BlockID, cutLabel: String, proc: ProcInfo) = {
       val np = ir.dsl.IRToDSL.cloneSingleProcedure(proc.transition)
 
       val bl = proc.transition.blocks.find(_.label == slice).get
@@ -1347,16 +1352,16 @@ object TranslationValidator {
       toRemove.foreach(jump.removeTarget)
 
       TransitionSystem.removeUnreachableBlocks(np.mainProcedure)
-      proc.copy(transition = np.mainProcedure)
+      proc.copy(transition = np.mainProcedure, cutRestict = Some(cutLabel))
     }
 
     nextS.map {
       case (cutLabel, sourceBlock) => {
-        val newsource = cloneWithSlice(sourceBlock.label, source)
+        val newsource = cloneWithSlice(sourceBlock.label, cutLabel, source)
 
         val targetBlock = targetBlockForCut(cutLabel).label
 
-        val newtarget = cloneWithSlice(targetBlock, target)
+        val newtarget = cloneWithSlice(targetBlock, cutLabel, target)
 
         (newsource, newtarget)
       }

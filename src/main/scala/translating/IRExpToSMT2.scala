@@ -283,7 +283,8 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       typedecls.foreach(psexp)
       decls.foreach(psexp)
       exprs.foreach(e => psexp(e.toSexp))
-      psexp(list(sym("check-sat")))
+      b.append("(check-sat-using (then (repeat (then (repeat (then euf-completion simplify)) (par-or (try-for smt 5000) skip))) smt))")
+      // psexp(list(sym("check-sat")))
       getUnsat.foreach(psexp)
     }
 
@@ -403,11 +404,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     if endian == Endian.LittleEndian then vexpr(FalseLiteral) else vexpr(TrueLiteral)
   }
   override def vfapply_expr(name: String, args: Seq[Sexp[Expr]]): Sexp[Expr] = {
-    if (args.size == 1) {
-      list(sym(name), args.head)
-    } else {
-      list(sym(name), Sexp.Slist(args.toList))
-    }
+    list((sym(name) :: args.toList): _*)
   }
 
   override def vrvar(e: Variable): Sexp[Variable] = sym(fixVname(e.name))
