@@ -284,15 +284,10 @@ object IRTransform {
   def doCleanup(ctx: IRContext, doSimplify: Boolean = false): IRContext = {
     Logger.info("[!] Removing external function calls")
     // Remove external function references (e.g. @printf)
-    val externalNames = ctx.externalFunctions.map(e => e.name)
-    val externalNamesLibRemoved = mutable.Set[String]()
-    externalNamesLibRemoved.addAll(externalNames)
-
-    for (e <- externalNames) {
-      if (e.contains('@')) {
-        externalNamesLibRemoved.add(e.split('@')(0))
+    val external = ctx.externalFunctions.map(e => e.name -> e.offset).toMap
+      ++ ctx.externalFunctions.collect {
+        case ExternalFunction(n, addr) if n.contains('@') => n.split('@')(0) -> addr
       }
-    }
 
     ctx.program.procedures.foreach(ir.transforms.makeProcEntryNonLoop)
 
@@ -309,12 +304,22 @@ object IRTransform {
 
     transforms.establishProcedureDiamondForm(ctx.program, doSimplify)
 
-    ir.transforms.removeBodyOfExternal(externalNamesLibRemoved.toSet)(ctx.program)
+    ir.transforms.removeBodyOfExternal(external.keys.toSet)(ctx.program)
     for (p <- ctx.program.procedures) {
       p.isExternal = Some(
         ctx.externalFunctions.exists(e => e.name == p.procName || p.address.contains(e.offset)) || p.isExternal
           .getOrElse(false)
       )
+    }
+
+    // add external procedures to program
+    for (ef <- ctx.externalFunctions) {
+      val p = ctx.program.procedures.find(proc => proc.procName == ef.name || proc.address.contains(ef.offset))
+      if (p.isEmpty) {
+        val np = Procedure(ef.name.split('@')(0), Some(ef.offset))
+        np.isExternal = Some(true)
+        ctx.program.addProcedure(np)
+      }
     }
 
     assert(invariant.singleCallBlockEnd(ctx.program))
@@ -854,7 +859,7 @@ object RunUtils {
       }
     }
     Logger.info("Copyprop Start")
-    transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
+    transforms.copyPropParamFixedPoint(program)
 
     transforms.fixupGuards(program)
     transforms.removeDuplicateGuard(program)
@@ -920,7 +925,7 @@ object RunUtils {
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
 
-    ctx = IRTransform.doCleanup(ctx, conf.simplify)
+    ctx = IRTransform.doCleanup(ctx, conf.simplify != SimplifyMode.Disabled)
     assert(ir.invariant.programDiamondForm(ctx.program))
 
     transforms.inlinePLTLaunchpad(ctx.program)
@@ -938,7 +943,7 @@ object RunUtils {
     ctx.program.procedures.foreach(transforms.RemoveUnreachableBlocks.apply)
     Logger.info(s"[!] Removed unreachable blocks")
 
-    if (q.loading.parameterForm && !q.simplify) {
+    if (q.loading.parameterForm && !(q.simplify != SimplifyMode.Disabled)) {
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
       if (conf.assertCalleeSaved) {
@@ -965,23 +970,42 @@ object RunUtils {
 
     assert(ir.invariant.programDiamondForm(ctx.program))
     ir.eval.SimplifyValidation.validate = conf.validateSimp
-    if (conf.simplify) {
 
-      ir.transforms.clearParams(ctx.program)
-
-      ir.transforms.liftIndirectCall(ctx.program)
-      transforms.liftSVCompNonDetEarlyIR(ctx.program)
-
-      DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
-      ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
-      DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
-
-      if (conf.assertCalleeSaved) {
-        transforms.CalleePreservedParam.transform(ctx.program)
+    conf.simplify match {
+      case SimplifyMode.Disabled => ()
+      case _ => {
+        for (p <- ctx.program.procedures) {
+          p.normaliseBlockNames()
+        }
       }
+    }
 
-      assert(ir.invariant.programDiamondForm(ctx.program))
-      doSimplify(ctx, conf.staticAnalysis)
+    conf.simplify match {
+      case c: SimplifyMode.ValidatedSimplify => {
+        ir.transforms.clearParams(ctx.program)
+        ir.transforms.liftIndirectCall(ctx.program)
+        DebugDumpIRLogger.writeToFile(File("il-beforetvsimp.il"), pp_prog(ctx.program))
+        val (tvres, nctx) = transforms.validate.validatedSimplifyPipeline(ctx, conf.simplify)
+        ctx = nctx
+      }
+      case SimplifyMode.Simplify => {
+        ir.transforms.clearParams(ctx.program)
+
+        ir.transforms.liftIndirectCall(ctx.program)
+        transforms.liftSVCompNonDetEarlyIR(ctx.program)
+
+        DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
+        ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
+        DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
+
+        if (conf.assertCalleeSaved) {
+          transforms.CalleePreservedParam.transform(ctx.program)
+        }
+
+        assert(ir.invariant.programDiamondForm(ctx.program))
+        doSimplify(ctx, conf.staticAnalysis)
+      }
+      case SimplifyMode.Disabled => ()
     }
 
     assert(ir.invariant.programDiamondForm(ctx.program))
@@ -1008,7 +1032,11 @@ object RunUtils {
 
     if (conf.summariseProcedures) {
       StaticAnalysisLogger.info("[!] Generating Procedure Summaries")
-      IRTransform.generateProcedureSummaries(ctx, ctx.program, q.loading.parameterForm || conf.simplify)
+      IRTransform.generateProcedureSummaries(
+        ctx,
+        ctx.program,
+        q.loading.parameterForm || conf.simplify != SimplifyMode.Disabled
+      )
     }
 
     if (!conf.staticAnalysis.exists(!_.irreducibleLoops) && conf.generateLoopInvariants) {
@@ -1150,7 +1178,6 @@ object RunUtils {
 
     StaticAnalysisLogger.info("[!] Running DSA Analysis")
 
-    writeToFile(pp_prog(ctx.program), "testo1.il")
     val symbolTableEntries: Set[SymbolTableEntry] = ctx.globals ++ ctx.funcEntries
     val dsa = DataStructureAnalysis(
       ctx.program,

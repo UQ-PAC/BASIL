@@ -20,6 +20,7 @@ import basilmill.BasilDocs
 import basilmill.BasilVersion
 import basilmill.ProfileModule
 import basilmill.Z3Module
+//import basilmill.CVC5Module
 
 import os.Path
 
@@ -49,8 +50,12 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
   val aslpOffline = mvn"io.github.uq-pac::lifter:0.1.0"
   val javaSmt = mvn"org.sosy-lab:java-smt:5.0.0"
   val javaSmtZ3 = mvn"org.sosy-lab:javasmt-solver-z3:4.14.0"
+  val javaSmtCVC5 = mvn"org.sosy-lab:javasmt-solver-cvc5:1.2.1-g8594a8e4dc"
+  val cats_collections = mvn"org.typelevel::cats-collections-core:0.9.10"
+  val cats_core = mvn"org.typelevel::cats-core:2.13.0"
+  val cats_kernel = mvn"org.typelevel::cats-kernel:2.13.0"
 
-  override def mvnDeps = Seq(scalactic, sourceCode, mainArgs, upickle, aslpOffline, javaSmt, javaSmtZ3)
+  override def mvnDeps = Seq(scalactic, sourceCode, mainArgs, upickle, aslpOffline, javaSmt, javaSmtZ3, javaSmtCVC5, cats_kernel, cats_core, cats_collections)
 
   override def repositoriesTask = Task.Anon {
     super.repositoriesTask() :+ MavenRepository(
@@ -66,6 +71,7 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
   override def mainClass = Some("Main")
 
   override def moduleDir = BuildCtx.workspaceRoot / "src"
+
 
   override def sources = Task.Sources("main/scala")
 
@@ -223,6 +229,7 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
   }
 
   object z3 extends Z3Module
+//  object cvc5 extends CVC5Module
 
   def ctagsConfig = Task.Source {
     BuildCtx.workspaceRoot / "basilmill" / "scala.ctags"
@@ -255,7 +262,9 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
   def runProfile(profileDest: String, args: String*) = Task.Command {
     println(s"Profiling: you may want to set\n  sudo sysctl kernel.perf_event_paranoid=1\n  sudo sysctl kernel.kptr_restrict=0\n")
     val prof = asyncProf.path()
-    os.call(("java", s"-agentpath:${prof}=start,event=cpu,file=${profileDest}",  "-jar", assembly().path.toString, args), stdout = os.Inherit, cwd = BuildCtx.workspaceRoot)
+    val oargs : Seq[String] = forkArgs() 
+    val realArgs : Seq[String] = oargs ++ Seq(s"-agentpath:${prof}=start,event=cpu,file=${profileDest}")
+    os.call(Seq("java") ++ realArgs ++ Seq( "-jar", assembly().path.toString) ++ args, stdout = os.Inherit, cwd = BuildCtx.workspaceRoot)
   }
 
 }

@@ -249,6 +249,7 @@ jobs:
           AnalysisSystemTest2,
           AnalysisSystemTest3,
           AnalysisSystemTest4,
+          TVSystemTest,
         ]
       fail-fast: false
 
