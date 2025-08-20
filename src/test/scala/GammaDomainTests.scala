@@ -18,6 +18,13 @@ class GammaDomainTests extends AnyFunSuite, CaptureOutput {
     after
   }
 
+  def getWpDualResults(procedure: Procedure): Map[Block, Predicate] = {
+    reversePostOrder(procedure)
+    val domain = WpDualDomain(_ => ProcedureSummary(List(), List()))
+    val (before, after) = worklistSolver(domain).solveProc(procedure, true)
+    after
+  }
+
   def getReachabilityConditions(procedure: Procedure): Map[Block, Predicate] = {
     reversePostOrder(procedure)
     val (before, after) = worklistSolver(ReachabilityConditions()).solveProc(procedure, false)
@@ -97,5 +104,14 @@ class GammaDomainTests extends AnyFunSuite, CaptureOutput {
         .split
         .contains(Predicate.gammaLeq(GammaTerm.Var(R0), GammaTerm.OldVar(R2)))
     )
+  }
+
+  test("fApplyExpr") {
+    val program = prog(
+      proc("main", block("main", directCall("f"), goto("mainRet")), block("mainRet", ret)),
+      proc("f", block("assign", LocalAssign(R0, FApplyExpr("__VERIFIER_nondet_uint", Seq(), BitVecType(32), true), None), goto("returnBlock")), block("returnBlock", ret))
+    )
+    val f = program.nameToProcedure("f")
+    val wpDualResults = getWpDualResults(f)
   }
 }
