@@ -34,6 +34,10 @@
     align-items: flex-start;
 }
 
+.d2h-code-side-linenumber, .d2h-cntx {
+    cursor: default!important;
+}
+
 .custom-controls {
     display: flex;
     align-items: center;
