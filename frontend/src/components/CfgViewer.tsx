@@ -23,7 +23,7 @@ import { FIT_VIEW_OPTIONS, ZOOM_CONFIGS } from '../constants';
 const NODE_COLORS = {
     RED: '#FF4D4D',
     LIGHT_RED: '#FFCCCC', // TODO: Maybe make it yellow?
-    GREEN: '#90EE90',
+    GREEN: '#04d104',
     LIGHT_GREEN: '#b9f4b9',
     DEFAULT: '#777',
 };
