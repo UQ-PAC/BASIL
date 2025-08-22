@@ -109,7 +109,15 @@ class GammaDomainTests extends AnyFunSuite, CaptureOutput {
   test("fApplyExpr") {
     val program = prog(
       proc("main", block("main", directCall("f"), goto("mainRet")), block("mainRet", ret)),
-      proc("f", block("assign", LocalAssign(R0, FApplyExpr("__VERIFIER_nondet_uint", Seq(), BitVecType(32), true), None), goto("returnBlock")), block("returnBlock", ret))
+      proc(
+        "f",
+        block(
+          "assign",
+          LocalAssign(R0, FApplyExpr("__VERIFIER_nondet_uint", Seq(), BitVecType(32), true), None),
+          goto("returnBlock")
+        ),
+        block("returnBlock", ret)
+      )
     )
     val f = program.nameToProcedure("f")
     val wpDualResults = getWpDualResults(f)

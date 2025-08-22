@@ -6,9 +6,17 @@ import org.sosy_lab.common.ShutdownManager
 import org.sosy_lab.common.configuration.Configuration
 import org.sosy_lab.common.log.LogManager
 import org.sosy_lab.java_smt.SolverContextFactory
-import org.sosy_lab.java_smt.api.{BitvectorFormula, BooleanFormula, FormulaManager, SolverContext}
+import org.sosy_lab.java_smt.api.{
+  BitvectorFormula,
+  BooleanFormula,
+  FormulaManager,
+  FormulaType,
+  FunctionDeclaration,
+  SolverContext
+}
 
-import scala.jdk.CollectionConverters.SetHasAsJava
+import scala.collection.mutable
+import scala.jdk.CollectionConverters.{SeqHasAsJava, SetHasAsJava}
 
 // TODO
 // support moving up and down a proof context stack
@@ -118,6 +126,8 @@ class SMTSolver(var defaultTimeoutMillis: Option[Int] = None) {
 class FormulaConverter(formulaManager: FormulaManager) {
   lazy val bitvectorFormulaManager = formulaManager.getBitvectorFormulaManager()
   lazy val booleanFormulaManager = formulaManager.getBooleanFormulaManager()
+  lazy val uninterpretedFunctionManager = formulaManager.getUFManager()
+  var uninterpretedFunctions: mutable.Map[String, FunctionDeclaration[BitvectorFormula]] = mutable.Map()
 
   def convertBoolLit(lit: BoolLit): BooleanFormula = {
     lit match {
@@ -284,6 +294,16 @@ class FormulaConverter(formulaManager: FormulaManager) {
       }
       case ZeroExtend(extension, body) => bitvectorFormulaManager.extend(convertBVTerm(body), extension, false)
       case SignExtend(extension, body) => bitvectorFormulaManager.extend(convertBVTerm(body), extension, true)
+      case FApply(name, params, returnWidth, uninterpreted) => {
+        if (!uninterpretedFunctions.contains(name)) {
+          uninterpretedFunctions += (name -> uninterpretedFunctionManager.declareUF(
+            name,
+            FormulaType.getBitvectorTypeWithSize(returnWidth),
+            params.map(b => FormulaType.getBitvectorTypeWithSize(b.size)).asJava
+          ))
+        }
+        uninterpretedFunctionManager.callUF(uninterpretedFunctions(name), params.map(convertBVTerm(_)).asJava)
+      }
     }
   }
 
