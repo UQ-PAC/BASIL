@@ -1,5 +1,5 @@
 
-/* These are the colour components for the code style.
+/* These are the colour components for the code style. */
 .token.keyword    { color: var(--token-keyword-color); font-weight: 600; }
 .token.variable   { color: var(--token-variable-color); }
 .token.function   { color: var(--token-function-color); font-weight: 600; }
