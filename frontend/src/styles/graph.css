@@ -30,3 +30,8 @@
     height: 98vh;
     overflow: auto;
 }
+
+.node-size-icon {
+    fill: var(--cfg-node-text-color);
+    color: var(--cfg-node-text-color);
+}

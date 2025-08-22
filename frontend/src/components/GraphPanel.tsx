@@ -19,6 +19,9 @@ import { type CustomNodeData } from './CustomNode';
 import CustomBackground from './CustomBackground';
 import { applyLayout } from '../utils/graphLayout';
 
+import ExpandIcon from '../assets/expand-icon.svg';
+import CollapseIcon from '../assets/collapse-icon.svg';
+
 interface GraphPanelProps {
     nodes: Node<CustomNodeData>[];
     edges: Edge[];
@@ -155,17 +158,9 @@ const GraphPanel: React.FC<GraphPanelProps> = ({
                                     onClick={handleExpandAllToggle}
                                 >
                                     {allNodesExpanded ? (
-                                        <img
-                                            src="/minimize-window-icon.png"
-                                            alt="Collapse All Nodes"
-                                            className="icon"
-                                        />
+                                        <CollapseIcon className="node-size-icon" />
                                     ) : (
-                                        <img
-                                            src="/maximum-window-line-icon.png"
-                                            alt="Expand All Nodes"
-                                            className="icon"
-                                        />
+                                        <ExpandIcon className="node-size-icon" />
                                     )}
                                 </button>
                             </div>
