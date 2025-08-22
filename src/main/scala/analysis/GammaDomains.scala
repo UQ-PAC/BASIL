@@ -225,13 +225,13 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
         val nb = terms.foldLeft(b) { case (acc, (l, r)) =>
           r match {
             case Some(rhs) => acc.replace(l, rhs)
-            case None => acc.remove(l, Predicate.True)
+            case None => acc.remove(l, Predicate.True) // TODO verify soundness
           }
         }
         gammas.foldLeft(nb) { case (acc, (l, r)) =>
           r match {
             case Some(rhs) => acc.replace(l, rhs)
-            case None => acc.remove(l, Predicate.True)
+            case None => acc.remove(l, Predicate.True) // TODO verify soundness
           }
         }
       }
