@@ -52,6 +52,8 @@
     background-color: var(--combined-ir-code-panel-background-color);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     min-height: 0;
+    min-width: 0;
+    max-width: 50vw;
 }
 
 .ir-code-panel h3 {
@@ -69,13 +71,13 @@
     flex: 1;
     margin: 0;
     padding: 15px;
-    overflow: auto;
+    overflow-y: auto;
     font-family: 'Fira Code', 'JetBrains Mono', monospace; /* TODO: Is this consistent with the others??? */
-    font-size: 0.9em;
+    font-size: 1em;
     line-height: 1.4;
     color: #abb2bf;
-    white-space: pre-wrap;
-    word-break: break-all;
+    white-space: pre;
+    background-color: black;
 }
 
 .ir-code-display code {

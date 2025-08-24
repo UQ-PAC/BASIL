@@ -285,7 +285,6 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
                 <div className="ir-code-panel">
                     <h3>Intermediate Representation (IR)</h3>
                     {irCode ? (
-                        // <pre className="ir-code-display"><code ref={irCodeRef}>{irCode}</code></pre>
                         <pre className="ir-code-display">
                             <div ref={irCodeRef} className="language-ir">{irCode}</div>
                         </pre>
@@ -306,7 +305,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
                                 fitViewOptions={FIT_VIEW_OPTIONS}
                                 minZoom={ZOOM_CONFIGS.min}
                                 maxZoom={ZOOM_CONFIGS.max}
-                                graphRenderKey={graphRenderKey} // Use the same key for both to trigger remount
+                                graphRenderKey={graphRenderKey}
                             />
                         </ReactFlowProvider>
                     ) : (
