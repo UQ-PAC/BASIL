@@ -23,7 +23,8 @@ interface DotGraphResponse {
 }
 
 interface CombinedViewerProps {
-    selectedEpochName: string | null;
+    selectedStartEpoch: string | null;
+    selectedEndEpoch: string | null;
     selectedProcedureName: string | null;
     setSelectedProcedureName: (name: string | null) => void;
     procedureNames: string[];
@@ -33,7 +34,8 @@ interface CombinedViewerProps {
 
 // TODO: Remove the dup
 const CombinedViewer: React.FC<CombinedViewerProps> = ({
-                                                           selectedEpochName,
+                                                           selectedStartEpoch,
+                                                           selectedEndEpoch,
                                                            selectedProcedureName,
                                                            setSelectedProcedureName,
                                                            procedureNames,
@@ -119,7 +121,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
     // TODO: This is also a lot of dup...
     useEffect(() => {
         const fetchAllData = async () => {
-            if (!isGraphvizWasmReady || !selectedEpochName || !selectedProcedureName) {
+            if (!isGraphvizWasmReady || !selectedStartEpoch || !selectedEndEpoch || !selectedProcedureName) {
                 setLoadingGraphs(false);
                 setGraphError(null);
                 setIrCode(null);
@@ -140,12 +142,22 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
             setAfterEdges([]);
 
             try {
-                const irResponse = await fetch(`${API_BASE_URL}/ir/${selectedEpochName}/${selectedProcedureName}/${displayCfgType}`);
-                if (!irResponse.ok) {
-                    throw new Error(`HTTP error! status: ${irResponse.status} fetching IR for ${selectedProcedureName} (${displayCfgType})`);
+                const irBeforeResponse = await fetch(`${API_BASE_URL}/ir/${selectedStartEpoch}/${selectedProcedureName}/before`);
+                const irAfterResponse = await fetch(`${API_BASE_URL}/ir/${selectedEndEpoch}/${selectedProcedureName}/after`);
+                if (!irBeforeResponse.ok) {
+                    throw new Error(`HTTP error! status: ${irBeforeResponse.status} fetching IR for ${selectedProcedureName} (before)`);
                 }
-                const code: string = await irResponse.text();
-                setIrCode(code);
+                if (!irAfterResponse.ok) {
+                    throw new Error(`HTTP error! status: ${irAfterResponse.status} fetching IR for ${selectedProcedureName} (after)`);
+                }
+
+                if ((displayCfgType) === 'before') {
+                    const code: string = await irBeforeResponse.text();
+                    setIrCode(code);
+                } else { // 'after'
+                    const code: string = await irAfterResponse.text();
+                    setIrCode(code);
+                }
 
                 const fetchDotString = async (epoch: string, type: 'before' | 'after'): Promise<string | undefined> => {
                     const response = await fetch(`${API_BASE_URL}/cfg/${epoch}/${type}`);
@@ -161,15 +173,15 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
                     return matchingProcedureKey ? data[matchingProcedureKey] : undefined;
                 };
 
-                const beforeDotString = await fetchDotString(selectedEpochName!, 'before');
-                const afterDotString = await fetchDotString(selectedEpochName!, 'after');
+                const beforeDotString = await fetchDotString(selectedStartEpoch!, 'before');
+                const afterDotString = await fetchDotString(selectedEndEpoch!, 'after');
 
                 if (beforeDotString) {
                     const { nodes, edges } = await getLayoutedElements(beforeDotString, 'before-');
                     setBeforeNodes(nodes);
                     setBeforeEdges(edges);
                 } else {
-                    console.warn(`No 'before' CFG data (DOT) for procedure '${selectedProcedureName}' in epoch '${selectedEpochName}'.`);
+                    console.warn(`No 'before' CFG data (DOT) for procedure '${selectedProcedureName}' in epoch '${selectedStartEpoch}'.`);
                 }
 
                 if (afterDotString) {
@@ -177,7 +189,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
                     setAfterNodes(nodes);
                     setAfterEdges(edges);
                 } else {
-                    console.warn(`No 'after' CFG data (DOT) for procedure '${selectedProcedureName}' in epoch '${selectedEpochName}'.`);
+                    console.warn(`No 'after' CFG data (DOT) for procedure '${selectedProcedureName}' in epoch '${selectedEndEpoch}'.`);
                 }
 
             } catch (e: any) {
@@ -193,7 +205,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
         if (isGraphvizWasmReady) {
             fetchAllData();
         }
-    }, [selectedEpochName, selectedProcedureName, displayCfgType, isGraphvizWasmReady, setBeforeNodes, setBeforeEdges, setAfterNodes, setAfterEdges]);
+    }, [selectedStartEpoch, selectedEndEpoch, selectedProcedureName, displayCfgType, isGraphvizWasmReady, setBeforeNodes, setBeforeEdges, setAfterNodes, setAfterEdges]);
 
 
     const currentCfgNodes = displayCfgType === 'before' ? beforeNodes : afterNodes;
@@ -211,7 +223,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
         return <div className="combined-viewer-error">Error: {procedureError || graphError}</div>;
     }
 
-    const showInitialMessage = !selectedEpochName || !selectedProcedureName;
+    const showInitialMessage = !selectedStartEpoch || !selectedEndEpoch || !selectedProcedureName;
     if (showInitialMessage && procedureNames.length === 0) {
         return <div className="combined-viewer-message">Please select an epoch from the sidebar to view IR and CFG.</div>;
     }
@@ -222,7 +234,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
     return (
         <div className="combined-viewer-container">
             <div className="combined-viewer-header">
-                {selectedEpochName && procedureNames.length > 0 && (
+                {selectedStartEpoch && selectedEndEpoch && procedureNames.length > 0 && (
                     <div className="header-controls">
                         <div className="flex-spacer"></div>
                         <div className="procedure-select-wrapper">
@@ -263,8 +275,8 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
                         </div>
                     </div>
                 )}
-                {selectedEpochName && procedureNames.length === 0 && !loadingProcedures && !procedureError && (
-                    <p className="no-procedures-message">No procedures found for epoch: {selectedEpochName}</p>
+                {selectedStartEpoch && selectedEndEpoch && procedureNames.length === 0 && !loadingProcedures && !procedureError && (
+                    <p className="no-procedures-message">No procedures found for epoch: {selectedStartEpoch}, {selectedEndEpoch}</p>
                 )}
             </div>
 

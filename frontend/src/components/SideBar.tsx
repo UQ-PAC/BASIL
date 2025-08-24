@@ -1,15 +1,16 @@
-
+// src/components/SideBar.tsx
 import '../styles/sidebar.css';
+import React from "react";
 
 interface SidebarProps {
     epochNames: string[];
-    selectedEpochName: string | null;
-    onEpochSelect: (epochName: string) => void;
+    selectedEpochs: Set<string>;
+    onEpochSelect: (epochName: string, event: React.MouseEvent) => void;
     loading: boolean;
     error: string | null;
 }
 
-export function Sidebar({ epochNames, selectedEpochName, onEpochSelect, loading, error }: SidebarProps) {
+export function Sidebar({ epochNames, selectedEpochs, onEpochSelect, loading, error }: SidebarProps) {
     return (
         <aside className="sidebar">
             <h2 className="sidebar-header">Analysis Epochs</h2>
@@ -23,8 +24,8 @@ export function Sidebar({ epochNames, selectedEpochName, onEpochSelect, loading,
                     {epochNames.map((name) => (
                         <button
                             key={name}
-                            className={`epoch-button ${name === selectedEpochName ? 'selected' : ''}`}
-                            onClick={() => onEpochSelect(name)}
+                            className={`epoch-button ${selectedEpochs.has(name) ? 'selected' : ''}`}
+                            onClick={(event) => onEpochSelect(name, event)}
                             disabled={loading}
                         >
                             {name}

@@ -1,5 +1,5 @@
 // App.tsx
-import {useEffect, useState, useCallback} from 'react'
+import React, {useEffect, useState, useCallback} from 'react'
 import './App.css'
 import { DiffViewer } from './components/DiffViewer';
 import { Header } from './components/Header';
@@ -15,7 +15,8 @@ const LOCAL_STORAGE_PROCEDURE_KEY = 'cfgViewerSelectedProcedure';
 function App() {
     const [viewMode, setViewMode] = useState<'IR' | 'CFG' | 'IR/CFG'>('IR');
     const [allEpochNames, setAllEpochNames] = useState<string[]>([]);
-    const [selectedEpochName, setSelectedEpochName] = useState<string | null>(null);
+    const [selectedEpochs, setSelectedEpochs] = useState<Set<string>>(new Set());
+    const [lastClickedEpoch, setLastClickedEpoch] = useState<string | null>(null);
     const [loadingEpochs, setLoadingEpochs] = useState(true);
     const [epochError, setEpochError] = useState<string | null>(null);
     const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
@@ -51,7 +52,8 @@ function App() {
 
                 // Automatically select the first epoch if available
                 if (names.length > 0) {
-                    setSelectedEpochName(names[0]);
+                    setSelectedEpochs(new Set([names[0]]));
+                    setLastClickedEpoch(names[0]);
                 } else {
                     setEpochError("No analysis epochs found.");
                 }
@@ -59,7 +61,7 @@ function App() {
                 console.error("Error fetching epoch names:", err);
                 setEpochError(`Error fetching epochs: ${err.message}`);
                 setAllEpochNames([]);
-                setSelectedEpochName(null);
+                setSelectedEpochs(new Set());
             } finally {
                 setLoadingEpochs(false);
             }
@@ -68,10 +70,11 @@ function App() {
         fetchEpochNames();
     }, []);
 
-    // Fetch procedures for the currently selected epoch
+    const singleSelectedStartEpoch = selectedEpochs.size > 0 ? Array.from(selectedEpochs)[0] : null;
+    const singleSelectedEndEpoch = selectedEpochs.size > 0 ? Array.from(selectedEpochs)[selectedEpochs.size - 1] : null;
     useEffect(() => {
         const fetchProcedureNames = async () => {
-            if (!selectedEpochName) {
+            if (!singleSelectedStartEpoch && !singleSelectedEndEpoch) {
                 setProcedureNames([]);
                 setSelectedProcedureName(null);
                 setProcedureError(null);
@@ -81,9 +84,9 @@ function App() {
             setLoadingProcedures(true);
             setProcedureError(null);
             try {
-                const response = await fetch(`${API_BASE_URL}/procedures/${selectedEpochName}`);
+                const response = await fetch(`${API_BASE_URL}/procedures/${singleSelectedEndEpoch}`);
                 if (!response.ok) {
-                    const errorMessage = `HTTP error! status: ${response.status} fetching procedures for ${selectedEpochName}`;
+                    const errorMessage = `HTTP error! status: ${response.status} fetching procedures for ${singleSelectedEndEpoch}`;
                     console.error(errorMessage);
                     setProcedureError(errorMessage);
                     setProcedureNames([]);
@@ -115,7 +118,7 @@ function App() {
         };
 
         fetchProcedureNames().catch(error => console.error("Unhandled promise rejected from 'fetchProcedureNames': ", error));
-    }, [selectedEpochName, selectedProcedureName]); // Added selectedProcedureName to dependencies to handle case where it's reset
+    }, [singleSelectedEndEpoch, selectedProcedureName, selectedEpochs]);
 
     // Save the selected procedure to local storage whenever it changes
     useEffect(() => {
@@ -126,11 +129,25 @@ function App() {
         }
     }, [selectedProcedureName]);
 
-    const handleEpochSelect = useCallback((epochName: string) => {
-        if (selectedEpochName !== epochName) {
-            setSelectedEpochName(epochName);
+    const handleEpochSelect = useCallback((name: string, event: React.MouseEvent) => {
+        if (!event.shiftKey) {
+            setSelectedEpochs(new Set([name]));
+            setLastClickedEpoch(name);
+        } else if (lastClickedEpoch !== null) {
+            const lastIndex = allEpochNames.indexOf(lastClickedEpoch);
+            const currentIndex = allEpochNames.indexOf(name);
+
+            const startIndex = Math.min(lastIndex, currentIndex);
+            const endIndex = Math.max(lastIndex, currentIndex);
+
+            const newSelectedEpochs = new Set<string>();
+            for (let i = startIndex; i <= endIndex; i++) {
+                newSelectedEpochs.add(allEpochNames[i]);
+            }
+
+            setSelectedEpochs(newSelectedEpochs);
         }
-    }, [selectedEpochName]);
+    }, [allEpochNames, lastClickedEpoch]);
 
     const toggleSidebar = () => {
         setIsSidebarMinimized(!isSidebarMinimized);
@@ -162,17 +179,22 @@ function App() {
                     >
                         <Sidebar
                           epochNames={allEpochNames}
-                          selectedEpochName={selectedEpochName}
+                          selectedEpochs={selectedEpochs}
                           onEpochSelect={handleEpochSelect}
                           loading={loadingEpochs}
                           error={epochError}
                         />
                     </ResizableSidebar>
                     {viewMode === 'IR' ? ( // TODO: Change to enums and a switch
-                      <DiffViewer selectedEpochName={selectedEpochName} theme={theme} />
+                      <DiffViewer
+                          selectedStartEpoch={singleSelectedStartEpoch}
+                          selectedEndEpoch={singleSelectedEndEpoch}
+                          theme={theme}
+                      />
                   ) : viewMode === 'CFG' ? (
                         <CfgViewer
-                            selectedEpochName={selectedEpochName}
+                            selectedStartEpoch={singleSelectedStartEpoch}
+                            selectedEndEpoch={singleSelectedEndEpoch}
                             selectedProcedureName={selectedProcedureName}
                             setSelectedProcedureName={setSelectedProcedureName}
                             procedureNames={procedureNames}
@@ -181,7 +203,8 @@ function App() {
                         />
                     ) : ( // 'IR/CFG'
                       <CombinedViewer
-                          selectedEpochName={selectedEpochName}
+                          selectedStartEpoch={singleSelectedStartEpoch}
+                          selectedEndEpoch={singleSelectedEndEpoch}
                           selectedProcedureName={selectedProcedureName}
                           setSelectedProcedureName={setSelectedProcedureName}
                           procedureNames={procedureNames}

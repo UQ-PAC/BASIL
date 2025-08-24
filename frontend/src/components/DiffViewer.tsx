@@ -26,11 +26,12 @@ interface IREpochData {
 }
 
 interface DiffViewerProps {
-    selectedEpochName: string | null;
+    selectedStartEpoch: string | null;
+    selectedEndEpoch: string | null;
     theme: string | null;
 }
 
-export function DiffViewer({ selectedEpochName, theme }: DiffViewerProps) {
+export function DiffViewer({selectedStartEpoch, selectedEndEpoch, theme }: DiffViewerProps) {
     const [irData, setIrData] = useState<IREpochData | null>(null);
     const [contextLines, setContextLines] = useState(5);
     const [outputFormat, setOutputFormat] = useState<'side-by-side' | 'line-by-line'>('side-by-side');
@@ -40,52 +41,52 @@ export function DiffViewer({ selectedEpochName, theme }: DiffViewerProps) {
     const diffContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (!selectedEpochName) {
+        if (!selectedStartEpoch || !selectedEndEpoch) {
             setIrData(null);
             setLoading(false);
             setError(null);
             return;
         }
 
-        const fetchIRDataForEpoch = async (epochName: string) => {
+        const fetchIRDataForEpoch = async (epochBeforeName: string, epochAfterName: string) => {
             try {
                 setLoading(true);
                 setError(null);
 
                 const [beforeResponse, afterResponse, proceduresResponse] = await Promise.all([
-                    fetch(`${API_BASE_URL}/ir/${epochName}/before`),
-                    fetch(`${API_BASE_URL}/ir/${epochName}/after`),
-                    fetch(`${API_BASE_URL}/ir/${epochName}/procedures_with_lines`)
+                    fetch(`${API_BASE_URL}/ir/${epochBeforeName}/before`),
+                    fetch(`${API_BASE_URL}/ir/${epochAfterName}/after`),
+                    fetch(`${API_BASE_URL}/ir/${epochAfterName}/procedures_with_lines`) // TODO: Procedures just for after atm
                 ]);
 
-                if (!beforeResponse.ok) throw new Error(`HTTP error fetching before IR for ${epochName}! status: ${beforeResponse.status}`);
-                if (!afterResponse.ok) throw new Error(`HTTP error fetching after IR for ${epochName}! status: ${afterResponse.status}`);
+                if (!beforeResponse.ok) throw new Error(`HTTP error fetching before IR for ${epochBeforeName}! status: ${beforeResponse.status}`);
+                if (!afterResponse.ok) throw new Error(`HTTP error fetching after IR for ${epochAfterName}! status: ${afterResponse.status}`);
                 if (!proceduresResponse.ok) throw new Error(`HTTP error fetching procedures! status: ${proceduresResponse.status}`);
 
                 const beforeText: string = await beforeResponse.text();
                 const afterText: string = await afterResponse.text();
                 const proceduresData: ProcedureLocation[] = await proceduresResponse.json();
 
-                console.log(`Fetched data for epoch: ${epochName}`);
+                console.log(`Fetched data for epoch: ${epochBeforeName} and ${epochAfterName}`);
 
                 setIrData({
                     before: beforeText,
                     after: afterText,
                     procedures: proceduresData,
-                    epochName: epochName
+                    epochName: (epochBeforeName === epochAfterName) ? epochBeforeName : '${epochBeforeName} to ${epochAfterName}'
                 });
 
             } catch (err: any) {
-                console.error(`Error fetching analysis data for ${epochName}:`, err);
-                setError(`Error fetching data for ${epochName}: ${err.message}`);
+                console.error(`Error fetching analysis data for ${epochBeforeName} and ${epochAfterName}:`, err);
+                setError(`Error fetching data for ${epochBeforeName} and ${epochAfterName}: ${err.message}`);
                 setIrData(null);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchIRDataForEpoch(selectedEpochName); // Call the fetch function
-    }, [selectedEpochName]);
+        fetchIRDataForEpoch(selectedStartEpoch, selectedEndEpoch);
+    }, [selectedStartEpoch, selectedEndEpoch]);
 
 
     const scrollToLine = (lineNumber: number) => {
@@ -252,7 +253,7 @@ export function DiffViewer({ selectedEpochName, theme }: DiffViewerProps) {
         return <div className="p-4 text-center text-red-500">Error: {error}</div>;
     }
 
-    if (!selectedEpochName) {
+    if (!selectedStartEpoch || ! selectedEndEpoch) {
         return <div className="flex-1 p-4 text-center">Please select an epoch from the sidebar.</div>;
     }
 

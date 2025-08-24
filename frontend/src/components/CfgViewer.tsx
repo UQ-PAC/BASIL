@@ -39,7 +39,8 @@ interface DotGraphResponse {
 }
 
 interface CfgViewerProps {
-    selectedEpochName: string | null;
+    selectedStartEpoch: string | null;
+    selectedEndEpoch: string | null;
     selectedProcedureName: string | null;
     setSelectedProcedureName: (name: string | null) => void;
     procedureNames: string[];
@@ -48,7 +49,8 @@ interface CfgViewerProps {
 }
 
 const CfgViewer: React.FC<CfgViewerProps> = ({
-                                                 selectedEpochName,
+                                                 selectedStartEpoch,
+                                                 selectedEndEpoch,
                                                  selectedProcedureName,
                                                  setSelectedProcedureName,
                                                  procedureNames,
@@ -206,7 +208,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
 
     useEffect(() => {
         const fetchAndRenderCfgs = async () => {
-            if (!isGraphvizWasmReady || !selectedEpochName || !selectedProcedureName) {
+            if (!isGraphvizWasmReady || !selectedStartEpoch || !selectedProcedureName) {
                 setGraphError("Graphviz WebAssembly is still loading or failed to initialize.");
                 setLoadingGraphs(false);
                 return;
@@ -243,8 +245,8 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
                     return matchingProcedureKey ? data[matchingProcedureKey] : undefined;
                 };
 
-                beforeDotString = await fetchDotString(selectedEpochName!, 'before');
-                afterDotString = await fetchDotString(selectedEpochName!, 'after');
+                beforeDotString = await fetchDotString(selectedStartEpoch!, 'before');
+                afterDotString = await fetchDotString(selectedEndEpoch!, 'after');
 
                 let processedBeforeNodes: Node<CustomNodeData>[] = [];
                 let processedBeforeEdges: Edge[] = [];
@@ -257,7 +259,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
                     processedBeforeEdges = edges;
                     console.log('Final Before Nodes Count:', nodes.length);
                 } else {
-                    console.warn(`No 'before' CFG data (DOT) for procedure '${selectedProcedureName}' in epoch '${selectedEpochName}'.`);
+                    console.warn(`No 'before' CFG data (DOT) for procedure '${selectedProcedureName}' in epoch '${selectedStartEpoch}'.`);
                     setGraphError((prev) => (prev ? prev + "\n" : "") + `No 'before' CFG data for '${selectedProcedureName}'.`);
                 }
 
@@ -267,7 +269,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
                     processedAfterEdges = edges;
                     console.log('Final After Nodes Count:', nodes.length);
                 } else {
-                    console.warn(`No 'after' CFG data (DOT) for procedure '${selectedProcedureName}' in epoch '${selectedEpochName}'.`);
+                    console.warn(`No 'after' CFG data (DOT) for procedure '${selectedProcedureName}' in epoch '${selectedEndEpoch}'.`);
                     setGraphError((prev) => (prev ? prev + "\n" : "") + `No 'after' CFG data for '${selectedProcedureName}'.`);
                 }
 
@@ -298,7 +300,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
 
         if (isGraphvizWasmReady) {
             fetchAndRenderCfgs().catch(error => console.error("Unhandled promise rejected from 'fetchAndRenderCfgs: ", error));
-        } else if (!selectedEpochName || !selectedProcedureName) {
+        } else if (!selectedStartEpoch || !selectedProcedureName || !selectedEndEpoch) {
             setBeforeNodes([]);
             setBeforeEdges([]);
             setAfterNodes([]);
@@ -307,7 +309,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
             setGraphError(null);
             setGraphRenderKey(prev => prev + 1);
         }
-    }, [selectedEpochName, selectedProcedureName, isGraphvizWasmReady, compareAndColorElements]);
+    }, [selectedStartEpoch, selectedEndEpoch, selectedProcedureName, isGraphvizWasmReady, compareAndColorElements]);
 
     if (loadingProcedures || loadingGraphs) {
         return <div className="cfg-viewer-message">Loading CFG data...</div>;
@@ -317,7 +319,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
         return <div className="cfg-viewer-error">Error: {procedureError || graphError}</div>;
     }
 
-    const showInitialMessage = !selectedEpochName || !selectedProcedureName;
+    const showInitialMessage = !selectedStartEpoch || !selectedEndEpoch || !selectedProcedureName;
     if (showInitialMessage && procedureNames.length === 0) {
         return <div className="cfg-viewer-message">Please select an epoch from the sidebar to view CFGs.</div>;
     }
@@ -332,7 +334,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
     return (
         <div className="cfg-comparison-container-wrapper">
             <div className="cfg-viewer-header">
-                {selectedEpochName && procedureNames.length > 0 && (
+                {selectedStartEpoch && selectedEndEpoch && procedureNames.length > 0 && (
                     <>
                         <div className="flex-spacer"></div>
                         <div className="procedure-select-wrapper">
@@ -355,8 +357,8 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
                         <div className="flex-spacer"></div> { /* TODO: Maybe add a bit more padding here? */ }
                     </>
                 )}
-                {selectedEpochName && procedureNames.length === 0 && !loadingGraphs && !graphError && (
-                    <p className="no-procedures-message">No procedures found for epoch: {selectedEpochName}</p>
+                {selectedStartEpoch && selectedEndEpoch && procedureNames.length === 0 && !loadingGraphs && !graphError && (
+                    <p className="no-procedures-message">No procedures found for epoch: '{selectedStartEpoch}' and '{selectedEndEpoch}'</p>
                 )}
             </div>
             <div className="cfg-comparison-container">
