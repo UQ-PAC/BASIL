@@ -90,7 +90,7 @@
     cursor: default !important;
 }
 
-.icon { /* TODO: Convert to svg so that I can change the colour and add a bottom border */
+.icon {
     width: 24px;
     height: 24px;
 }
