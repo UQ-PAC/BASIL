@@ -43,7 +43,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
                                                            procedureError
                                                        }) => {
     const [irCode, setIrCode] = useState<string | null>(null);
-    const [loadingGraphs, setLoadingGraphs] = useState(false);
+    const [loading, setLoading] = useState(false);
     const [graphError, setGraphError] = useState<string | null>(null);
     const [isGraphvizWasmReady, setIsGraphvizWasmReady] = useState(false);
 
@@ -118,47 +118,47 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
         }
     }, [irCode, irCodeRef.current]);
 
-    // TODO: This is also a lot of dup...
     useEffect(() => {
-        const fetchAllData = async () => {
-            if (!isGraphvizWasmReady || !selectedStartEpoch || !selectedEndEpoch || !selectedProcedureName) {
-                setLoadingGraphs(false);
-                setGraphError(null);
-                setIrCode(null);
-                setBeforeNodes([]);
-                setBeforeEdges([]);
-                setAfterNodes([]);
-                setAfterEdges([]);
-                setGraphRenderKey(prev => prev + 1);
-                return;
-            }
-
-            setLoadingGraphs(true);
-            setGraphError(null);
+        if (!selectedStartEpoch || !selectedEndEpoch || !selectedProcedureName) {
             setIrCode(null);
+            return;
+        }
+
+        const fetchIrCode = async () => {
+            setLoading(true);
+            try {
+                const irResponse = await fetch(`${API_BASE_URL}/ir/${displayCfgType === 'before' ? selectedStartEpoch 
+                    : selectedEndEpoch}/${selectedProcedureName}/${displayCfgType}`);
+                if (!irResponse.ok) {
+                    throw new Error(`HTTP error! status: ${irResponse.status} fetching IR`);
+                }
+                const code: string = await irResponse.text();
+                setIrCode(code);
+            } catch (error) {
+                console.error("Failed to fetch IR code:", error);
+                setIrCode(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchIrCode();
+
+    }, [selectedStartEpoch, selectedEndEpoch, selectedProcedureName, displayCfgType]);
+
+    useEffect(() => {
+        if (!isGraphvizWasmReady || !selectedStartEpoch || !selectedEndEpoch || !selectedProcedureName) {
             setBeforeNodes([]);
             setBeforeEdges([]);
             setAfterNodes([]);
             setAfterEdges([]);
+            setGraphRenderKey(prev => prev + 1);
+            return;
+        }
 
+        const fetchCfgData = async () => {
+            setLoading(true);
             try {
-                const irBeforeResponse = await fetch(`${API_BASE_URL}/ir/${selectedStartEpoch}/${selectedProcedureName}/before`);
-                const irAfterResponse = await fetch(`${API_BASE_URL}/ir/${selectedEndEpoch}/${selectedProcedureName}/after`);
-                if (!irBeforeResponse.ok) {
-                    throw new Error(`HTTP error! status: ${irBeforeResponse.status} fetching IR for ${selectedProcedureName} (before)`);
-                }
-                if (!irAfterResponse.ok) {
-                    throw new Error(`HTTP error! status: ${irAfterResponse.status} fetching IR for ${selectedProcedureName} (after)`);
-                }
-
-                if ((displayCfgType) === 'before') {
-                    const code: string = await irBeforeResponse.text();
-                    setIrCode(code);
-                } else { // 'after'
-                    const code: string = await irAfterResponse.text();
-                    setIrCode(code);
-                }
-
                 const fetchDotString = async (epoch: string, type: 'before' | 'after'): Promise<string | undefined> => {
                     const response = await fetch(`${API_BASE_URL}/cfg/${epoch}/${type}`);
                     if (!response.ok) {
@@ -177,7 +177,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
                 const afterDotString = await fetchDotString(selectedEndEpoch!, 'after');
 
                 if (beforeDotString) {
-                    const { nodes, edges } = await getLayoutedElements(beforeDotString, 'before-');
+                    const {nodes, edges} = await getLayoutedElements(beforeDotString, 'before-');
                     setBeforeNodes(nodes);
                     setBeforeEdges(edges);
                 } else {
@@ -185,7 +185,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
                 }
 
                 if (afterDotString) {
-                    const { nodes, edges } = await getLayoutedElements(afterDotString, 'after-');
+                    const {nodes, edges} = await getLayoutedElements(afterDotString, 'after-');
                     setAfterNodes(nodes);
                     setAfterEdges(edges);
                 } else {
@@ -195,16 +195,17 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
             } catch (e: any) {
                 console.error("Error fetching data in CombinedViewer:", e);
                 setGraphError(`Failed to load data: ${e.message}`);
-                setIrCode(null);
+                setBeforeNodes([]);
+                setBeforeEdges([]);
+                setAfterNodes([]);
+                setAfterEdges([]);
             } finally {
-                setLoadingGraphs(false);
+                setLoading(false);
                 setGraphRenderKey(prev => prev + 1);
             }
         };
 
-        if (isGraphvizWasmReady) {
-            fetchAllData();
-        }
+        fetchCfgData();
     }, [selectedStartEpoch, selectedEndEpoch, selectedProcedureName, displayCfgType, isGraphvizWasmReady, setBeforeNodes, setBeforeEdges, setAfterNodes, setAfterEdges]);
 
 
@@ -215,7 +216,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
 
     const currentCfgTitle = `${displayCfgType === 'before' ? 'Before' : 'After'} Transform: ${selectedProcedureName || 'N/A'}`;
 
-    if (loadingProcedures || loadingGraphs) {
+    if (loadingProcedures || loading) {
         return <div className="combined-viewer-message">Loading data...</div>;
     }
 
@@ -243,8 +244,8 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
                                 id="combined-procedure-select"
                                 className="procedure-dropdown"
                                 value={selectedProcedureName || ''}
-                                onChange={(e) => setSelectedProcedureName(e.target.value)} // TODO: I might need to make a handleProcSelect
-                                disabled={loadingProcedures || loadingGraphs}
+                                onChange={(e) => setSelectedProcedureName(e.target.value)}
+                                disabled={loadingProcedures || loading}
                             >
                                 {!selectedProcedureName && <option value="">-- Choose a Procedure --</option>}
                                 {procedureNames.map((name) => (
@@ -259,7 +260,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
                             <button
                                 className={`toggle-button ${displayCfgType === 'before' ? 'active' : ''}`}
                                 onClick={() => setDisplayCfgType('before')}
-                                disabled={loadingProcedures || loadingGraphs}
+                                disabled={loadingProcedures || loading}
                             >
                                 {displayCfgType === 'before' && <span className="tick">✓</span>}
                                 Show Before CFG
@@ -267,7 +268,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
                             <button
                                 className={`toggle-button ${displayCfgType === 'after' ? 'active' : ''}`}
                                 onClick={() => setDisplayCfgType('after')}
-                                disabled={loadingProcedures || loadingGraphs}
+                                disabled={loadingProcedures || loading}
                             >
                                 {displayCfgType === 'after' && <span className="tick">✓</span>}
                                 Show After CFG

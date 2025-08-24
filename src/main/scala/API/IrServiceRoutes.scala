@@ -79,7 +79,7 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean])(
             }
       }
   }
-  
+
   /**
    * **Endpoint:** `GET /ir/:epochName/procedures-with-lines`
    *
@@ -299,7 +299,7 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean])(
             .flatMap {
               case Some(epoch) =>
                 logger.info(s"Attempting to generate 'after' code for procedure: `$procedureName` and for epoch: `$epochName`") *>
-                  findAndPrettyPrint(epoch.beforeTransform.procedures.toList, procedureName)
+                  findAndPrettyPrint(epoch.afterTransform.procedures.toList, procedureName)
               case None => NotFound(s"Epoch '$epochName' not found.")
             }
             .handleErrorWith { e =>
