@@ -142,7 +142,7 @@ class TestKnownBitsInterpreter
   )
 
   def testInterpret(arg1: BigInt, arg2: BigInt) = {
-    val (testResult, _) = analysis.knownBitsAnalysis(kbitsCtx.program)
+    val testResult = analysis.knownBitsAnalysis(kbitsCtx.program)._1.map{ (k,v) => k -> v.toMap}.toMap
     val res = runTestInterpreter(kbitsCtx, testResult, callParams = params(arg1, arg2))
     assert(res.checksPassed.nonEmpty)
     assert(
@@ -265,7 +265,7 @@ class TestKnownBitsInterpreter
     e <- genExpr(Some(sz))
   } yield (e))
 
-  def evaluateAbstract(e: Expr): TNum = TNumDomain().evaluateExprToTNum(Map(), e)
+  def evaluateAbstract(e: Expr): TNum = EvaluateInLattice(TNum.top(1)).evalExpr(_ => None)(e)
 
   test("TNUM soundness property") {
     forAll(minSuccessful(50000)) { (e: Expr) =>

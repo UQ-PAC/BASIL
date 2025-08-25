@@ -640,7 +640,7 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends ValueLattice[
 
 }
 
-class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
+class TNumDomainX extends AbstractDomain[Map[Variable, TNum]] {
   override def top: Map[Variable, TNum] = Map.empty
   override def bot: Map[Variable, TNum] = Map.empty
 
@@ -663,7 +663,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
   }
 
   // Evaluates binary operation and returns either a TNum or TNum
-  def evaluateValueBinOp(op: BVBinOp | IntBinOp, tn1: TNum, tn2: TNum): TNum = {
+  private def evaluateValueBinOp(op: BVBinOp | IntBinOp, tn1: TNum, tn2: TNum): TNum = {
     op match {
       case BVAND => tn1.TAND(tn2)
       case BVOR => tn1.TOR(tn2)
@@ -729,7 +729,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
   }
 
   // Recursively evaluates nested or non-nested expression
-  def evaluateExprToTNum(s: Map[Variable, TNum], expr: Expr): TNum =
+  private def evaluateExprToTNum(s: Map[Variable, TNum], expr: Expr): TNum =
     val r = expr match {
       case b: AssocExpr => evaluateExprToTNum(s, b.toBinaryExpr)
       case u: FApplyExpr => TNum.top(sizeBits(u.getType))
@@ -857,13 +857,15 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
 
 def knownBitsAnalysis(p: Program) = {
   applyRPO(p)
-  val solver = transforms.worklistSolver(TNumDomain())
+  val lattice = DefaultValueLattice(TNum.top(1), None)
+  val solver = transforms.worklistSolver(ValueStateDomain(lattice.top, DefaultTransfer(lattice), lattice))
   val (beforeIn, afterIn) = solver.solveProgIntraProc(p, backwards = false)
   (beforeIn, afterIn)
 }
 
 class SimplifyKnownBits() {
-  val solver = transforms.worklistSolver(TNumDomain())
+  val lattice = DefaultValueLattice(TNum.top(1), None)
+  val solver = transforms.worklistSolver(ValueStateDomain(lattice.top, DefaultTransfer(lattice), lattice))
 
   def applyTransform(p: Program): Unit = {
     for (proc <- p.procedures) {
