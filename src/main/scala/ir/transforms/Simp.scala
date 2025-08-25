@@ -1,11 +1,14 @@
 package ir.transforms
+
+import analysis.LoopDetector
 import ir.*
 import ir.cilvisitor.*
 import ir.eval.{AlgebraicSimplifications, AssumeConditionSimplifications, simplifyExprFixpoint}
 import translating.PrettyPrinter.*
 import util.assertion.*
-import util.{SimplifyLogger, condPropDebugLogger}
+import util.{Logger, SimplifyLogger, condPropDebugLogger}
 
+import java.io.{BufferedWriter, FileWriter}
 import scala.collection.mutable
 import scala.util.boundary
 
@@ -867,6 +870,22 @@ def coalesceBlocks(p: Program): Boolean = {
   didAny
 }
 
+val coalesceBlocksOnce = Transform(
+  "CoalesceBlocksOnce",
+  (ctx, man) => {
+    coalesceBlocks(ctx.program)
+    man.ClobberAll
+  }
+)
+
+val coalesceBlocksFixpoint = Transform(
+  "CoalesceBlocksFixpoint",
+  (ctx, man) => {
+    while (coalesceBlocks(ctx.program)) {}
+    man.ClobberAll
+  }
+)
+
 def removeDeadInParams(p: Program): Boolean = {
   var modified = false
   debugAssert(invariant.correctCalls(p))
@@ -1177,6 +1196,14 @@ def applyRPO(p: Program) = {
     reversePostOrder(proc)
   }
 }
+
+val applyRpoTransform = Transform(
+  "ApplyRPO",
+  (ctx, man) => {
+    applyRPO(man.program)
+    man.ClobberAll
+  }
+)
 
 object getProcFrame {
   class GetProcFrame(frames: Procedure => Set[Memory]) extends CILVisitor {
@@ -1957,7 +1984,7 @@ class DefinitelyExits(knownExit: Set[Procedure]) extends ProcedureSummaryGenerat
   }
 }
 
-def findDefinitelyExits(p: Program) = {
+def findDefinitelyExits(p: Program): ProcReturnInfo = {
   val exit = p.procedures.filter(p => p.procName == "exit").toSet
   val dom = DefinitelyExits(exit)
   val ldom = ProcExitsDomain(x => false)
@@ -1972,6 +1999,59 @@ def findDefinitelyExits(p: Program) = {
     }.toSet
   )
 }
+
+val replaceJumpsInNonReturningProcs = Transform(
+  "ReplaceJumpsInNonReturningProcs",
+  (ctx, man) => {
+    val nonReturning = findDefinitelyExits(ctx.program)
+    ctx.program.mainProcedure.foreach {
+      case d: DirectCall if nonReturning.nonreturning.contains(d.target) => d.parent.replaceJump(Return())
+      case _ =>
+    }
+    man.ClobberAll
+  }
+)
+
+val removeExternalFunctionReferences = Transform(
+  "RemoveExternalFunctionReferences",
+  (ctx, man) => {
+    val externalNames = ctx.externalFunctions.map(_.name)
+    val unqualifiedNames = externalNames.filter(_.contains('@')).map(_.split('@')(0))
+    removeBodyOfExternal(externalNames ++ unqualifiedNames)(ctx.program)
+    for (p <- ctx.program.procedures) {
+      p.isExternal = Some(
+        ctx.externalFunctions.exists(e => e.name == p.procName || p.address.contains(e.offset)) || p.isExternal
+          .getOrElse(false)
+      )
+    }
+    man.ClobberAll
+  }
+)
+
+def getDoCleanupTransform(doSimplify: Boolean): Transform = TransformBatch(
+  "DoCleanup",
+  List(
+    makeProcEntriesNonLoops,
+    // useful for ReplaceReturns
+    // (pushes single block with `Unreachable` into its predecessor)
+    coalesceBlocksFixpoint,
+    applyRpoTransform,
+    replaceJumpsInNonReturningProcs,
+    getEstablishProcedureDiamondFormTransform(doSimplify),
+    removeExternalFunctionReferences
+  ),
+  notice = "Removing external function calls", // fixme: is this all the cleanup is doing?
+  postRunChecks = ctx => {
+    assert(invariant.singleCallBlockEnd(ctx.program))
+    assert(invariant.cfgCorrect(ctx.program))
+    assert(invariant.blocksUniqueToEachProcedure(ctx.program))
+    assert(invariant.procEntryNoIncoming(ctx.program))
+  }
+)
+
+// these are called a lot so it's useful to create them here rather than generating many copies on the fly
+lazy val doCleanupWithSimplify = getDoCleanupTransform(true)
+lazy val doCleanupWithoutSimplify = getDoCleanupTransform(false)
 
 class Simplify(val res: Boolean => Variable => Option[Expr], val initialBlock: Block = null) extends CILVisitor {
 
@@ -2196,14 +2276,264 @@ def removeTriviallyDeadBranches(p: Program, removeAllUnreachableBlocks: Boolean 
   dead.nonEmpty
 }
 
-// ensure procedure entry has no incoming jumps, if it does replace with new
-// block jumping to the old procedure entry
-def makeProcEntryNonLoop(p: Procedure) = {
-  if (p.entryBlock.exists(_.prevBlocks.nonEmpty)) {
-    val nb = Block(p.name + "_entry")
-    p.addBlock(nb)
-    val eb = p.entryBlock.get
-    nb.replaceJump(GoTo(eb))
-    p.entryBlock = nb
+val makeProcEntriesNonLoops = Transform(
+  "MakeProcEntriesNonLoops",
+  (ctx, man) => {
+    ctx.program.procedures.foreach(p => {
+      // ensure procedure entry has no incoming jumps, if it does replace with new
+      // block jumping to the old procedure entry
+      if (p.entryBlock.exists(_.prevBlocks.nonEmpty)) {
+        val nb = Block(p.name + "_entry")
+        p.addBlock(nb)
+        val eb = p.entryBlock.get
+        nb.replaceJump(GoTo(eb))
+        p.entryBlock = nb
+      }
+    })
+    man.ClobberAll
   }
-}
+)
+
+// --- DoSimplify ------------------------------------------------------------------------------------------------------
+
+// the following code is a work in progress
+
+val reduceLoops = Transform(
+  "ReduceLoops",
+  (ctx, man) => {
+    val foundLoops = LoopDetector.identify_loops(ctx.program)
+    val newLoops = foundLoops.reducibleTransformIR()
+    newLoops.updateIrWithLoops()
+    man.ClobberAll
+  }
+)
+
+val normaliseBlockNamesTransform = Transform(
+  "NormaliseBlockNames",
+  (ctx, man) => {
+    for (p <- ctx.program.procedures) {
+      p.normaliseBlockNames()
+    }
+    man.ClobberAll
+  }
+)
+
+val sortProceduresRpoTransform = Transform(
+  "NormaliseBlockNames",
+  (ctx, man) => {
+    ctx.program.sortProceduresRPO()
+    man.ClobberAll
+  }
+)
+
+val liftSvCompTransform = Transform(
+  "LiftSvComp",
+  (ctx, man) => {
+    liftSVComp(ctx.program)
+    man.ClobberAll
+  }
+)
+
+val removeEmptyBlocksTransform = Transform(
+  "RemoveEmptyBlocks",
+  (ctx, man) => {
+    removeEmptyBlocks(ctx.program)
+    man.ClobberAll
+  }
+)
+
+val onePassDsaTransform = Transform(
+  "OnePassDsa",
+  (ctx, man) => {
+    OnePassDSA().applyTransform(ctx.program)
+    man.ClobberAll
+  }
+)
+
+// fixme: this is not really a transform, but a check on the ir
+val dsaCheck = Transform(
+  "DsaCheck",
+  (ctx, man) => {
+    Logger.info("DSA no uninitialised")
+    assert(invariant.allVariablesAssignedIndex(ctx.program))
+    // Logger.info("Live vars difftest")
+    // val tipLiveVars : Map[CFGPosition, Set[Variable]] = analysis.IntraLiveVarsAnalysis(ctx.program).analyze()
+    // assert(ctx.program.procedures.forall(transforms.difftestLiveVars(_, tipLiveVars)))
+
+    Logger.info("DSA Check")
+    val x = ctx.program.procedures.forall(rdDSAProperty)
+    assert(x)
+    Logger.info("DSA Check passed")
+    assert(invariant.singleCallBlockEnd(ctx.program))
+    assert(invariant.cfgCorrect(ctx.program))
+    assert(invariant.blocksUniqueToEachProcedure(ctx.program))
+    man.PreserveAll
+  }
+)
+
+// fixme: similar issues to the above transform
+val dsaCheckAfterTransform = Transform(
+  "DsaCheckAfterTransform",
+  (ctx, man) => {
+    Logger.info("DSA Check (after transform)")
+    val x = ctx.program.procedures.forall(rdDSAProperty)
+    assert(x)
+    Logger.info("DSA Check succeeded")
+    man.PreserveAll
+  }
+)
+
+// fixme: similar issues to the above
+// we might want to move this out of the transform, to the callsite
+val logSimplificationValidation = Transform(
+  "LogSimplificationValidation",
+  (ctx, man) => {
+    Logger.info("[!] Simplify :: Writing simplification validation")
+    val w = BufferedWriter(FileWriter("rewrites.smt2"))
+    ir.eval.SimplifyValidation.makeValidation(w)
+    w.close()
+    man.PreserveAll
+  }
+)
+
+val copyPropParamFixedPointTransform = Transform(
+  "CopyPropParamFixedPoint",
+  (ctx, man) => {
+    copyPropParamFixedPoint(ctx.program, ctx.globalOffsets)
+    man.ClobberAll
+  },
+  notice = "Copyprop Start"
+)
+
+val fixupGuardsTransform = Transform(
+  "FixUpGuards",
+  (ctx, man) => {
+    fixupGuards(ctx.program)
+    man.ClobberAll
+  }
+)
+
+val removeDuplicateGuardsTransform = Transform(
+  "RemoveDuplicateGuards",
+  (ctx, man) => {
+    removeDuplicateGuard(ctx.program)
+    man.ClobberAll
+  }
+)
+
+val liftLinuxAssertFailTransform = Transform(
+  "LiftLinuxAssertFail",
+  (ctx, man) => {
+    liftLinuxAssertFail(ctx)
+    man.ClobberAll
+  }
+)
+
+def getDoSimplifyTransform(validate: Boolean) = TransformBatch(
+  "DoSimplify",
+  List(
+    reduceLoops,
+    normaliseBlockNamesTransform,
+    sortProceduresRpoTransform,
+    liftSvCompTransform,
+    /*
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-simp.il"), pp_prog(program))
+      }
+    }
+     */
+    applyRpoTransform, // (this transform was already defined in this file)
+    // example of printing a simple analysis
+    removeEmptyBlocksTransform,
+    coalesceBlocksOnce,
+    removeEmptyBlocksTransform,
+    // transforms.coalesceBlocksCrossBranchDependency(program)
+    /*
+    config.foreach {
+      _.analysisDotPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_blockgraph-before-dsa.dot"), dotBlockGraph(program.mainProcedure))
+      }
+    }
+    Logger.info("[!] Simplify :: DynamicSingleAssignment")
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-dsa.il"), pp_prog(program))
+      }
+    }
+     */
+    onePassDsaTransform,
+    inlinePLTLaunchpad,
+    removeEmptyBlocksTransform,
+    /*
+    config.foreach {
+      _.analysisDotPath.foreach { s =>
+        AnalysisResultDotLogger.writeToFile(
+          File(s"${s}_blockgraph-after-dsa.dot"),
+          dotBlockGraph(
+            program,
+            (program.collect { case b: Block =>
+              b -> pp_block(b)
+            }).toMap
+          )
+        )
+      }
+    }
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-dsa.il"), pp_prog(program))
+      }
+    }
+     */
+    // todo: only run iff ir.eval.SimplifyValidation.validate (that is: iff conf.validateSimp)
+    dsaCheck,
+    // todo:
+    // - if config is set and config.dumpILToPath is set then dump il
+    // - if config is set and config.analysisDotPath is set then dump blockgraph
+    // - always log performance for this transform
+    copyPropParamFixedPointTransform,
+    fixupGuardsTransform,
+    removeDuplicateGuardsTransform,
+    /*
+    config.foreach {
+      _.analysisDotPath.foreach { s =>
+        AnalysisResultDotLogger.writeToFile(
+          File(s"${s}_blockgraph-after-simp.dot"),
+          dotBlockGraph(program.mainProcedure)
+        )
+      }
+    }
+     */
+    liftLinuxAssertFailTransform,
+    // assert(program.procedures.forall(transforms.rdDSAProperty))
+    // todo: transforms should have the ability to log their performance as soon as they finish
+    /*
+    assert(invariant.blockUniqueLabels(program))
+    Logger.info(s"CopyProp ${timer.checkPoint("Simplify")} ms ")
+
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-copyprop.il"), pp_prog(program))
+      }
+    }
+     */
+    // val x = program.procedures.forall(transforms.rdDSAProperty)
+    // assert(x)
+    dsaCheckAfterTransform, // todo: only run iff conf.validateSimp
+    // run this after cond recovery because sign bit calculations often need high bits
+    // which go away in high level conss
+    /*
+    config.foreach {
+      _.dumpILToPath.foreach { s =>
+        DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-slices.il"), pp_prog(program))
+      }
+    }
+     */
+    // re-apply dsa
+    // transforms.OnePassDSA().applyTransform(program)
+    logSimplificationValidation // todo: only run iff conf.validateSimp
+  ),
+  notice = "Running Simplify",
+  // fixme: not an appropriate use of this field
+  postRunChecks = _ => Logger.info("[!] Simplify :: finished")
+)

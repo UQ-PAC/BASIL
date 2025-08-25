@@ -1,5 +1,6 @@
 package test_util
 
+import ir.IRContext
 import org.scalatest.concurrent.ScaledTimeSpans
 import org.scalatest.time.{Seconds, Span}
 import util.boogie_interaction.*
@@ -9,7 +10,6 @@ import util.{
   BoogieGeneratorConfig,
   DSConfig,
   ILLoadingConfig,
-  IRContext,
   Logger,
   RunUtils,
   StaticAnalysisConfig
