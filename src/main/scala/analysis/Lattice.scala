@@ -13,7 +13,7 @@ trait Lattice[T]:
 
   /** The bottom element of this lattice.
     */
-  val bottom: T
+  def bottom: T
 
   /** The top element of this lattice. Default: not implemented.
     */
