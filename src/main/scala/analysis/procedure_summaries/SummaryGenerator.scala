@@ -44,7 +44,7 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
      * (think nested in statements).
      */
     Logger.debug(s"Generating gamma with reachability preconditions for $procedure")
-    val initialMustGammaDeps = LatticeMap.BottomMap(
+    val initialMustGammaDeps = LatticeMap.bottomMap(
       (relevantGlobals ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap
     )
     val mustGammaDomain = MustGammaDomain(initialMustGammaDeps)

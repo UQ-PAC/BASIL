@@ -104,10 +104,7 @@ class BoundedDisjunctiveCompletion[L](d: AbstractDomain[L], bound: Int) extends 
     joinCount += pos -> (joinCount.getOrElse(pos, 0) + 1)
     bound(
       if a.contains(d.top) || b.contains(d.top) then top
-      else {
-        // TODO this is manual widening, maybe widening should be added to the solver instead
-        if pos.isLoopHeader() || joinCount(pos) > 20 then widen(a, b, pos) else a.union(b)
-      },
+      else a.union(b),
       pos
     )
 
