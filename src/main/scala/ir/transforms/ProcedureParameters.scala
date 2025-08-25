@@ -580,8 +580,10 @@ object SpecFixer {
       case _ => DoChildren()
     }
 
-    def changeVar(v: Variable) = {
+    val defined = (varInPre.values ++ varInPost.values).map(v => v.name -> v).toMap
+    def changeVar(v: Variable): VisitAction[Variable] = {
       val repl = v match {
+        case l if defined.contains(l.name) => defined(l.name)
         case l: Variable if isPost && varInPost.contains(l.name) => varInPost(l.name)
         case l: Variable if varInPre.contains(l.name) => varInPre(l.name)
         case o => o
@@ -610,7 +612,10 @@ object SpecFixer {
     val varToOld = convVarToOld(varInPre, varInPost, isPost, makeLocal)
     val preVars = varInPre.values.toSet
     val postVars = varInPost.values.toSet
+    val defined = preVars ++ postVars
     b match {
+      case b: BVariable if defined.contains(b.name) =>
+        BVariable(b.name, b.getType, if makeLocal then Scope.Local else b.scope)
       case b: BVariable => {
         if isPost && varInPost.contains(b.name) then
           BVariable(varInPost(b.name), b.getType, if makeLocal then Scope.Local else b.scope)
