@@ -581,11 +581,19 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends ValueLattice[
    */
   val INTEGER_WIDTH = 100
 
+  def top(ty: IRType): TNum = ty match {
+    case BitVecType(w) => TNum.top(w)
+    case ty => throw Exception("unable to construct top TNum for type: " + ty)
+  }
+
+  def bottom(ty: IRType): TNum = throw Exception("TODO: TNum#bottom(IRType)")
+
   // XXX: the reference defines "bottom" as having at least one
   // position which is simultaneously set in the mask and value.
   // it is not clear if this is something that we can do without
   // adding special cases for all the operations to detect and
   // propagate this.
+
   def bottom: TNum = throw Exception("TNum.bottom not defined")
   def meet(x: TNum): TNum = intersect(x)
 
@@ -623,7 +631,7 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends ValueLattice[
     case x: BitVecLiteral => constant(x)
     case TrueLiteral => trueBool
     case FalseLiteral => falseBool
-    case IntLiteral(x) => constant(BitVectorEval.signedInt2BV(INTEGER_WIDTH, x))
+    case IntLiteral(x) => constant(BitVectorEval.signedInt2BV(INTEGER_WIDTH, x)) // XXX: is this wanted?
   }
   def equal(other: TNum): TNum = TEQ(other)
   def extract(hi: Int, lo: Int): TNum = TNum(value(hi, lo), mask(hi, lo))

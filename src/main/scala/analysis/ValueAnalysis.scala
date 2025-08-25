@@ -6,6 +6,9 @@ trait ValueLattice[ValueType <: ValueLattice[ValueType]] extends InternalLattice
   def top: ValueType
   def bottom: ValueType
 
+  def top(ty: IRType): ValueType
+  def bottom(ty: IRType): ValueType
+
   def join(x: ValueType): ValueType
   def meet(x: ValueType): ValueType
 
@@ -66,9 +69,10 @@ trait ValueLattice[ValueType <: ValueLattice[ValueType]] extends InternalLattice
 }
 
 class NOPValueAnalysis[ValueType <: NOPValueAnalysis[ValueType]] extends ValueLattice[ValueType] {
-
   def top: ValueType = ???
   def bottom: ValueType = ???
+  def top(ty: IRType): ValueType = ???
+  def bottom(ty: IRType): ValueType = ???
   def join(x: ValueType): ValueType = ???
   def meet(x: ValueType): ValueType = ???
 
@@ -87,7 +91,6 @@ class NOPValueAnalysis[ValueType <: NOPValueAnalysis[ValueType]] extends ValueLa
   def bvshl(other: ValueType): ValueType = top
   def bvlshr(other: ValueType): ValueType = top
   def bvashr(other: ValueType): ValueType = top
-  def bvshr(other: ValueType): ValueType = top
   def bvult(other: ValueType): ValueType = top
   def bvxor(other: ValueType): ValueType = top
   def bvsub(other: ValueType): ValueType = top
@@ -123,26 +126,25 @@ class NOPValueAnalysis[ValueType <: NOPValueAnalysis[ValueType]] extends ValueLa
   def sign_extend(extend: Int): ValueType = top
   def repeat(repeats: Int): ValueType = top
   def extract(hi: Int, lo: Int): ValueType = top
-
 }
 
-class EvaluateInLattice[Value <: ValueLattice[Value]](top: Value) {
+class EvaluateInLattice[Value <: ValueLattice[Value]](lattice: Value) {
 
   def evalExpr(evalVar: Variable => Option[Value])(e: Expr): Value = {
     e match {
-      case e: Variable => evalVar(e).getOrElse(top)
+      case e: Variable => evalVar(e).getOrElse(lattice.top(e.irType))
       case BinaryExpr(op, l, r) => evalBinExpr(evalVar)(op, evalExpr(evalVar)(l), evalExpr(evalVar)(r))
-      case l: Literal => top.constant(l)
+      case l: Literal => lattice.constant(l)
       case ZeroExtend(extend, e) => evalExpr(evalVar)(e).zero_extend(extend)
       case SignExtend(extend, e) => evalExpr(evalVar)(e).sign_extend(extend)
       case Extract(hi, lo, e) => evalExpr(evalVar)(e).extract(hi, lo)
       case Repeat(reps, e) => evalExpr(evalVar)(e).repeat(reps)
       case UnaryExpr(op, e) => evalUnaryExpr(op, evalExpr(evalVar)(e))
-      case _: FApplyExpr => top
-      case _: Memory => top
-      case _: LambdaExpr => top
-      case _: QuantifierExpr => top
-      case _: OldExpr => top
+      case _: FApplyExpr => lattice.top(e.getType)
+      case _: Memory => lattice.top(e.getType)
+      case _: LambdaExpr => lattice.top(e.getType)
+      case _: QuantifierExpr => lattice.top(e.getType)
+      case _: OldExpr => lattice.top(e.getType)
       case AssocExpr(BoolAND, exprs) => exprs.map(evalExpr(evalVar)).reduce((a, b) => a.booland(b))
       case AssocExpr(BoolOR, exprs) => exprs.map(evalExpr(evalVar)).reduce((a, b) => a.boolor(b))
       case AssocExpr(BoolIMPLIES, exprs) => exprs.map(evalExpr(evalVar)).reduce((l, r) => l.boolor(r.boolnot()))
@@ -225,11 +227,11 @@ case class ProductInternalLattice[V1 <: InternalLattice[V1], V2 <: InternalLatti
 }
 
 class ProductValueLattice[Value1 <: ValueLattice[Value1], Value2 <: ValueLattice[Value2]](
-  topValue1: Value1,
-  topValue2: Value2
+  lattice1: Value1,
+  lattice2: Value2
 ) extends AbsEvalExpr[ProductInternalLattice[Value1, Value2]] {
 
-  override val top = ProductInternalLattice(topValue1, topValue2)
+  override val top = ProductInternalLattice(lattice1, lattice2)
   override val bottom: ProductInternalLattice[Value1, Value2] = ???
   override def lub(x: ProductInternalLattice[Value1, Value2], y: ProductInternalLattice[Value1, Value2]) = x.join(y)
 
@@ -244,8 +246,8 @@ class ProductValueLattice[Value1 <: ValueLattice[Value1], Value2 <: ValueLattice
     ???
   }
 
-  val eval1 = EvaluateInLattice[Value1](topValue1)
-  val eval2 = EvaluateInLattice[Value2](topValue2)
+  val eval1 = EvaluateInLattice[Value1](lattice1)
+  val eval2 = EvaluateInLattice[Value2](lattice2)
 
   def evalExpr(
     read: Variable => Option[ProductInternalLattice[Value1, Value2]]
@@ -256,15 +258,15 @@ class ProductValueLattice[Value1 <: ValueLattice[Value1], Value2 <: ValueLattice
   }
 }
 
-class DefaultValueLattice[Value <: ValueLattice[Value]](topValue: Value, bottomValue: Option[Value] = None)
+class DefaultValueLattice[Value <: ValueLattice[Value]](lattice: Value, bottomValue: Option[Value] = None)
     extends AbsEvalExpr[Value]
     with Lattice[Value] {
-  override val top: Value = topValue
-  val v = EvaluateInLattice[Value](topValue)
+  override val top: Value = lattice.top
+  val eval = EvaluateInLattice[Value](lattice)
 
   override def bottom: Value = bottomValue.getOrElse(throw Exception("bottom not defined for this lattice"))
   override def lub(x: Value, y: Value) = x.join(y)
-  def evalExpr(read: Variable => Option[Value])(e: Expr): Value = v.evalExpr(read)(e)
+  def evalExpr(read: Variable => Option[Value])(e: Expr): Value = eval.evalExpr(read)(e)
 }
 
 trait TransferFun[L] {
@@ -306,17 +308,17 @@ class DefaultTransfer[L <: InternalLattice[L]](innerLattice: AbsEvalExpr[L])
 }
 
 class ValueStateDomain[L <: InternalLattice[L]](
-  topValue: L,
+  lattice: L,
   transferFn: TransferFun[LatticeMap[Variable, L]],
   innerLattice: AbsEvalExpr[L]
 ) extends MapDomain[Variable, L] {
   //  val innerLattice : DefaultValueLattice[L] = DefaultValueLattice[L](topValue)
 
-  given v: L = topValue
+  given v: L = lattice
 
-  def botTerm: L = topValue.bottom
+  def botTerm: L = lattice.bottom
   def joinTerm(a: L, b: L, pos: ir.Block): L = a.join(b)
-  def topTerm: L = topValue
+  def topTerm: L = lattice.top
 
   override def transfer(v: LatticeMap[Variable, L], b: Command): LatticeMap[Variable, L] = {
     val get = v.toMap.get
