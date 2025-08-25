@@ -38,7 +38,7 @@ trait NativeDepsModule extends JavaModule {
       ).head
     )
 
-    (names zip libs).map((name, lib) => {
+    (names `zip` libs).map((name, lib) => {
       val newPath = Task.dest / s"$name.${plat.os.libExtension}"
       os.copy(lib.path, newPath)
     })
