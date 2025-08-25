@@ -262,7 +262,7 @@ class DefaultValueLattice[Value <: ValueLattice[Value]](topValue: Value, bottomV
   override val top: Value = topValue
   val v = EvaluateInLattice[Value](topValue)
 
-  override val bottom: Value = bottomValue.get
+  override def bottom: Value = bottomValue.getOrElse(throw Exception("bottom not defined for this lattice"))
   override def lub(x: Value, y: Value) = x.join(y)
   def evalExpr(read: Variable => Option[Value])(e: Expr): Value = v.evalExpr(read)(e)
 }
