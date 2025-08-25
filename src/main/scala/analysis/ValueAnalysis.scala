@@ -1,6 +1,12 @@
 package analysis
 import ir.*
 
+trait StaticLatticeOps[T] {
+  def top(ty: IRType): T
+  def bottom(ty: IRType): T
+  def constant(v: Literal): T
+}
+
 trait ValueLattice[ValueType <: ValueLattice[ValueType]] extends InternalLattice[ValueType] {
 
   def top: ValueType
@@ -57,12 +63,10 @@ trait ValueLattice[ValueType <: ValueLattice[ValueType]] extends InternalLattice
   def booland(other: ValueType): ValueType
   def boolor(other: ValueType): ValueType
 
-  def constant(v: Literal): ValueType
   def zero_extend(extend: Int): ValueType
   def sign_extend(extend: Int): ValueType
   def repeat(repeats: Int): ValueType
   def extract(hi: Int, lo: Int): ValueType
-
 }
 
 class NOPValueAnalysis[ValueType <: NOPValueAnalysis[ValueType]] extends ValueLattice[ValueType] {
@@ -87,7 +91,6 @@ class NOPValueAnalysis[ValueType <: NOPValueAnalysis[ValueType]] extends ValueLa
   def bvshl(other: ValueType): ValueType = top
   def bvlshr(other: ValueType): ValueType = top
   def bvashr(other: ValueType): ValueType = top
-  def bvshr(other: ValueType): ValueType = top
   def bvult(other: ValueType): ValueType = top
   def bvxor(other: ValueType): ValueType = top
   def bvsub(other: ValueType): ValueType = top
@@ -118,7 +121,6 @@ class NOPValueAnalysis[ValueType <: NOPValueAnalysis[ValueType]] extends ValueLa
   def booland(other: ValueType): ValueType = top
   def boolor(other: ValueType): ValueType = top
 
-  def constant(v: Literal): ValueType = top
   def zero_extend(extend: Int): ValueType = top
   def sign_extend(extend: Int): ValueType = top
   def repeat(repeats: Int): ValueType = top
@@ -130,7 +132,7 @@ class EvaluateInLattice[Value <: ValueLattice[Value]](top: Value) {
 
   def evalExpr(evalVar: Variable => Option[Value])(e: Expr): Value = {
     e match {
-      case e: Variable => evalVar(e).getOrElse(top)
+      case e: Variable => evalVar(e).getOrElse(top.top(e.irType))
       case BinaryExpr(op, l, r) => evalBinExpr(evalVar)(op, evalExpr(evalVar)(l), evalExpr(evalVar)(r))
       case l: Literal => top.constant(l)
       case ZeroExtend(extend, e) => evalExpr(evalVar)(e).zero_extend(extend)
@@ -256,7 +258,7 @@ class ProductValueLattice[Value1 <: ValueLattice[Value1], Value2 <: ValueLattice
   }
 }
 
-class DefaultValueLattice[Value <: ValueLattice[Value]](topValue: Value, bottomValue: Option[Value] = None)
+class DefaultValueLattice[Ops <: StaticLatticeOps[Value], Value <: ValueLattice[Value]](topValue: Ops, bottomValue: Option[Ops] = None)
     extends AbsEvalExpr[Value]
     with Lattice[Value] {
   override val top: Value = topValue
@@ -280,7 +282,7 @@ trait TransferFun[L] {
 class DefaultTransfer[L <: InternalLattice[L]](innerLattice: AbsEvalExpr[L])
     extends TransferFun[LatticeMap[Variable, L]] {
 
-  given v: L = innerLattice.top
+  given dummyLatticeValue: L = innerLattice.top
 
   def assign(v: LatticeMap[Variable, L], assignments: Seq[(Variable, Expr)]): LatticeMap[Variable, L] = {
     val get = v.toMap.get

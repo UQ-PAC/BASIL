@@ -57,9 +57,37 @@ object TNum {
   def falseBool = TNum(0.bv1, 0.bv1)
   def unkBool = TNum(0.bv1, 1.bv1)
   def top(width: Int) = TNum(0.bv(width), BitVecLiteral(BitVecType(width).maxValue, width))
+
+  trait TNumStaticOps extends StaticLatticeOps[TNum] {
+
+    /**
+    * Hack to define a certain "big enough" width to represent
+    * arbitrary-precision integers within the lattice values.
+    */
+    val INTEGER_WIDTH = 100
+
+    def top(ty: IRType): TNum = ty match {
+      case BitVecType(w) => TNum.top(w)
+      case ty => throw Exception("unable to construct top TNum for type: " + ty)
+    }
+
+    def bottom(ty: IRType): TNum = throw Exception("TODO: TNum#bottom(IRType)")
+
+    protected def constant(n: Int & Singleton, w: Int): TNum = constant(BigInt(n), w)
+    protected def constant(n: BigInt, w: Int): TNum =
+      TNum(BitVectorEval.signedInt2BV(w, n), 0.bv(w))
+    protected def constant(n: BitVecLiteral): TNum = constant(n.value, n.size)
+
+    def constant(v: ir.Literal): TNum = v match {
+      case x: BitVecLiteral => constant(x)
+      case TrueLiteral => TNum.trueBool
+      case FalseLiteral => TNum.falseBool
+      case IntLiteral(x) => constant(BitVectorEval.signedInt2BV(INTEGER_WIDTH, x))
+    }
+  }
 }
 
-case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends ValueLattice[TNum] {
+case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends ValueLattice[TNum] with TNum.TNumStaticOps {
   import TNum.*
 
   def width: Int = {
@@ -73,18 +101,6 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends ValueLattice[
   }
 
   debugAssert(wellFormed, s"not well formed $this")
-
-  def top = {
-    TNum(0.bv(width), BitVecLiteral(BitVecType(width).maxValue, width))
-  }
-
-  def zero = TNum(0.bv(width), 0.bv(width))
-  def constant(n: Int) = {
-    TNum(n.bv(width), 0.bv(width))
-  }
-  def constant(n: BitVecLiteral) = {
-    TNum(n, 0.bv(n.size))
-  }
 
   override def toString() = {
     val padwidth = width / 4 + (if width % 4 != 0 then 1 else 0)
@@ -162,7 +178,7 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends ValueLattice[
   def TMUL(that: TNum): TNum = {
     require(this.width == that.width, s"$this $that bv width")
     var acc_v = this.value * that.value
-    var acc_m = constant(0)
+    var acc_m = constant(0, this.width)
 
     var a = this
     var b = that
@@ -174,8 +190,8 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends ValueLattice[
         acc_m = acc_m.TADD(TNum(0.bv(b.width), b.value | b.mask))
       }
 
-      a = a.TLSHR(constant(1))
-      b = b.TSHL(constant(1))
+      a = a.TLSHR(constant(1, this.width))
+      b = b.TSHL(constant(1, this.width))
     }
 
     constant(acc_v).TADD(acc_m)
@@ -454,7 +470,7 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends ValueLattice[
 
   // Two's complement negation
   def TNEG(): TNum = {
-    constant(0).TSUB(this)
+    constant(0, this.width).TSUB(this)
   }
 
   // Bitwise Not
@@ -575,18 +591,15 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends ValueLattice[
   private inline def mapBoth(f: BitVecLiteral => BitVecLiteral) =
     TNum(f(value), f(mask))
 
-  /**
-   * Hack to define a certain "big enough" width to represent
-   * arbitrary-precision integers within the lattice values.
-   */
-  val INTEGER_WIDTH = 100
+  def top = TNum.top(width)
 
   // XXX: the reference defines "bottom" as having at least one
   // position which is simultaneously set in the mask and value.
   // it is not clear if this is something that we can do without
   // adding special cases for all the operations to detect and
   // propagate this.
-  def bottom: TNum = throw Exception("TNum.bottom not defined")
+  def bottom = throw Exception("TODO: TNum#bottom")
+
   def meet(x: TNum): TNum = intersect(x)
 
   def booland(other: TNum): TNum = bvand(other)
@@ -619,12 +632,6 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends ValueLattice[
   def bvult(other: TNum): TNum = TULT(other)
   def bvurem(other: TNum): TNum = TUREM(other)
   def bvxor(other: TNum): TNum = TXOR(other)
-  def constant(v: ir.Literal): TNum = v match {
-    case x: BitVecLiteral => constant(x)
-    case TrueLiteral => trueBool
-    case FalseLiteral => falseBool
-    case IntLiteral(x) => constant(BitVectorEval.signedInt2BV(INTEGER_WIDTH, x))
-  }
   def equal(other: TNum): TNum = TEQ(other)
   def extract(hi: Int, lo: Int): TNum = TNum(value(hi, lo), mask(hi, lo))
 
@@ -649,14 +656,14 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends ValueLattice[
 
 def knownBitsAnalysis(p: Program) = {
   applyRPO(p)
-  val lattice = DefaultValueLattice(TNum.top(1), None)
+  val lattice = DefaultValueLattice(new TNum.TNumStaticOps{ }, None)
   val solver = transforms.worklistSolver(ValueStateDomain(lattice.top, DefaultTransfer(lattice), lattice))
   val (beforeIn, afterIn) = solver.solveProgIntraProc(p, backwards = false)
   (beforeIn, afterIn)
 }
 
 class SimplifyKnownBits() {
-  val lattice = DefaultValueLattice(TNum.top(1), None)
+  val lattice = DefaultValueLattice(new TNum.TNumStaticOps {}, None)
   val solver = transforms.worklistSolver(ValueStateDomain(lattice.top, DefaultTransfer(lattice), lattice))
 
   def applyTransform(p: Program): Unit = {
