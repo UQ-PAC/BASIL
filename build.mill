@@ -232,7 +232,7 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
    * Build the ctags file containing code definition locations.
    * This can be used with `./mill -w` to watch and re-build on file changes.
    */
-  def ctags() = Task.Command {
+  def ctags = Task {
     val src = Task.traverse(Seq(this, test) ++ moduleDeps)(_.allSources)().flatten
     val srcArgs = src.map(_.path).filter(os.exists(_)).map(_.toString)
 
