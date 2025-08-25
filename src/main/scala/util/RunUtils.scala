@@ -1079,7 +1079,7 @@ object RunUtils {
 
     val boogiePrograms = if (q.boogieTranslation.directTranslation) {
       Logger.info("Disabling WPIF VCs")
-      ArrayBuffer(translating.BoogieTranslator.translateProg(ctx.program, q.outputPrefix))
+      ArrayBuffer(translating.BoogieTranslator.translateProg(ctx.program, Some(ctx.specification), q.outputPrefix))
     } else if (q.boogieTranslation.threadSplit && ctx.program.threads.nonEmpty) {
       val outPrograms = ArrayBuffer[BProgram]()
       for (thread <- ctx.program.threads) {
