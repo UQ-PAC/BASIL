@@ -594,7 +594,8 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends ValueLattice[
   // adding special cases for all the operations to detect and
   // propagate this.
 
-  def bottom: TNum = throw Exception("TNum.bottom not defined")
+  // HACK: frighteningly unsound. this is just so LatticeMap has a bottom to use.
+  def bottom: TNum = TNum(0.bv(100), 1.bv(100))
   def meet(x: TNum): TNum = intersect(x)
 
   def booland(other: TNum): TNum = bvand(other)
@@ -611,21 +612,24 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends ValueLattice[
   def bvneg(): TNum = TNEG()
   def bvnot(): TNum = TNOT()
   def bvor(other: TNum): TNum = TOR(other)
-  def bvsdiv(other: TNum): TNum = TSDIV(other)
   def bvsge(other: TNum): TNum = TSGE(other)
   def bvsgt(other: TNum): TNum = TSGT(other)
   def bvshl(other: TNum): TNum = TSHL(other)
   def bvsle(other: TNum): TNum = TSLE(other)
   def bvslt(other: TNum): TNum = TSLT(other)
-  def bvsmod(other: TNum): TNum = TSMOD(other)
-  def bvsrem(other: TNum): TNum = TSREM(other)
   def bvsub(other: TNum): TNum = TSUB(other)
-  def bvudiv(other: TNum): TNum = TUDIV(other)
   def bvuge(other: TNum): TNum = TUGE(other)
   def bvugt(other: TNum): TNum = TUGT(other)
   def bvule(other: TNum): TNum = TULE(other)
   def bvult(other: TNum): TNum = TULT(other)
-  def bvurem(other: TNum): TNum = TUREM(other)
+
+  // TODO: TNum division-related functions currently broken
+  def bvsmod(other: TNum): TNum = top
+  def bvsrem(other: TNum): TNum = top
+  def bvudiv(other: TNum): TNum = top
+  def bvurem(other: TNum): TNum = top
+  def bvsdiv(other: TNum): TNum = top
+
   def bvxor(other: TNum): TNum = TXOR(other)
   def constant(v: ir.Literal): TNum = v match {
     case x: BitVecLiteral => constant(x)
