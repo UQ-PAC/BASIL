@@ -1,10 +1,17 @@
 package analysis
 import ir.*
-import ir.eval.BitVectorEval
-import ir.eval.InfixBitVectorEval
-import ir.eval.InfixBitVectorEval.{zero_extend => _, sign_extend => _, bvult => _, bvugt => _, bvule => _, bvuge => _, *}
 import ir.eval.InfixBitVectorEval.given
-import ir.transforms.{applyRPO}
+import ir.eval.InfixBitVectorEval.{
+  bvuge as _,
+  bvugt as _,
+  bvule as _,
+  bvult as _,
+  sign_extend as _,
+  zero_extend as _,
+  *
+}
+import ir.eval.{BitVectorEval, InfixBitVectorEval}
+import ir.transforms.applyRPO
 import util.assertion.*
 import util.writeToFile
 

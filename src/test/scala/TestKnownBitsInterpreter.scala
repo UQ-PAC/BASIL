@@ -142,7 +142,7 @@ class TestKnownBitsInterpreter
   )
 
   def testInterpret(arg1: BigInt, arg2: BigInt) = {
-    val testResult = analysis.knownBitsAnalysis(kbitsCtx.program)._1.map{ (k,v) => k -> v.toMap}.toMap
+    val testResult = analysis.knownBitsAnalysis(kbitsCtx.program)._1.map { (k, v) => k -> v.toMap }.toMap
     val res = runTestInterpreter(kbitsCtx, testResult, callParams = params(arg1, arg2))
     assert(res.checksPassed.nonEmpty)
     assert(
