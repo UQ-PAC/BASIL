@@ -34,7 +34,7 @@ enum SatResult {
  *  (!!) It is very important (!!) to close the solver with [[close]] once you are done with it to prevent memory leaks!
  *
  *  This class contains an SMT solver context. This means that ideally, you should create a single solver, and make many
- *  queries to it. Queries can be either BASIL [[Expr]]s of type [[BoolType]] or [[Predicate]]s. Alternatively one can
+ *  queries to it. Queries can be either BASIL [[ir.Expr]]s of type [[ir.BoolType]] or [[analysis.Predicate]]s. Alternatively one can
  *  pass a string representation of an SMT2 query using [[smt2Sat]].
  *
  *  A solver wide default timeout can optionally be given with the [[defaultTimeoutMillis]] variable, but this can be
@@ -101,12 +101,12 @@ class SMTSolver(var defaultTimeoutMillis: Option[Int] = None) {
     }
   }
 
-  /** Run solver on a [[Predicate]] */
+  /** Run solver on a [[analysis.Predicate]] */
   def predSat(p: Predicate, timeoutMillis: Option[Int] = None, obtainModel: Boolean = false): SatResult = {
     sat(formulaConverter.convertPredicate(p), timeoutMillis.orElse(defaultTimeoutMillis), obtainModel)
   }
 
-  /** Run solver on a boolean typed BASIL [[Expr]] */
+  /** Run solver on a boolean typed BASIL [[ir.Expr]] */
   def exprSat(p: Expr, timeoutMillis: Option[Int] = None, obtainModel: Boolean = false): SatResult = {
     sat(formulaConverter.convertBoolExpr(p), timeoutMillis.orElse(defaultTimeoutMillis), obtainModel)
   }
