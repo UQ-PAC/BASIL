@@ -68,6 +68,106 @@ trait ValueLattice[ValueType <: ValueLattice[ValueType]] extends InternalLattice
 
 }
 
+enum BVValueLattice[T <: ValueLattice[T]](lattice: T) extends ValueLattice[BVValueLattice[T]] {
+  case Bot(lattice: T) extends BVValueLattice[T](lattice)
+  case Elem(width: Int, inner: T) extends BVValueLattice[T](inner)
+  case Top(lattice: T) extends BVValueLattice[T](lattice)
+
+  protected def getBVType(ty: IRType) = ty match {
+    case ty: BitVecType => Some(ty)
+    case BoolType => Some(BitVecType(1))
+    case _ => None
+  }
+
+  protected def wrapInner(ty: IRType)(inner: BitVecType => T) =
+    getBVType(ty).fold(top)(ty => Elem(ty.size, inner(ty)))
+
+  protected def checkBinary(x: BVValueLattice[T], y: BVValueLattice[T])(f: (T, T) => T): BVValueLattice[T] = {
+    (x, y) match {
+      case (Bot(_), _) | (_, Bot(_)) => Bot(lattice)
+      case (Top(_), _) | (_, Top(_)) => Top(lattice)
+      case (Elem(wx, x), Elem(wy, y)) =>
+        if wx != wy then {
+          Top(lattice)
+        } else {
+          Elem(wx, f(x, y))
+        }
+    }
+  }
+
+  protected def checkUnary(x: BVValueLattice[T])(f: T => T): BVValueLattice[T] = {
+    x match {
+      case Bot(_) => Bot(lattice)
+      case Top(_) => Top(lattice)
+      case Elem(wx, x) => Elem(wx, f(x))
+    }
+  }
+
+  def top: BVValueLattice[T] = Top(lattice)
+  def bottom: BVValueLattice[T] = Bot(lattice)
+
+  def top(ty: IRType): BVValueLattice[T] = wrapInner(ty)(lattice.top(_))
+  def bottom(ty: IRType): BVValueLattice[T] = wrapInner(ty)(lattice.bottom(_))
+
+  def join(x: BVValueLattice[T]) = checkBinary(this, x)(_ `join` _)
+  def meet(x: BVValueLattice[T]) = checkBinary(this, x)(_ `meet` _)
+
+  override def lub(x: BVValueLattice[T]) = join(x)
+  override def glb(x: BVValueLattice[T]) = meet(x)
+
+  def bvnot() = checkUnary(this)(_.bvnot())
+  def bvneg() = checkUnary(this)(_.bvneg())
+  def boolnot() = checkUnary(this)(_.boolnot())
+  def intneg() = checkUnary(this)(_.intneg())
+  def booltobv1() = checkUnary(this)(_.booltobv1())
+
+  def equal(other: BVValueLattice[T]) = checkBinary(this, other)(_ `equal` _)
+  def bvcomp(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvcomp` _)
+  def bvand(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvand` _)
+  def bvor(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvor` _)
+  def bvadd(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvadd` _)
+  def bvmul(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvmul` _)
+  def bvshl(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvshl` _)
+  def bvlshr(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvlshr` _)
+  def bvashr(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvashr` _)
+  def bvult(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvult` _)
+  def bvxor(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvxor` _)
+  def bvsub(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvsub` _)
+  def bvurem(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvurem` _)
+  def bvsrem(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvsrem` _)
+  def bvsmod(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvsmod` _)
+  def bvudiv(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvudiv` _)
+  def bvsdiv(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvsdiv` _)
+  def bvule(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvule` _)
+  def bvugt(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvugt` _)
+  def bvslt(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvslt` _)
+  def bvsle(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvsle` _)
+  def bvsgt(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvsgt` _)
+  def bvsge(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvsge` _)
+  def bvuge(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvuge` _)
+  def bvconcat(other: BVValueLattice[T]) = checkBinary(this, other)(_ `bvconcat` _)
+
+  def intlt(other: BVValueLattice[T]) = checkBinary(this, other)(_ `intlt` _)
+  def intle(other: BVValueLattice[T]) = checkBinary(this, other)(_ `intle` _)
+  def intgt(other: BVValueLattice[T]) = checkBinary(this, other)(_ `intgt` _)
+  def intge(other: BVValueLattice[T]) = checkBinary(this, other)(_ `intge` _)
+  def intadd(other: BVValueLattice[T]) = checkBinary(this, other)(_ `intadd` _)
+  def intsub(other: BVValueLattice[T]) = checkBinary(this, other)(_ `intsub` _)
+  def intmul(other: BVValueLattice[T]) = checkBinary(this, other)(_ `intmul` _)
+  def intdiv(other: BVValueLattice[T]) = checkBinary(this, other)(_ `intdiv` _)
+  def intmod(other: BVValueLattice[T]) = checkBinary(this, other)(_ `intmod` _)
+
+  def booland(other: BVValueLattice[T]) = checkBinary(this, other)(_ `booland` _)
+  def boolor(other: BVValueLattice[T]) = checkBinary(this, other)(_ `boolor` _)
+
+  def constant(v: Literal) = wrapInner(v.getType)(_ => lattice.constant(v))
+  def zero_extend(extend: Int) = checkUnary(this)(_.zero_extend(extend))
+  def sign_extend(extend: Int) = checkUnary(this)(_.zero_extend(extend))
+  def repeat(repeats: Int) = checkUnary(this)(_.repeat(repeats))
+  def extract(hi: Int, lo: Int) = checkUnary(this)(_.extract(hi, lo))
+
+}
+
 class NOPValueAnalysis[ValueType <: NOPValueAnalysis[ValueType]] extends ValueLattice[ValueType] {
   def top: ValueType = ???
   def bottom: ValueType = ???
