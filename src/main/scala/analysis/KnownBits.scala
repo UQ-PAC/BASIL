@@ -59,7 +59,7 @@ object TNum {
   def top(width: Int) = TNum(0.bv(width), BitVecLiteral(BitVecType(width).maxValue, width))
 }
 
-case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends ValueLattice[TNum] {
+case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends BVValueLattice[TNum] {
   import TNum.*
 
   def width: Int = {
