@@ -70,7 +70,7 @@ trait Mu[A] extends Term[A] {
   */
 trait TermOps[A] {
 
-  /** Constructor for [[analysis.solvers.Mu]] terms.
+  /** Constructor for [[analysis.solvers.aMu]] terms.
     */
   def makeMu(v: Var[A], t: Term[A]): Mu[A]
 
