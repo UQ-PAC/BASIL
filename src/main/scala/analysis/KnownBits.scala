@@ -59,13 +59,15 @@ object TNum {
   def top(width: Int) = TNum(0.bv(width), BitVecLiteral(BitVecType(width).maxValue, width))
 }
 
-case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends BVValueLattice[TNum] {
+case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends TypedValueLattice[TNum] {
   import TNum.*
 
   def width: Int = {
     require(value.size == mask.size)
     value.size
   }
+
+  def getType = BitVecType(width)
 
   def wellFormed: Boolean = {
     value.value >= 0 && mask.value >= 0 && value.size >= 0 && mask.size >= 0 && value.size == mask.size && ((value & mask) == 0
@@ -653,14 +655,14 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends BVValueLattic
 
 def knownBitsAnalysis(p: Program) = {
   applyRPO(p)
-  val lattice = DefaultValueLattice(BVLattice.Top(TNum.top(1)), None)
+  val lattice = DefaultValueLattice(TypedLattice.Top(TNum.top(1)), None)
   val solver = transforms.worklistSolver(ValueStateDomain(lattice.top, DefaultTransfer(lattice), lattice))
   val (beforeIn, afterIn) = solver.solveProgIntraProc(p, backwards = false)
   (beforeIn, afterIn)
 }
 
 class SimplifyKnownBits() {
-  val lattice = DefaultValueLattice(BVLattice.Top(TNum.top(1)), None)
+  val lattice = DefaultValueLattice(TypedLattice.Top(TNum.top(1)), None)
   val solver = transforms.worklistSolver(ValueStateDomain(lattice.top, DefaultTransfer(lattice), lattice))
 
   def applyTransform(p: Program): Unit = {

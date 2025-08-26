@@ -142,8 +142,8 @@ class TestKnownBitsInterpreter
   )
 
   def testInterpret(arg1: BigInt, arg2: BigInt) = {
-    def convert(map: LatticeMap[Variable, BVLattice[TNum]]): Map[Variable, TNum] = {
-      map.toMap.collect { case (k, BVLattice.Elem(v)) => k -> v }
+    def convert(map: LatticeMap[Variable, TypedLattice[TNum]]): Map[Variable, TNum] = {
+      map.toMap.collect { case (k, TypedLattice.Elem(v)) => k -> v }
     }
     val testResult = analysis
       .knownBitsAnalysis(kbitsCtx.program)

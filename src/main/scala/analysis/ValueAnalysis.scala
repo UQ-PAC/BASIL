@@ -3,10 +3,16 @@ import ir.*
 
 trait ValueLattice[ValueType <: ValueLattice[ValueType]] extends InternalLattice[ValueType] {
 
+  /** Returns a type-independent top value. */
   def top: ValueType
+
+  /** Returns a type-independent bottom value. */
   def bottom: ValueType
 
+  /** Returns a type-*dependent* top value. */
   def top(ty: IRType): ValueType
+
+  /** Returns a type-*dependent* bottom value. */
   def bottom(ty: IRType): ValueType
 
   def join(x: ValueType): ValueType
@@ -69,84 +75,66 @@ trait ValueLattice[ValueType <: ValueLattice[ValueType]] extends InternalLattice
 }
 
 /**
- * A lattice type which has width-specific values. Each lattice element is expected
- * to have a known bit width, defined by its [[BVValueLattice#width]] method.
- * This trait is mainly intended for use with [[BVLattice]].
+ * A lattice which has type-specific values. Each lattice element is expected
+ * to have a known [[ir.IRType]], defined by its [[TypedValueLattice#getType]] method.
+ *
+ * This trait is mainly intended to be used use within a [[TypedLattice]].
  */
-trait BVValueLattice[T <: ValueLattice[T]] extends ValueLattice[T] {
+trait TypedValueLattice[T <: ValueLattice[T]] extends ValueLattice[T] {
 
   /**
-   * Returns the bit width of the current lattice element.
+   * Returns the [[ir.IRType]] of the current lattice element.
    */
-  def width: Int
-}
-
-class A {
-  protected def protect(): Int = ???
+  def getType: IRType
 }
 
 /**
- * Derives a lattice for all bit-widths from the given width-specific [[BVValueLattice]].
- * This is done by wrapping the "inner" lattice into [[BVLattice.Elem]]. New
- * [[BVLattice.Top]] and [[BVLattice.Bot]] values are also introduced to act as
+ * Derives a lattice for all [[ir.IRType]]s from the given type-specific [[TypedValueLattice]].
+ * This is done by wrapping the "inner" lattice into [[TypedLattice.Elem]]. New
+ * [[TypedLattice.Top]] and [[TypedLattice.Bot]] values are also introduced to act as
  * universal (width-independent) top and bottom elements.
  *
- * If a width-specific operation is attempted on inner lattice values of differing width,
- * the [[BVLattice.handleConflictingTypes]] function is called. The default implementation
- * of this just returns the width-independent [[BVLattice.Top]].
+ * If a type-specific operation is attempted on inner lattice values of incompatible type,
+ * the [[TypedLattice.handleConflictingTypes]] function is called. The default implementation
+ * will throw an exception.
  *
- * This [[BVLattice]] class guarantees that the width-dependent methods of the inner
- * [[BVValueLattice]] are only called with values of compatible width. It also guarantees that
+ * This [[TypedLattice]] class guarantees that the type-dependent methods of the inner
+ * [[TypedValueLattice]] are only called with values of compatible type. It also guarantees that
  * the inner lattice's parameter-less [[ValueLattice#top]] and [[ValueLattice#bottom]]
- * methods are _never_ called&mdash;instead, these are implemented by returning [[BVLattice.Top]]
- * and [[BVLattice.Bot]], respectively.
+ * methods are _never_ called&mdash;instead, these are implemented by returning [[TypedLattice.Top]]
+ * and [[TypedLattice.Bot]], respectively.
  */
-enum BVLattice[T <: BVValueLattice[T]](lattice: T) extends ValueLattice[BVLattice[T]] {
-  case Bot(lattice: T) extends BVLattice[T](lattice)
-  case Elem(inner: T) extends BVLattice[T](inner)
-  case Top(lattice: T) extends BVLattice[T](lattice)
+enum TypedLattice[T <: TypedValueLattice[T]](lattice: T) extends ValueLattice[TypedLattice[T]] {
+  case Bot(lattice: T) extends TypedLattice[T](lattice)
+  case Elem(inner: T) extends TypedLattice[T](inner)
+  case Top(lattice: T) extends TypedLattice[T](lattice)
 
   /**
-   * Narrows the given [[IRType]] to a [[BitVecType]] if possible, otherwise returns [[None]].
-   * [[BoolType]] is treated as a `BitVecType(1)`.
+   * Called to combine two inner lattice elements of differing types.
    */
-  def getBVType(ty: IRType) = ty match {
-    case ty: BitVecType => Some(ty)
-    case BoolType => Some(BitVecType(1))
-    case _ => None
-  }
-  // TODO: make protected once https://github.com/scala/scala3/issues/23814 is fixed?
+  def handleConflictingTypes(x: T, y: T): TypedLattice[T] = throw new Exception(
+    s"attempted lattice operation on incompatible ${lattice.getClass.getName} values: '$x' and '$y'"
+  )
 
-  /**
-   * If the given [[IRType]] describes a type with a width, computes the given inner lattice
-   * value and wraps it into a [[BVLattice.Elem]]. Otherwise, returns [[BVLattice.top]].
-   */
-  def wrapInnerElem(ty: IRType)(inner: BitVecType => T) =
-    getBVType(ty).fold(top)(ty => Elem(inner(ty)))
-
-  /**
-   * Called to combine two inner lattice elements of differing widths.
-   */
-  def handleConflictingTypes(x: Elem[T], y: Elem[T]): BVLattice[T] = top
-
-  def checkBinaryTopBot(x: BVLattice[T], y: BVLattice[T])(f: (Elem[T], Elem[T]) => BVLattice[T]): BVLattice[T] =
+  inline def checkBinaryTopBot(x: TypedLattice[T], y: TypedLattice[T])(
+    f: (Elem[T], Elem[T]) => TypedLattice[T]
+  ): TypedLattice[T] =
     (x, y) match {
       case (Bot(_), _) | (_, Bot(_)) => Bot(lattice)
       case (Top(_), _) | (_, Top(_)) => Top(lattice)
       case (x: Elem[T], y: Elem[T]) => f(x, y)
     }
 
-  def checkBinaryWidths(x: Elem[T], y: Elem[T])(f: (T, T) => T): BVLattice[T] =
+  inline def checkBinaryWidths(x: Elem[T], y: Elem[T])(f: (T, T) => T): TypedLattice[T] =
     (x, y) match {
-      case (Elem(l), Elem(r)) if l.width != r.width => handleConflictingTypes(x, y)
-
+      case (Elem(x), Elem(y)) if x.getType != y.getType => handleConflictingTypes(x, y)
       case (Elem(x), Elem(y)) => Elem(f(x, y))
     }
 
-  def checkBinary(x: BVLattice[T], y: BVLattice[T])(f: (T, T) => T): BVLattice[T] =
+  def checkBinary(x: TypedLattice[T], y: TypedLattice[T])(f: (T, T) => T): TypedLattice[T] =
     checkBinaryTopBot(x, y)(checkBinaryWidths(_, _)(f))
 
-  def checkUnary(x: BVLattice[T])(f: T => T): BVLattice[T] = {
+  def checkUnary(x: TypedLattice[T])(f: T => T): TypedLattice[T] = {
     x match {
       case Bot(_) => Bot(lattice)
       case Top(_) => Top(lattice)
@@ -154,17 +142,17 @@ enum BVLattice[T <: BVValueLattice[T]](lattice: T) extends ValueLattice[BVLattic
     }
   }
 
-  def top: BVLattice[T] = Top(lattice)
-  def bottom: BVLattice[T] = Bot(lattice)
+  def top: TypedLattice[T] = Top(lattice)
+  def bottom: TypedLattice[T] = Bot(lattice)
 
-  def top(ty: IRType): BVLattice[T] = wrapInnerElem(ty)(lattice.top(_))
-  def bottom(ty: IRType): BVLattice[T] = wrapInnerElem(ty)(lattice.bottom(_))
+  def top(ty: IRType): TypedLattice[T] = Elem(lattice.top(ty))
+  def bottom(ty: IRType): TypedLattice[T] = Elem(lattice.bottom(ty))
 
-  def join(x: BVLattice[T]) = checkBinary(this, x)(_ `join` _)
-  def meet(x: BVLattice[T]) = checkBinary(this, x)(_ `meet` _)
+  def join(x: TypedLattice[T]) = checkBinary(this, x)(_ `join` _)
+  def meet(x: TypedLattice[T]) = checkBinary(this, x)(_ `meet` _)
 
-  override def lub(x: BVLattice[T]) = join(x)
-  override def glb(x: BVLattice[T]) = meet(x)
+  override def lub(x: TypedLattice[T]) = join(x)
+  override def glb(x: TypedLattice[T]) = meet(x)
 
   def bvnot() = checkUnary(this)(_.bvnot())
   def bvneg() = checkUnary(this)(_.bvneg())
@@ -172,46 +160,46 @@ enum BVLattice[T <: BVValueLattice[T]](lattice: T) extends ValueLattice[BVLattic
   def intneg() = checkUnary(this)(_.intneg())
   def booltobv1() = checkUnary(this)(_.booltobv1())
 
-  def equal(other: BVLattice[T]) = checkBinary(this, other)(_ `equal` _)
-  def bvcomp(other: BVLattice[T]) = checkBinary(this, other)(_ `bvcomp` _)
-  def bvand(other: BVLattice[T]) = checkBinary(this, other)(_ `bvand` _)
-  def bvor(other: BVLattice[T]) = checkBinary(this, other)(_ `bvor` _)
-  def bvadd(other: BVLattice[T]) = checkBinary(this, other)(_ `bvadd` _)
-  def bvmul(other: BVLattice[T]) = checkBinary(this, other)(_ `bvmul` _)
-  def bvshl(other: BVLattice[T]) = checkBinary(this, other)(_ `bvshl` _)
-  def bvlshr(other: BVLattice[T]) = checkBinary(this, other)(_ `bvlshr` _)
-  def bvashr(other: BVLattice[T]) = checkBinary(this, other)(_ `bvashr` _)
-  def bvult(other: BVLattice[T]) = checkBinary(this, other)(_ `bvult` _)
-  def bvxor(other: BVLattice[T]) = checkBinary(this, other)(_ `bvxor` _)
-  def bvsub(other: BVLattice[T]) = checkBinary(this, other)(_ `bvsub` _)
-  def bvurem(other: BVLattice[T]) = checkBinary(this, other)(_ `bvurem` _)
-  def bvsrem(other: BVLattice[T]) = checkBinary(this, other)(_ `bvsrem` _)
-  def bvsmod(other: BVLattice[T]) = checkBinary(this, other)(_ `bvsmod` _)
-  def bvudiv(other: BVLattice[T]) = checkBinary(this, other)(_ `bvudiv` _)
-  def bvsdiv(other: BVLattice[T]) = checkBinary(this, other)(_ `bvsdiv` _)
-  def bvule(other: BVLattice[T]) = checkBinary(this, other)(_ `bvule` _)
-  def bvugt(other: BVLattice[T]) = checkBinary(this, other)(_ `bvugt` _)
-  def bvslt(other: BVLattice[T]) = checkBinary(this, other)(_ `bvslt` _)
-  def bvsle(other: BVLattice[T]) = checkBinary(this, other)(_ `bvsle` _)
-  def bvsgt(other: BVLattice[T]) = checkBinary(this, other)(_ `bvsgt` _)
-  def bvsge(other: BVLattice[T]) = checkBinary(this, other)(_ `bvsge` _)
-  def bvuge(other: BVLattice[T]) = checkBinary(this, other)(_ `bvuge` _)
-  def bvconcat(other: BVLattice[T]) = checkBinaryTopBot(this, other)(_ `bvconcat` _)
+  def equal(other: TypedLattice[T]) = checkBinary(this, other)(_ `equal` _)
+  def bvcomp(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvcomp` _)
+  def bvand(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvand` _)
+  def bvor(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvor` _)
+  def bvadd(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvadd` _)
+  def bvmul(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvmul` _)
+  def bvshl(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvshl` _)
+  def bvlshr(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvlshr` _)
+  def bvashr(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvashr` _)
+  def bvult(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvult` _)
+  def bvxor(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvxor` _)
+  def bvsub(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvsub` _)
+  def bvurem(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvurem` _)
+  def bvsrem(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvsrem` _)
+  def bvsmod(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvsmod` _)
+  def bvudiv(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvudiv` _)
+  def bvsdiv(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvsdiv` _)
+  def bvule(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvule` _)
+  def bvugt(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvugt` _)
+  def bvslt(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvslt` _)
+  def bvsle(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvsle` _)
+  def bvsgt(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvsgt` _)
+  def bvsge(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvsge` _)
+  def bvuge(other: TypedLattice[T]) = checkBinary(this, other)(_ `bvuge` _)
+  def bvconcat(other: TypedLattice[T]) = checkBinaryTopBot(this, other)(_ `bvconcat` _)
 
-  def intlt(other: BVLattice[T]) = checkBinary(this, other)(_ `intlt` _)
-  def intle(other: BVLattice[T]) = checkBinary(this, other)(_ `intle` _)
-  def intgt(other: BVLattice[T]) = checkBinary(this, other)(_ `intgt` _)
-  def intge(other: BVLattice[T]) = checkBinary(this, other)(_ `intge` _)
-  def intadd(other: BVLattice[T]) = checkBinary(this, other)(_ `intadd` _)
-  def intsub(other: BVLattice[T]) = checkBinary(this, other)(_ `intsub` _)
-  def intmul(other: BVLattice[T]) = checkBinary(this, other)(_ `intmul` _)
-  def intdiv(other: BVLattice[T]) = checkBinary(this, other)(_ `intdiv` _)
-  def intmod(other: BVLattice[T]) = checkBinary(this, other)(_ `intmod` _)
+  def intlt(other: TypedLattice[T]) = checkBinary(this, other)(_ `intlt` _)
+  def intle(other: TypedLattice[T]) = checkBinary(this, other)(_ `intle` _)
+  def intgt(other: TypedLattice[T]) = checkBinary(this, other)(_ `intgt` _)
+  def intge(other: TypedLattice[T]) = checkBinary(this, other)(_ `intge` _)
+  def intadd(other: TypedLattice[T]) = checkBinary(this, other)(_ `intadd` _)
+  def intsub(other: TypedLattice[T]) = checkBinary(this, other)(_ `intsub` _)
+  def intmul(other: TypedLattice[T]) = checkBinary(this, other)(_ `intmul` _)
+  def intdiv(other: TypedLattice[T]) = checkBinary(this, other)(_ `intdiv` _)
+  def intmod(other: TypedLattice[T]) = checkBinary(this, other)(_ `intmod` _)
 
-  def booland(other: BVLattice[T]) = checkBinary(this, other)(_ `booland` _)
-  def boolor(other: BVLattice[T]) = checkBinary(this, other)(_ `boolor` _)
+  def booland(other: TypedLattice[T]) = checkBinary(this, other)(_ `booland` _)
+  def boolor(other: TypedLattice[T]) = checkBinary(this, other)(_ `boolor` _)
 
-  def constant(v: Literal) = wrapInnerElem(v.getType)(_ => lattice.constant(v))
+  def constant(v: Literal) = Elem(lattice.constant(v))
   def zero_extend(extend: Int) = checkUnary(this)(_.zero_extend(extend))
   def sign_extend(extend: Int) = checkUnary(this)(_.zero_extend(extend))
   def repeat(repeats: Int) = checkUnary(this)(_.repeat(repeats))
@@ -283,7 +271,7 @@ class EvaluateInLattice[Value <: ValueLattice[Value]](lattice: Value) {
 
   def evalExpr(evalVar: Variable => Option[Value])(e: Expr): Value = {
     e match {
-      case e: Variable => evalVar(e).getOrElse(lattice.top(e.irType))
+      case e: Variable => evalVar(e).getOrElse(lattice.top(e.getType))
       case BinaryExpr(op, l, r) => evalBinExpr(evalVar)(op, evalExpr(evalVar)(l), evalExpr(evalVar)(r))
       case l: Literal => lattice.constant(l)
       case ZeroExtend(extend, e) => evalExpr(evalVar)(e).zero_extend(extend)
