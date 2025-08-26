@@ -74,6 +74,7 @@ trait ValueLattice[ValueType <: ValueLattice[ValueType]] extends InternalLattice
  * This trait is mainly intended for use with [[BVLattice]].
  */
 trait BVValueLattice[T <: ValueLattice[T]] extends ValueLattice[T] {
+
   /**
    * Returns the bit width of the current lattice element.
    */

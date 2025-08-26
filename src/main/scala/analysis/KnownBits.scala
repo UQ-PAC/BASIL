@@ -575,27 +575,19 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends BVValueLattic
   private inline def mapBoth(f: BitVecLiteral => BitVecLiteral) =
     TNum(f(value), f(mask))
 
-  /**
-   * Hack to define a certain "big enough" width to represent
-   * arbitrary-precision integers within the lattice values.
-   */
-  val INTEGER_WIDTH = 100
-
   def top(ty: IRType): TNum = ty match {
     case BitVecType(w) => TNum.top(w)
     case ty => throw Exception("unable to construct top TNum for type: " + ty)
   }
 
-  def bottom(ty: IRType): TNum = throw Exception("TODO: TNum#bottom(IRType)")
+  def bottom(ty: IRType): TNum = bottom
 
   // XXX: the reference defines "bottom" as having at least one
   // position which is simultaneously set in the mask and value.
   // it is not clear if this is something that we can do without
   // adding special cases for all the operations to detect and
   // propagate this.
-
-  // HACK: frighteningly unsound. this is just so LatticeMap has a bottom to use.
-  def bottom: TNum = TNum(0.bv(100), 1.bv(100))
+  def bottom: TNum = throw Exception("TNum has no bit-specific bottom")
   def meet(x: TNum): TNum = intersect(x)
 
   def booland(other: TNum): TNum = bvand(other)
@@ -635,7 +627,7 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends BVValueLattic
     case x: BitVecLiteral => constant(x)
     case TrueLiteral => trueBool
     case FalseLiteral => falseBool
-    case IntLiteral(x) => constant(BitVectorEval.signedInt2BV(INTEGER_WIDTH, x)) // XXX: is this wanted?
+    case IntLiteral(x) => throw Exception("TNum undefined for integers")
   }
   def equal(other: TNum): TNum = TEQ(other)
   def extract(hi: Int, lo: Int): TNum = TNum(value(hi, lo), mask(hi, lo))
@@ -661,14 +653,14 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) extends BVValueLattic
 
 def knownBitsAnalysis(p: Program) = {
   applyRPO(p)
-  val lattice = DefaultValueLattice(TNum.top(1), None)
+  val lattice = DefaultValueLattice(BVLattice.Top(TNum.top(1)), None)
   val solver = transforms.worklistSolver(ValueStateDomain(lattice.top, DefaultTransfer(lattice), lattice))
   val (beforeIn, afterIn) = solver.solveProgIntraProc(p, backwards = false)
   (beforeIn, afterIn)
 }
 
 class SimplifyKnownBits() {
-  val lattice = DefaultValueLattice(TNum.top(1), None)
+  val lattice = DefaultValueLattice(BVLattice.Top(TNum.top(1)), None)
   val solver = transforms.worklistSolver(ValueStateDomain(lattice.top, DefaultTransfer(lattice), lattice))
 
   def applyTransform(p: Program): Unit = {
