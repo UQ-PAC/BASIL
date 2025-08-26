@@ -95,7 +95,7 @@ trait TypedValueLattice[T <: ValueLattice[T]] extends ValueLattice[T] {
  * universal (width-independent) top and bottom elements.
  *
  * If a type-specific operation is attempted on inner lattice values of incompatible type,
- * the [[TypedLattice.handleConflictingTypes]] function is called. The default implementation
+ * the [[TypedLattice.Elem#handleConflictingTypes]] function is called. The default implementation
  * will throw an exception.
  *
  * This [[TypedLattice]] class guarantees that the type-dependent methods of the inner
