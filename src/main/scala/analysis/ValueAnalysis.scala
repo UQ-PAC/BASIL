@@ -86,17 +86,27 @@ trait TypedValueLattice[T <: ValueLattice[T]] extends ValueLattice[T] {
    * Returns the [[ir.IRType]] of the current lattice element.
    */
   def getType: IRType
+
+  /**
+   * Called by [[TypedLattice]] to handle two lattice elements of incompatible types.
+   * The default implementation will throw an exception.
+   */
+  def handleConflictingTypes[T <: TypedValueLattice[T]](x: T, y: T): TypedLattice[T] = throw new Exception(
+    s"attempted lattice operation on incompatible ${getClass.getName} values: '$x' and '$y'"
+  )
+  // NOTE: this makes the TypedLattice and TypedValueLattice classes /mutually referential/.
+  // this is not the best. maybe typeclasses could avoid this.
+
 }
 
 /**
  * Derives a lattice for all [[ir.IRType]]s from the given type-specific [[TypedValueLattice]].
  * This is done by wrapping the "inner" lattice into [[TypedLattice.Elem]]. New
  * [[TypedLattice.Top]] and [[TypedLattice.Bot]] values are also introduced to act as
- * universal (width-independent) top and bottom elements.
+ * universal (type-independent) top and bottom elements.
  *
  * If a type-specific operation is attempted on inner lattice values of incompatible type,
- * the [[TypedLattice.Elem#handleConflictingTypes]] function is called. The default implementation
- * will throw an exception.
+ * the [[TypedValueLattice#handleConflictingTypes]] function is called.
  *
  * This [[TypedLattice]] class guarantees that the type-dependent methods of the inner
  * [[TypedValueLattice]] are only called with values of compatible type. It also guarantees that
@@ -109,13 +119,6 @@ enum TypedLattice[T <: TypedValueLattice[T]](lattice: T) extends ValueLattice[Ty
   case Elem(inner: T) extends TypedLattice[T](inner)
   case Top(lattice: T) extends TypedLattice[T](lattice)
 
-  /**
-   * Called to combine two inner lattice elements of differing types.
-   */
-  def handleConflictingTypes(x: T, y: T): TypedLattice[T] = throw new Exception(
-    s"attempted lattice operation on incompatible ${lattice.getClass.getName} values: '$x' and '$y'"
-  )
-
   inline def checkBinaryTopBot(x: TypedLattice[T], y: TypedLattice[T])(
     f: (Elem[T], Elem[T]) => TypedLattice[T]
   ): TypedLattice[T] =
@@ -127,7 +130,7 @@ enum TypedLattice[T <: TypedValueLattice[T]](lattice: T) extends ValueLattice[Ty
 
   inline def checkBinaryWidths(x: Elem[T], y: Elem[T])(f: (T, T) => T): TypedLattice[T] =
     (x, y) match {
-      case (Elem(x), Elem(y)) if x.getType != y.getType => handleConflictingTypes(x, y)
+      case (Elem(x), Elem(y)) if x.getType != y.getType => lattice.handleConflictingTypes(x, y)
       case (Elem(x), Elem(y)) => Elem(f(x, y))
     }
 
