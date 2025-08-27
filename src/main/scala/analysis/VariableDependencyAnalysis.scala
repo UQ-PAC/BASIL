@@ -36,7 +36,8 @@ trait ProcVariableDependencyAnalysisFunctions(
   varDepsSummaries: Map[Procedure, Map[Variable, LatticeSet[Variable]]],
   procedure: Procedure,
   parameterForm: Boolean
-)(using latticeset: Lattice[LatticeSet[Variable]]) extends ForwardIDEAnalysis[Variable, LatticeSet[Variable], Lattice[LatticeSet[Variable]]] {
+)(using latticeset: Lattice[LatticeSet[Variable]])
+    extends ForwardIDEAnalysis[Variable, LatticeSet[Variable], Lattice[LatticeSet[Variable]]] {
   val valuelattice = latticeset
   val edgelattice = EdgeFunctionLattice(valuelattice)
   import edgelattice.{IdEdge, ConstEdge}

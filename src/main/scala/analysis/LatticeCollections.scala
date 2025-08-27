@@ -151,7 +151,8 @@ given [T]: Lattice[LatticeSet[T]] = InternalLatticeLattice(LatticeSet.Bottom())
 object LatticeMap {
 
   /** Create a TopMap only if `m` is non-empty, else make Top. */
-  def topMap[D, L](m: Map[D, L])(using l: Lattice[L]): LatticeMap[D, L] = if m.isEmpty then LatticeMap.Top() else LatticeMap.TopMap(m)
+  def topMap[D, L](m: Map[D, L])(using l: Lattice[L]): LatticeMap[D, L] =
+    if m.isEmpty then LatticeMap.Top() else LatticeMap.TopMap(m)
 
   /** Create a BottomMap only if `m` is non-empty, else make Bottom. */
   def bottomMap[D, L](m: Map[D, L])(using l: Lattice[L]): LatticeMap[D, L] =
@@ -303,7 +304,7 @@ trait LatticeLattice[L](l: Lattice[L]) extends Lattice[L] {
   val bottom: L = l.bottom
 }
 
-private def check[T](l: Lattice[T]) = new LatticeLattice(l) { }
+private def check[T](l: Lattice[T]) = new LatticeLattice(l) {}
 
 given [D, L](using l: Lattice[L]): Lattice[LatticeMap[D, L]] with
   def lub(a: LatticeMap[D, L], b: LatticeMap[D, L]): LatticeMap[D, L] =
@@ -314,7 +315,6 @@ given [D, L](using l: Lattice[L]): Lattice[LatticeMap[D, L]] with
 
   override def top: LatticeMap[D, L] = LatticeMap.Top()
   val bottom: LatticeMap[D, L] = LatticeMap.Bottom()
-
 
 /** A domain which has terms as maps. Implementing a MapDomain involves only defining operations element wise on the
   * codomain of the map (along with the transfer function).

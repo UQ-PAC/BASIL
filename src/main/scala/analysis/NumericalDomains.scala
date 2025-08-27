@@ -62,7 +62,6 @@ enum Interval extends InternalLattice[Interval] {
 
 given Lattice[Interval] = InternalLatticeLattice(Interval.Top)
 
-
 class IntervalDomain(
   procedure: Option[Procedure] = None,
   signed: Boolean,
