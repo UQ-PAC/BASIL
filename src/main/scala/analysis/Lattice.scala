@@ -33,7 +33,7 @@ trait Lattice[T]:
 
   extension (x: T)
     def join(y: T) = lub(x, y)
-    def meet(y: T) = lub(x, y)
+    def meet(y: T) = glb(x, y)
 
 trait StridedWrappedInterval
 
