@@ -3,6 +3,7 @@ package util
 import Parsers.*
 import analysis.data_structure_analysis.*
 import analysis.{Interval as _, *}
+import analysis.given
 import bap.*
 import boogie.*
 import com.grammatech.gtirb.proto.IR.IR

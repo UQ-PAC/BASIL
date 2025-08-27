@@ -19,12 +19,11 @@ trait InterferenceCompatibleLattice[S] extends Lattice[S] {
 /** A compatible LatticeMapLattice representing the interval domain, where each
   * element of the lattice maps Variables to Intervals, and where these
   * Intervals are ordered by the IntervalLattice.
-  * 
+  *
   * @param l: A lattice over individual intervals, like [4, 7].
   */
-class IntervalLatticeExtension()
-    extends LatticeMapLattice[Variable, Interval, IntervalLattice](IntervalLattice())
-    with InterferenceCompatibleLattice[LatticeMap[Variable, Interval]] {
+class IntervalLatticeExtension()(using Lattice[LatticeMap[Variable, Interval]])
+    extends InterferenceCompatibleLattice[LatticeMap[Variable, Interval]] {
 
   def contains(s: LatticeMap[Variable, Interval], v: Variable): Boolean =
     s.toMap.contains(v)

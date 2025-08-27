@@ -60,7 +60,8 @@ enum Interval extends InternalLattice[Interval] {
   def bottom: Interval = Bottom
 }
 
-private implicit val intervalTerm: Interval = Interval.Bottom
+given Lattice[Interval] = InternalLatticeLattice(Interval.Top)
+
 
 class IntervalDomain(
   procedure: Option[Procedure] = None,

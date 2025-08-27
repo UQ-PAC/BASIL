@@ -7,7 +7,7 @@ import scala.annotation.implicitNotFound
 
 extension (x: Any)
   def top = ???
-  def bottom = ???
+def bottom = ???
 
 /** Lattice structure internal to a type.
   */
@@ -29,7 +29,7 @@ class InternalLatticeLattice[L <: InternalLattice[L]](term: L) extends Lattice[L
   override def glb(x: L, y: L): L = x.meet(y)
 
   val bottom: L = term.bottom
-  override def top: L = term.top
+  override val top: L = term.top
 }
 
 object LatticeSet {
@@ -135,18 +135,7 @@ enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
   }
 }
 
-class LatticeSetLattice[T] extends Lattice[LatticeSet[T]] {
-  import LatticeSet.{Top, Bottom}
-
-  type Element = LatticeSet[T];
-
-  def lub(a: LatticeSet[T], b: LatticeSet[T]): LatticeSet[T] = a.join(b)
-
-  override def glb(a: LatticeSet[T], b: LatticeSet[T]): LatticeSet[T] = a.meet(b)
-
-  override def top: LatticeSet[T] = Top()
-  val bottom: LatticeSet[T] = Bottom()
-}
+given [T]: Lattice[LatticeSet[T]] = InternalLatticeLattice(LatticeSet.Bottom())
 
 object LatticeMap {
 
