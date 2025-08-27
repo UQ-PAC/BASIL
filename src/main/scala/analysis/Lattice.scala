@@ -19,10 +19,6 @@ import util.assertion.*
  * variable containing the [[Lattice]] methods. See [given syntax] docs for
  * more details, including how to define given instances.
  *
- * See also [[InternalLattice]] which provides a similar abstraction. Note
- * that using [[Lattice]] directly is preferred for new lattices, see
- * [[InternalLattice]] docs for more info.
- *
  * [type-class]: https://docs.scala-lang.org/scala3/book/ca-type-classes.html
  * [given syntax]: https://docs.scala-lang.org/scala3/reference/contextual/previous-givens.html
  */
