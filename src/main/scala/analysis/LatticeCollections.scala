@@ -288,8 +288,24 @@ def latticeMapApply[D, L](m: LatticeMap[D, L], d: D)(using l: Lattice[L]): L = {
   }
 }
 
-given [D, L](using l: Lattice[L]): Lattice[LatticeMap[D, L]] with
+/**
+ * A terrible hack to translate a [[Lattice]] value into a trait
+ * superclass by forwarding its methods to the [[Lattice]] value.
+ *
+ * Think twice before using.
+ */
+trait LatticeLattice[L](l: Lattice[L]) extends Lattice[L] {
+  def lub(a: L, b: L): L = l.lub(a, b)
 
+  override def glb(a: L, b: L): L = l.glb(a, b)
+
+  override def top: L = l.top
+  val bottom: L = l.bottom
+}
+
+private def check[T](l: Lattice[T]) = new LatticeLattice(l) { }
+
+given [D, L](using l: Lattice[L]): Lattice[LatticeMap[D, L]] with
   def lub(a: LatticeMap[D, L], b: LatticeMap[D, L]): LatticeMap[D, L] =
     latticeMapJoin(a, b, (x, y) => l.lub(x, y), l.top, l.bottom)
 
@@ -298,6 +314,7 @@ given [D, L](using l: Lattice[L]): Lattice[LatticeMap[D, L]] with
 
   override def top: LatticeMap[D, L] = LatticeMap.Top()
   val bottom: LatticeMap[D, L] = LatticeMap.Bottom()
+
 
 /** A domain which has terms as maps. Implementing a MapDomain involves only defining operations element wise on the
   * codomain of the map (along with the transfer function).
