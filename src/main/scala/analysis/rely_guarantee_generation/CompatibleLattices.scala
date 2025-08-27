@@ -22,7 +22,7 @@ trait InterferenceCompatibleLattice[S] extends Lattice[S] {
   *
   * @param l: A lattice over individual intervals, like [4, 7].
   */
-class IntervalLatticeExtension()(using Lattice[LatticeMap[Variable, Interval]])
+class IntervalLatticeExtension()(using lattice: Lattice[LatticeMap[Variable, Interval]])
     extends InterferenceCompatibleLattice[LatticeMap[Variable, Interval]] {
 
   def contains(s: LatticeMap[Variable, Interval], v: Variable): Boolean =
@@ -37,4 +37,13 @@ class IntervalLatticeExtension()(using Lattice[LatticeMap[Variable, Interval]])
   coupled with this lattice is SignedIntervalDomain().transfer */
   def toPredString(s: LatticeMap[Variable, Interval]): String =
     SignedIntervalDomain().toPred(s).toString()
+
+
+  // XXX: hack to pull the typeclass functions into our class instance, since extending
+  // from a given is not possible.
+  def lub(x: LatticeMap[Variable, Interval], y: LatticeMap[Variable, Interval]) = lattice.lub(x, y)
+  override def glb(x: LatticeMap[Variable, Interval], y: LatticeMap[Variable, Interval]) = lattice.glb(x, y)
+
+  val bottom = lattice.bottom
+  override val top = lattice.top
 }

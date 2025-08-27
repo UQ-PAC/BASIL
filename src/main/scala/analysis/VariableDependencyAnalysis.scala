@@ -36,8 +36,8 @@ trait ProcVariableDependencyAnalysisFunctions(
   varDepsSummaries: Map[Procedure, Map[Variable, LatticeSet[Variable]]],
   procedure: Procedure,
   parameterForm: Boolean
-) extends ForwardIDEAnalysis[Variable, LatticeSet[Variable], LatticeSetLattice[Variable]] {
-  val valuelattice = LatticeSetLattice()
+)(using latticeset: Lattice[LatticeSet[Variable]]) extends ForwardIDEAnalysis[Variable, LatticeSet[Variable], Lattice[LatticeSet[Variable]]] {
+  val valuelattice = latticeset
   val edgelattice = EdgeFunctionLattice(valuelattice)
   import edgelattice.{IdEdge, ConstEdge}
   import LatticeSet.*
@@ -257,7 +257,7 @@ class ProcVariableDependencyAnalysis(
   varDepsSummaries: Map[Procedure, Map[Variable, LatticeSet[Variable]]],
   procedure: Procedure,
   parameterForm: Boolean = false
-) extends ForwardIDESolver[Variable, LatticeSet[Variable], LatticeSetLattice[Variable]](program),
+) extends ForwardIDESolver[Variable, LatticeSet[Variable], Lattice[LatticeSet[Variable]]](program),
       ProcVariableDependencyAnalysisFunctions(relevantGlobals, varDepsSummaries, procedure, parameterForm) {
   override def start: CFGPosition = procedure
 }

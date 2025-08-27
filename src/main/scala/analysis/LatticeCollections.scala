@@ -173,16 +173,10 @@ enum LatticeMap[D, L](using l: Lattice[L]) {
   case BottomMap[D1, L1](m: Map[D1, L1])(using Lattice[L1]) extends LatticeMap[D1, L1]
 
   /** Update this map so that `from` now maps to `to` */
-  def update[L1 <: InternalLattice[L1]](pair: (D, L))(implicit
-    s: L <:< L1,
-    @implicitNotFound("No implicit of type ${L1} was found. See LatticeMap docs for more info.") l: L1
-  ): LatticeMap[D, L] = this.update(pair(0), pair(1))
+  def update(pair: (D, L)): LatticeMap[D, L] = this.update(pair(0), pair(1))
 
   /** Update this map so that `from` now maps to `to` */
-  def update[L1 <: InternalLattice[L1]](from: D, to: L)(implicit
-    s: L <:< L1,
-    @implicitNotFound("No implicit of type ${L1} was found. See LatticeMap docs for more info.") l: L1
-  ): LatticeMap[D, L] = this match {
+  def update(from: D, to: L): LatticeMap[D, L] = this match {
     case Top() => TopMap(Map(from -> to))
     case Bottom() => BottomMap(Map(from -> to))
     case TopMap(m) => if to == l.top then TopMap(m - from) else TopMap(m + (from -> to))
@@ -205,25 +199,16 @@ enum LatticeMap[D, L](using l: Lattice[L]) {
     case BottomMap(m) => m
   }
 
-  def +[L1 <: InternalLattice[L1]](kv: (D, L))(implicit
-    s: L <:< L1,
-    @implicitNotFound("No implicit of type ${L1} was found. See LatticeMap docs for more info.") l: L1
-  ): LatticeMap[D, L] = update(kv._1, kv._2)
-  def ++[L1 <: InternalLattice[L1]](kv: Map[D, L])(implicit
-    s: L <:< L1,
-    @implicitNotFound("No implicit of type ${L1} was found. See LatticeMap docs for more info.") l: L1
-  ): LatticeMap[D, L] = kv.foldLeft(this) { (m, kv) => m + kv }
+  def +(kv: (D, L)): LatticeMap[D, L] = update(kv._1, kv._2)
+  def ++(kv: Map[D, L]): LatticeMap[D, L] = kv.foldLeft(this) { (m, kv) => m + kv }
 
   /** Evaluate the function at `v`, accounting for defaulting behaviour.
     */
-  def apply[L1 <: InternalLattice[L1]](v: D)(implicit
-    s: L <:< L1,
-    @implicitNotFound("No implicit of type ${L1} was found. See LatticeMap docs for more info.") l: L1
-  ): L1 = this match {
+  def apply(v: D): L = this match {
     case Top() => l.top
     case Bottom() => l.bottom
-    case TopMap(m) => m.getOrElse(v, l.top).asInstanceOf[L1]
-    case BottomMap(m) => m.getOrElse(v, l.bottom).asInstanceOf[L1]
+    case TopMap(m) => m.getOrElse(v, l.top)
+    case BottomMap(m) => m.getOrElse(v, l.bottom)
   }
 
   def join(other: LatticeMap[D, L]): LatticeMap[D, L] =
@@ -288,7 +273,7 @@ private def latticeMapMeet[D, L](
 
 /** Evaluate the map m at value d, defaulting based on the top and bottom values in the lattice l.
   */
-def latticeMapApply[D, L, LA <: Lattice[L]](m: LatticeMap[D, L], d: D, l: LA): L = {
+def latticeMapApply[D, L](m: LatticeMap[D, L], d: D)(using l: Lattice[L]): L = {
   import LatticeMap.{Top, Bottom, TopMap, BottomMap}
 
   m match {
