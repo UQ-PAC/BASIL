@@ -1,6 +1,5 @@
 package analysis
 
-import analysis.given
 import analysis.solvers.SimpleWorklistFixpointSolver
 import ir.*
 import util.assertion.*

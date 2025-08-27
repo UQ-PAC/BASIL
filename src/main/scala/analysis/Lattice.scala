@@ -32,19 +32,19 @@ trait Lattice[T]:
 
   /** The bottom element of this lattice.
     */
-  def bottom: T
+  val bottom: T
 
-  /** The top element of this lattice.
+  /** The top element of this lattice. Default: not implemented.
     */
-  def top: T
+  def top: T = ???
 
   /** The least upper bound of `x` and `y`.
     */
   def lub(x: T, y: T): T
 
-  /** The greatest lower bound of `x` and `y`.
+  /** The greatest lower bound of `x` and `y`. Default: not implemented.
     */
-  def glb(x: T, y: T): T
+  def glb(x: T, y: T): T = ???
 
   /** Returns true whenever `x` <= `y`.
     */
@@ -70,9 +70,9 @@ trait Lattice[T]:
 trait LatticeLattice[L](l: Lattice[L]) extends Lattice[L] {
   def lub(a: L, b: L): L = l.lub(a, b)
 
-  def glb(a: L, b: L): L = l.glb(a, b)
+  override def glb(a: L, b: L): L = l.glb(a, b)
 
-  val top: L = l.top
+  override def top: L = l.top
   val bottom: L = l.bottom
 }
 
@@ -99,9 +99,9 @@ class SASILattice extends Lattice[StridedWrappedInterval] {
   val lowestPossibleValue: BigInt = 0
   val highestPossibleValue: BigInt = Long.MaxValue - 1
 
-  val bottom: StridedWrappedInterval = SIBottom
+  override val bottom: StridedWrappedInterval = SIBottom
 
-  val top: StridedWrappedInterval = SITop
+  override def top: StridedWrappedInterval = SITop
 
   //  def gamma(x: StridedWrappedInterval): Set[BitVecLiteral] = x match {
   //    case SIBottom => Set.empty
@@ -168,10 +168,8 @@ class SASILattice extends Lattice[StridedWrappedInterval] {
     }
   }
 
-  def glb(r: StridedWrappedInterval, t: StridedWrappedInterval): Nothing = ???
-
   /** S1[L1, U1] join S2[L2, U2] -> gcd(S1, S2)[min(L1, L2), max(U1, U2)] */
-  def lub(r: StridedWrappedInterval, t: StridedWrappedInterval): StridedWrappedInterval = {
+  override def lub(r: StridedWrappedInterval, t: StridedWrappedInterval): StridedWrappedInterval = {
     (r, t) match {
       case (SIBottom, t) => t
       case (t, SIBottom) => t
@@ -320,15 +318,13 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
     override def toString = "VSTop"
   }
 
-  val bottom: ValueSet[T] = VSBottom
+  override val bottom: ValueSet[T] = VSBottom
 
-  val top: ValueSet[T] = VSTop
+  override def top: ValueSet[T] = VSTop
 
   val lattice: SASILattice = SASILattice()
 
-  def glb(x: ValueSet[T], y: ValueSet[T]): Nothing = ???
-
-  def lub(x: ValueSet[T], y: ValueSet[T]): ValueSet[T] = {
+  override def lub(x: ValueSet[T], y: ValueSet[T]): ValueSet[T] = {
     (x, y) match {
       case (VSBottom, t) => t
       case (t, VSBottom) => t
@@ -534,11 +530,11 @@ case object MAYBE_BOOL3 extends Bool3 {
   */
 class Bool3Lattice extends Lattice[Bool3] {
 
-  val bottom: Bool3 = BOTTOM_BOOL3
+  override val bottom: Bool3 = BOTTOM_BOOL3
 
-  val top: Bool3 = MAYBE_BOOL3
+  override def top: Bool3 = MAYBE_BOOL3
 
-  def lub(x: Bool3, y: Bool3): Bool3 = {
+  override def lub(x: Bool3, y: Bool3): Bool3 = {
     (x, y) match {
       case (BOTTOM_BOOL3, t) => t
       case (t, BOTTOM_BOOL3) => t
@@ -547,8 +543,6 @@ class Bool3Lattice extends Lattice[Bool3] {
       case _ => x
     }
   }
-
-  def glb(x: Bool3, y: Bool3): Nothing = ???
 }
 
 enum Flags {
@@ -577,9 +571,9 @@ case class FlagMap(m: Map[Flags, Bool3]) extends Flag {
   */
 class FlagLattice extends Lattice[Flag] {
 
-  val bottom: Flag = BOTTOM_Flag
+  override val bottom: Flag = BOTTOM_Flag
 
-  val top: Flag = FlagMap(
+  override def top: Flag = FlagMap(
     Map(
       Flags.CF -> MAYBE_BOOL3,
       Flags.ZF -> MAYBE_BOOL3,
@@ -592,8 +586,7 @@ class FlagLattice extends Lattice[Flag] {
 
   val lattice: Bool3Lattice = Bool3Lattice()
 
-  def glb(x: Flag, y: Flag): Nothing = ???
-  def lub(x: Flag, y: Flag): Flag = {
+  override def lub(x: Flag, y: Flag): Flag = {
     (x, y) match {
       case (BOTTOM_Flag, t) => t
       case (t, BOTTOM_Flag) => t
@@ -615,22 +608,16 @@ class FlagLattice extends Lattice[Flag] {
   */
 class PowersetLattice[A] extends Lattice[Set[A]] {
   val bottom: Set[A] = Set.empty
-  def top: Nothing = ???
   def lub(x: Set[A], y: Set[A]): Set[A] = x.union(y)
-  def glb(x: Set[A], y: Set[A]): Nothing = ???
 }
-
-given [A]: Lattice[Set[A]] = PowersetLattice[A]()
 
 // Single element lattice (using Option)
 class SingleElementLattice[T] extends Lattice[Option[T]] {
   val bottom: Option[T] = None
-  def top: Nothing = ???
   def lub(x: Option[T], y: Option[T]): Option[T] = (x, y) match {
     case (None, None) => None
     case _ => Some(x.getOrElse(y.get))
   }
-  def glb(x: Option[T], y: Option[T]): Nothing = ???
 }
 
 trait LiftedElement[+T]
@@ -646,9 +633,7 @@ case object LiftedBottom extends LiftedElement[Nothing] {
 class LiftLattice[T, +L <: Lattice[T]](val sublattice: L) extends Lattice[LiftedElement[T]] {
 
   val bottom: LiftedElement[T] = LiftedBottom
-  def top: Nothing = ???
 
-  def glb(x: LiftedElement[T], y: LiftedElement[T]): Nothing = ???
   def lub(x: LiftedElement[T], y: LiftedElement[T]): LiftedElement[T] =
     (x, y) match {
       case (LiftedBottom, t) => t
@@ -681,7 +666,6 @@ class TwoElementLattice extends Lattice[TwoElement]:
   override val bottom: TwoElement = TwoElementBottom
   override val top: TwoElement = TwoElementTop
 
-  def glb(x: TwoElement, y: TwoElement): Nothing = ???
   def lub(x: TwoElement, y: TwoElement): TwoElement = (x, y) match {
     case (TwoElementBottom, TwoElementBottom) => TwoElementBottom
     case _ => TwoElementTop
@@ -699,9 +683,8 @@ class FlatLattice[X] extends Lattice[FlatElement[X]] {
 
   val bottom: FlatElement[X] = Bottom
 
-  val top: FlatElement[X] = Top
+  override val top: FlatElement[X] = Top
 
-  def glb(x: FlatElement[X], y: FlatElement[X]): Nothing = ???
   def lub(x: FlatElement[X], y: FlatElement[X]): FlatElement[X] = (x, y) match {
     case (a, Bottom) => a
     case (Bottom, b) => b
@@ -718,9 +701,8 @@ class FlatLatticeWithDefault[X](val f: () => X) extends Lattice[FlatElement[X]] 
 
   val bottom: FlatElement[X] = FlatEl(f())
 
-  val top: FlatElement[X] = Top
+  override val top: FlatElement[X] = Top
 
-  def glb(x: FlatElement[X], y: FlatElement[X]): Nothing = ???
   def lub(x: FlatElement[X], y: FlatElement[X]): FlatElement[X] = (x, y) match {
     case (a, Bottom) => a
     case (Bottom, b) => b
@@ -733,11 +715,9 @@ class FlatLatticeWithDefault[X](val f: () => X) extends Lattice[FlatElement[X]] 
 
 class TupleLattice[+L1 <: Lattice[T1], +L2 <: Lattice[T2], T1, T2](val lattice1: L1, val lattice2: L2)
     extends Lattice[(T1, T2)] {
-  val bottom: (T1, T2) = (lattice1.bottom, lattice2.bottom)
+  override val bottom: (T1, T2) = (lattice1.bottom, lattice2.bottom)
 
-  def glb(x: (T1, T2), y: (T1, T2)): Nothing = ???
-
-  def lub(x: (T1, T2), y: (T1, T2)): (T1, T2) = {
+  override def lub(x: (T1, T2), y: (T1, T2)): (T1, T2) = {
     val (x1, x2) = x
     val (y1, y2) = y
     (lattice1.lub(x1, y1), lattice2.lub(x2, y2))
@@ -749,18 +729,15 @@ class TupleLattice[+L1 <: Lattice[T1], +L2 <: Lattice[T2], T1, T2](val lattice1:
     lattice1.leq(x1, y1) && lattice2.leq(x2, y2)
   }
 
-  val top: (T1, T2) = (lattice1.top, lattice2.top)
+  override def top: (T1, T2) = (lattice1.top, lattice2.top)
 }
 
 /** A lattice of maps from a set of elements of type `A` to a lattice with element `L'. Bottom is the default value.
   */
-class MapLattice[A, T](using sublattice: Lattice[T]) extends Lattice[Map[A, T]] {
+class MapLattice[A, T, +L <: Lattice[T]](val sublattice: L) extends Lattice[Map[A, T]] {
   val bottom: Map[A, T] = Map().withDefaultValue(sublattice.bottom)
   def lub(x: Map[A, T], y: Map[A, T]): Map[A, T] =
     x.keys.foldLeft(y)((m, a) => m + (a -> sublattice.lub(x(a), y(a)))).withDefaultValue(sublattice.bottom)
-
-  def glb(x: Map[A, T], y: Map[A, T]): Nothing = ???
-  def top: Nothing = ???
 }
 
 /** Constant propagation lattice.
