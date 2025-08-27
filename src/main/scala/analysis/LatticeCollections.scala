@@ -3,12 +3,6 @@ package analysis
 import ir.*
 import ir.transforms.AbstractDomain
 
-import scala.annotation.implicitNotFound
-
-extension (x: Any)
-  def top = ???
-def bottom = ???
-
 /** Lattice structure internal to a type.
   */
 trait InternalLattice[T <: InternalLattice[T]] {
