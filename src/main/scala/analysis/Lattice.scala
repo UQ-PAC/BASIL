@@ -5,8 +5,27 @@ import ir.eval.BitVectorEval
 import util.StaticAnalysisLogger
 import util.assertion.*
 
-/** Basic lattice
-  */
+/**
+ * Lattice operations on the given type `T`. This is intended to be used
+ * as a [type-class]. Notably, this means that the T class should *not*
+ * directly extend [[Lattice]][T]. Rather, a separate class should be created
+ * to extend `Lattice[T]` (this is automated if you use the [given syntax]).
+ * Placing the lattice methods outside of the class itself gives us a lot
+ * more flexibility.
+ *
+ * To access the methods within this trait, you should add a
+ * "using" clause like `(using l: Lattice[DesiredType])` to the end of the
+ * parameter list of a method or class. Then, you will have access to an `l`
+ * variable containing the [[Lattice]] methods. See [given syntax] docs for
+ * more details, including how to define given instances.
+ *
+ * See also [[InternalLattice]] which provides a similar abstraction. Note
+ * that using [[Lattice]] directly is preferred for new lattices, see
+ * [[InternalLattice]] docs for more info.
+ *
+ * [type-class]: https://docs.scala-lang.org/scala3/book/ca-type-classes.html
+ * [given syntax]: https://docs.scala-lang.org/scala3/reference/contextual/previous-givens.html
+ */
 trait Lattice[T]:
 
   type Element = T
@@ -23,7 +42,7 @@ trait Lattice[T]:
     */
   def lub(x: T, y: T): T
 
-  /** The greatest lower bound of `x` and `y`
+  /** The greatest lower bound of `x` and `y`. Default: not implemented.
     */
   def glb(x: T, y: T): T = ???
 
@@ -31,6 +50,13 @@ trait Lattice[T]:
     */
   def leq(x: T, y: T): Boolean = lub(x, y) == y // rarely used, but easy to implement :-)
 
+  /**
+   * These convenience methods give easy access to the `join` and `meet` functions through
+   * the `.meet` and `.join` syntax.
+   *
+   * These methods provided by the [[Lattice]] trait and can be used whenever a
+   * [[Lattice]] (with the correct type) is in scope.
+   */
   extension (x: T)
     def join(y: T) = lub(x, y)
     def meet(y: T) = glb(x, y)

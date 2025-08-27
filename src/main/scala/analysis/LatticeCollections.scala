@@ -3,8 +3,25 @@ package analysis
 import ir.*
 import ir.transforms.AbstractDomain
 
-/** Lattice structure internal to a type.
-  */
+/**
+ * Lattice structure internal to a type.
+ *
+ * For new lattices, it is recommended to implement [[Lattice]] instead,
+ * as [[InternalLattice]] defines all its methods on the `this` value.
+ * This (1) forces the user to pass around an arbitrary value to access
+ * "static" functions like [[InternalLattice#top]], and (2) restricts
+ * flexibility because the type constraint forces this trait to be
+ * implemented on the class type itself.
+ *
+ * If you have a type that extends [[InternalLattice]], you can convert
+ * it to a [[Lattice]] given instance using [[InternalLatticeLattice]].
+ * For example, for the [[Interval]] type:
+ * {{{
+ * given Lattice[Interval] = InternalLatticeLattice(Interval.Top)
+ * }}}
+ * This will create a [[Lattice]] instance and allow access to methods
+ * and classes which require such an instance.
+ */
 trait InternalLattice[T <: InternalLattice[T]] {
   def join(other: T): T
   def meet(other: T): T
@@ -143,13 +160,6 @@ object LatticeMap {
 
 /** A map which defaults to either the top or bottom element of a lattice. This is more efficient to use in static
   * analyses as it is common to default most values in a map to either top or bottom.
-  *
-  * In order to call `apply`, `join` or `meet`, an implicit term of type L must be declared, and L must implement the
-  * `InternalLattice` trait. For example, to declare an implicit interval, we write (outside the scope of any classes
-  * that we are implementing)
-  * ```scala
-  * private implicit val intervalTerm: Interval = Interval.Bottom
-  * ```
   */
 enum LatticeMap[D, L](using l: Lattice[L]) {
   /* PERFORMANCE:
