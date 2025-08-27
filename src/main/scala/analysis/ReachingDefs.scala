@@ -22,7 +22,7 @@ abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[Globa
   val domain: Set[CFGPosition] = computeDomain(IntraProcIRCursor, program.procedures).toSet
   val lattice: MapLattice[CFGPosition, Map[Variable, Set[CFGPosition]], MapLattice[Variable, Set[
     CFGPosition
-  ], PowersetLattice[CFGPosition]]] = MapLattice(MapLattice(PowersetLattice[CFGPosition]()))
+  ]]] = MapLattice(MapLattice(PowersetLattice[CFGPosition]()))
 
   def transfer(n: CFGPosition, s: Map[Variable, Set[CFGPosition]]): Map[Variable, Set[CFGPosition]] = {
     n match {
@@ -49,4 +49,4 @@ class ReachingDefsAnalysis(program: Program, writesTo: Map[Procedure, Set[Global
       IRIntraproceduralForwardDependencies,
       SimplePushDownWorklistFixpointSolver[CFGPosition, Map[Variable, Set[CFGPosition]], MapLattice[Variable, Set[
         CFGPosition
-      ], PowersetLattice[CFGPosition]]]
+      ]]]

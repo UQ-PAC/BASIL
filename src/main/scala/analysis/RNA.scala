@@ -13,7 +13,7 @@ trait RNAAnalysis(program: Program, ignoreStack: Boolean = true) {
 
   val powersetLattice: PowersetLattice[Variable] = PowersetLattice()
 
-  val lattice: MapLattice[CFGPosition, Set[Variable], PowersetLattice[Variable]] = MapLattice(powersetLattice)
+  val lattice: MapLattice[CFGPosition, Set[Variable]] = MapLattice(powersetLattice)
 
   val domain: Set[CFGPosition] = Set.empty ++ program
 
@@ -66,4 +66,4 @@ class RNAAnalysisSolver(program: Program, ignoreStack: Boolean = true)
     extends RNAAnalysis(program, ignoreStack)
     with IRIntraproceduralBackwardDependencies
     with Analysis[Map[CFGPosition, Set[Variable]]]
-    with SimpleWorklistFixpointSolver[CFGPosition, Set[Variable], PowersetLattice[Variable]]
+    with SimpleWorklistFixpointSolver[CFGPosition, Set[Variable]]

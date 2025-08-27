@@ -21,7 +21,7 @@ trait ValueSetAnalysis(program: Program, mmm: MemoryModelMap) {
 
   val powersetLattice: PowersetLattice[Value] = PowersetLattice()
 
-  val mapLattice: MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]] = MapLattice(powersetLattice)
+  val mapLattice: MapLattice[Variable | MemoryRegion, Set[Value]] = MapLattice(powersetLattice)
 
   val liftedLattice: LiftLattice[Map[Variable | MemoryRegion, Set[Value]], mapLattice.type] = LiftLattice(mapLattice)
 
@@ -136,7 +136,7 @@ class ValueSetAnalysisSolver(program: Program, mmm: MemoryModelMap)
     with WorklistFixpointSolverWithReachability[
       CFGPosition,
       Map[Variable | MemoryRegion, Set[Value]],
-      MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]
+      MapLattice[Variable | MemoryRegion, Set[Value]]
     ] {
 
   override def funsub(

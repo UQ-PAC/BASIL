@@ -40,7 +40,7 @@ trait GlobalRegionAnalysis(
 
   val regionLattice: PowersetLattice[DataRegion] = PowersetLattice()
 
-  val lattice: MapLattice[CFGPosition, Set[DataRegion], PowersetLattice[DataRegion]] = MapLattice(regionLattice)
+  val lattice: MapLattice[CFGPosition, Set[DataRegion]] = MapLattice(regionLattice)
 
   val first: Set[CFGPosition] = Set(program.mainProcedure)
 
@@ -189,4 +189,4 @@ class GlobalRegionAnalysisSolver(
 ) extends GlobalRegionAnalysis(program, domain, constantProp, reachingDefs, mmm, vsaResult)
     with IRIntraproceduralForwardDependencies
     with Analysis[Map[CFGPosition, Set[DataRegion]]]
-    with SimpleWorklistFixpointSolver[CFGPosition, Set[DataRegion], PowersetLattice[DataRegion]]
+    with SimpleWorklistFixpointSolver[CFGPosition, Set[DataRegion]]
