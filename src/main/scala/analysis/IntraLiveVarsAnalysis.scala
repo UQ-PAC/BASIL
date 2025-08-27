@@ -4,7 +4,7 @@ import analysis.solvers.SimpleWorklistFixpointSolver
 import ir.*
 
 abstract class LivenessAnalysis(program: Program, addExternals: Boolean = true) extends Analysis[Any] {
-  val lattice: MapLattice[CFGPosition, Set[Variable], PowersetLattice[Variable]] = MapLattice(PowersetLattice())
+  val lattice: MapLattice[CFGPosition, Set[Variable]] = MapLattice()
   val domain: Set[CFGPosition] = Set.empty ++ program
 
   def transfer(n: CFGPosition, s: Set[Variable]): Set[Variable] = {
