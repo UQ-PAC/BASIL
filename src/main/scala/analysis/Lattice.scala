@@ -745,7 +745,7 @@ class TupleLattice[+L1 <: Lattice[T1], +L2 <: Lattice[T2], T1, T2](val lattice1:
     lattice1.leq(x1, y1) && lattice2.leq(x2, y2)
   }
 
-  val top: (T1, T2) = (lattice1.top, lattice2.top)
+  def top: (T1, T2) = (lattice1.top, lattice2.top)
 }
 
 /** A lattice of maps from a set of elements of type `A` to a lattice with element `L'. Bottom is the default value.

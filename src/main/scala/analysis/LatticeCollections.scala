@@ -37,6 +37,28 @@ enum LatticeSet[T] {
     }
   }
 
+  def join(other: LatticeSet[T]): LatticeSet[T] = {
+    (this, other) match {
+      case (Top(), _) => Top()
+      case (Bottom(), b) => b
+      case (FiniteSet(a), FiniteSet(b)) => finiteSet(a.union(b))
+      case (FiniteSet(a), DiffSet(b)) => diffSet(b -- a)
+      case (DiffSet(a), DiffSet(b)) => diffSet(a.intersect(b))
+      case (a, b) => b.join(a)
+    }
+  }
+
+  def meet(other: LatticeSet[T]): LatticeSet[T] = {
+    (this, other) match {
+      case (Top(), b) => b
+      case (Bottom(), _) => Bottom()
+      case (FiniteSet(a), FiniteSet(b)) => finiteSet(a.intersect(b))
+      case (FiniteSet(a), DiffSet(b)) => finiteSet(a.filter(x => !b.contains(x)))
+      case (DiffSet(a), DiffSet(b)) => diffSet(a.union(b))
+      case (a, b) => b.meet(a)
+    }
+  }
+
   def diff(other: LatticeSet[T]): LatticeSet[T] = {
     (this, other) match {
       case (_, Top()) => Bottom()
@@ -84,30 +106,11 @@ enum LatticeSet[T] {
 given [T]: Lattice[LatticeSet[T]] with
   import LatticeSet.*
 
-  def lub(x: LatticeSet[T], other: LatticeSet[T]): LatticeSet[T] = {
-    (x, other) match {
-      case (Top(), _) => Top()
-      case (Bottom(), b) => b
-      case (FiniteSet(a), FiniteSet(b)) => finiteSet(a.union(b))
-      case (FiniteSet(a), DiffSet(b)) => diffSet(b -- a)
-      case (DiffSet(a), DiffSet(b)) => diffSet(a.intersect(b))
-      case (a, b) => b.join(a)
-    }
-  }
-
-  override def glb(x: LatticeSet[T], other: LatticeSet[T]): LatticeSet[T] = {
-    (x, other) match {
-      case (Top(), b) => b
-      case (Bottom(), _) => Bottom()
-      case (FiniteSet(a), FiniteSet(b)) => finiteSet(a.intersect(b))
-      case (FiniteSet(a), DiffSet(b)) => finiteSet(a.filter(x => !b.contains(x)))
-      case (DiffSet(a), DiffSet(b)) => diffSet(a.union(b))
-      case (a, b) => b.meet(a)
-    }
-  }
-
-  override def top: LatticeSet[T] = Top()
+  val top: LatticeSet[T] = Top()
   val bottom: LatticeSet[T] = Bottom()
+
+  def lub(x: LatticeSet[T], y: LatticeSet[T]) = x.join(y)
+  def glb(x: LatticeSet[T], y: LatticeSet[T]) = x.meet(y)
 
 object LatticeMap {
 
