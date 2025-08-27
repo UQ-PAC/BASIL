@@ -31,6 +31,10 @@ trait Lattice[T]:
     */
   def leq(x: T, y: T): Boolean = lub(x, y) == y // rarely used, but easy to implement :-)
 
+  extension (x: T)
+    def join(y: T) = lub(x, y)
+    def meet(y: T) = lub(x, y)
+
 trait StridedWrappedInterval
 
 case class SI(s: BigInt, l: BigInt, u: BigInt, w: BigInt) extends StridedWrappedInterval {

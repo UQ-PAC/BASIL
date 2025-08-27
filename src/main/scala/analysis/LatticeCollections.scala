@@ -5,6 +5,10 @@ import ir.transforms.AbstractDomain
 
 import scala.annotation.implicitNotFound
 
+extension (x: Any)
+  def top = ???
+  def bottom = ???
+
 /** Lattice structure internal to a type.
   */
 trait InternalLattice[T <: InternalLattice[T]] {
@@ -147,10 +151,10 @@ class LatticeSetLattice[T] extends Lattice[LatticeSet[T]] {
 object LatticeMap {
 
   /** Create a TopMap only if `m` is non-empty, else make Top. */
-  def topMap[D, L](m: Map[D, L]): LatticeMap[D, L] = if m.isEmpty then LatticeMap.Top() else LatticeMap.TopMap(m)
+  def topMap[D, L](m: Map[D, L])(using l: Lattice[L]): LatticeMap[D, L] = if m.isEmpty then LatticeMap.Top() else LatticeMap.TopMap(m)
 
   /** Create a BottomMap only if `m` is non-empty, else make Bottom. */
-  def bottomMap[D, L](m: Map[D, L]): LatticeMap[D, L] =
+  def bottomMap[D, L](m: Map[D, L])(using l: Lattice[L]): LatticeMap[D, L] =
     if m.isEmpty then LatticeMap.Bottom() else LatticeMap.BottomMap(m)
 }
 
@@ -164,20 +168,20 @@ object LatticeMap {
   * private implicit val intervalTerm: Interval = Interval.Bottom
   * ```
   */
-enum LatticeMap[D, L] {
+enum LatticeMap[D, L](using l: Lattice[L]) {
   /* PERFORMANCE:
    * Something like an AVL tree could be more efficient, see section 4.1.4 of Antoine Miné's abstract interpretation
    * tutorial.
    */
 
   /* A map that is top everywhere */
-  case Top[D1, L1]() extends LatticeMap[D1, L1]
+  case Top[D1, L1]()(using Lattice[L1]) extends LatticeMap[D1, L1]
   /* A map that is bottom everywhere */
-  case Bottom[D1, L1]() extends LatticeMap[D1, L1]
+  case Bottom[D1, L1]()(using Lattice[L1]) extends LatticeMap[D1, L1]
   /* A Map which defaults to top and is else specified by the internal map */
-  case TopMap[D1, L1](m: Map[D1, L1]) extends LatticeMap[D1, L1]
+  case TopMap[D1, L1](m: Map[D1, L1])(using Lattice[L1]) extends LatticeMap[D1, L1]
   /* A Map which defaults to bottom and is else specified by the internal map */
-  case BottomMap[D1, L1](m: Map[D1, L1]) extends LatticeMap[D1, L1]
+  case BottomMap[D1, L1](m: Map[D1, L1])(using Lattice[L1]) extends LatticeMap[D1, L1]
 
   /** Update this map so that `from` now maps to `to` */
   def update[L1 <: InternalLattice[L1]](pair: (D, L))(implicit
@@ -233,17 +237,11 @@ enum LatticeMap[D, L] {
     case BottomMap(m) => m.getOrElse(v, l.bottom).asInstanceOf[L1]
   }
 
-  def join[L1 <: InternalLattice[L1]](other: LatticeMap[D, L1])(implicit
-    s: L <:< L1,
-    @implicitNotFound("No implicit of type ${L1} was found. See LatticeMap docs for more info.") l: L1
-  ): LatticeMap[D, L1] =
-    latticeMapJoin(this.asInstanceOf[LatticeMap[D, L1]], other, (a, b) => a.join(b), l.top, l.bottom)
+  def join(other: LatticeMap[D, L]): LatticeMap[D, L] =
+    latticeMapJoin(this, other, (a, b) => a.join(b), l.top, l.bottom)
 
-  def meet[L1 <: InternalLattice[L1]](other: LatticeMap[D, L1])(implicit
-    s: L <:< L1,
-    @implicitNotFound("No implicit of type ${L1} was found. See LatticeMap docs for more info.") l: L1
-  ): LatticeMap[D, L1] =
-    latticeMapMeet(this.asInstanceOf[LatticeMap[D, L1]], other, (a, b) => a.meet(b), l.top, l.bottom)
+  def meet(other: LatticeMap[D, L]): LatticeMap[D, L] =
+    latticeMapMeet(this, other, (a, b) => a.meet(b), l.top, l.bottom)
 
   def top: LatticeMap[D, L] = Top()
   def bottom: LatticeMap[D, L] = Bottom()
@@ -255,7 +253,7 @@ private def latticeMapJoin[D, L](
   join: ((L, L) => L),
   top: => L,
   bottom: => L
-): LatticeMap[D, L] = {
+)(using Lattice[L]): LatticeMap[D, L] = {
   import LatticeMap.*
 
   def joinMaps(m1: Map[D, L], m2: Map[D, L], d1: L, d2: L) =
@@ -280,7 +278,7 @@ private def latticeMapMeet[D, L](
   meet: ((L, L) => L),
   top: => L,
   bottom: => L
-): LatticeMap[D, L] = {
+)(using Lattice[L]): LatticeMap[D, L] = {
   import LatticeMap.*
 
   def meetMaps(m1: Map[D, L], m2: Map[D, L], d1: L, d2: L) =
@@ -312,10 +310,7 @@ def latticeMapApply[D, L, LA <: Lattice[L]](m: LatticeMap[D, L], d: D, l: LA): L
   }
 }
 
-class LatticeMapLattice[D, L, LA <: Lattice[L]](l: LA) extends Lattice[LatticeMap[D, L]] {
-  import LatticeMap.{Top, Bottom}
-
-  type Element = LatticeMap[D, L];
+given [D, L](using l: Lattice[L]): Lattice[LatticeMap[D, L]] with
 
   def lub(a: LatticeMap[D, L], b: LatticeMap[D, L]): LatticeMap[D, L] =
     latticeMapJoin(a, b, (x, y) => l.lub(x, y), l.top, l.bottom)
@@ -323,14 +318,13 @@ class LatticeMapLattice[D, L, LA <: Lattice[L]](l: LA) extends Lattice[LatticeMa
   override def glb(a: LatticeMap[D, L], b: LatticeMap[D, L]): LatticeMap[D, L] =
     latticeMapMeet(a, b, (x, y) => l.glb(x, y), l.top, l.bottom)
 
-  override def top: LatticeMap[D, L] = Top()
-  val bottom: LatticeMap[D, L] = Bottom()
-}
+  override def top: LatticeMap[D, L] = LatticeMap.Top()
+  val bottom: LatticeMap[D, L] = LatticeMap.Bottom()
 
 /** A domain which has terms as maps. Implementing a MapDomain involves only defining operations element wise on the
   * codomain of the map (along with the transfer function).
   */
-trait MapDomain[D, L] extends AbstractDomain[LatticeMap[D, L]] {
+trait MapDomain[D, L](using Lattice[L]) extends AbstractDomain[LatticeMap[D, L]] {
   import LatticeMap.*
 
   def joinTerm(a: L, b: L, pos: Block): L
