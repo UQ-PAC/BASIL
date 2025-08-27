@@ -12,7 +12,7 @@ trait ANRAnalysis(program: Program, ignoreStackPtrs: Boolean = false) {
 
   val powersetLattice: PowersetLattice[Variable] = PowersetLattice()
 
-  val lattice: MapLattice[CFGPosition, Set[Variable]] = MapLattice(powersetLattice)
+  val lattice: MapLattice[CFGPosition, Set[Variable], PowersetLattice[Variable]] = MapLattice(powersetLattice)
 
   val domain: Set[CFGPosition] = Set.empty ++ program
 
@@ -70,4 +70,4 @@ class ANRAnalysisSolver(program: Program, ignoreStack: Boolean = true)
     extends ANRAnalysis(program, ignoreStack)
     with IRIntraproceduralForwardDependencies
     with Analysis[Map[CFGPosition, Set[Variable]]]
-    with SimpleWorklistFixpointSolver[CFGPosition, Set[Variable]] {}
+    with SimpleWorklistFixpointSolver[CFGPosition, Set[Variable], PowersetLattice[Variable]] {}

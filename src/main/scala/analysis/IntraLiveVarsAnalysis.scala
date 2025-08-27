@@ -35,5 +35,5 @@ abstract class LivenessAnalysis(program: Program, addExternals: Boolean = true) 
 
 class IntraLiveVarsAnalysis(program: Program)
     extends LivenessAnalysis(program, false)
-    with SimpleWorklistFixpointSolver[CFGPosition, Set[Variable]]
+    with SimpleWorklistFixpointSolver[CFGPosition, Set[Variable], PowersetLattice[Variable]]
     with IRIntraproceduralBackwardDependencies

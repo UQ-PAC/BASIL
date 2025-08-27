@@ -104,7 +104,7 @@ trait MemoryRegionAnalysis(
   val stackLattice: PowersetLattice[StackRegion] = PowersetLattice()
   val stackPointerLattice: PowersetLattice[Variable] = PowersetLattice()
   val stackTupleLattice
-    : TupleLattice[PowersetLattice[StackRegion], Set[StackRegion], Set[Variable]] =
+    : TupleLattice[PowersetLattice[StackRegion], PowersetLattice[Variable], Set[StackRegion], Set[Variable]] =
     TupleLattice(stackLattice, stackPointerLattice)
 
   val heapLattice: PowersetLattice[HeapRegion] = PowersetLattice()
@@ -328,7 +328,7 @@ class MemoryRegionAnalysisSolver(
       CFGPosition,
       ((Set[StackRegion], Set[Variable]), Set[HeapRegion]),
       TupleLattice[
-        TupleLattice[PowersetLattice[StackRegion], Set[StackRegion], Set[Variable]],
+        TupleLattice[PowersetLattice[StackRegion], PowersetLattice[Variable], Set[StackRegion], Set[Variable]],
         PowersetLattice[HeapRegion],
         (Set[StackRegion], Set[Variable]),
         Set[HeapRegion]

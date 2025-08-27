@@ -4,22 +4,22 @@ import analysis.solvers.SimpleWorklistFixpointSolver
 import ir.*
 
 type ReachingDefTuple =
-  TupleLattice[MapLattice[Variable, Set[Assign]], MapLattice[Variable, Set[
+  TupleLattice[MapLattice[Variable, Set[Assign], PowersetLattice[Assign]], MapLattice[Variable, Set[
     Assign
-  ]], Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]]
+  ], PowersetLattice[Assign]], Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]]
 
 /** Calculates def-use chains for the program. */
 trait ReachingDefinitionsAnalysis(program: Program) {
 
   private val tupleLattice: TupleLattice[
-    MapLattice[Variable, Set[Assign]],
-    MapLattice[Variable, Set[Assign]],
+    MapLattice[Variable, Set[Assign], PowersetLattice[Assign]],
+    MapLattice[Variable, Set[Assign], PowersetLattice[Assign]],
     Map[Variable, Set[Assign]],
     Map[Variable, Set[Assign]]
   ] =
     TupleLattice(
-      MapLattice[Variable, Set[Assign]](PowersetLattice[Assign]()),
-      MapLattice[Variable, Set[Assign]](PowersetLattice[Assign]())
+      MapLattice[Variable, Set[Assign], PowersetLattice[Assign]](PowersetLattice[Assign]()),
+      MapLattice[Variable, Set[Assign], PowersetLattice[Assign]](PowersetLattice[Assign]())
     )
 
   val lattice: MapLattice[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]), ReachingDefTuple] =
