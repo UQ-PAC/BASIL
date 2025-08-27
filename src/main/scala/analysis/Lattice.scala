@@ -54,12 +54,27 @@ trait Lattice[T]:
    * These convenience methods give easy access to the `join` and `meet` functions through
    * the `.meet` and `.join` syntax.
    *
-   * These methods provided by the [[Lattice]] trait and can be used whenever a
+   * These methods are provided by the [[Lattice]] trait and can be used whenever a
    * [[Lattice]] (with the correct type) is in scope.
    */
   extension (x: T)
     def join(y: T) = lub(x, y)
     def meet(y: T) = glb(x, y)
+
+/**
+ * A terrible hack to translate a [[Lattice]] value into a trait
+ * superclass by forwarding its methods to the [[Lattice]] value.
+ *
+ * Think twice before using.
+ */
+trait LatticeLattice[L](l: Lattice[L]) extends Lattice[L] {
+  def lub(a: L, b: L): L = l.lub(a, b)
+
+  override def glb(a: L, b: L): L = l.glb(a, b)
+
+  override def top: L = l.top
+  val bottom: L = l.bottom
+}
 
 trait StridedWrappedInterval
 

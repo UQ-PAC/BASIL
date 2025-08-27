@@ -20,7 +20,7 @@ def signedInt2bv(bitSize: Int, n: BigInt): BitVecLiteral =
   if n < 0 then smt_bvneg(BitVecLiteral((-n) % BigInt(2).pow(bitSize), bitSize))
   else BitVecLiteral(n % BigInt(2).pow(bitSize), bitSize)
 
-enum Interval extends InternalLattice[Interval] {
+enum Interval {
   case Top
   case ConcreteInterval(lower: BigInt, upper: BigInt, width: Int)
   case Bottom
@@ -32,8 +32,13 @@ enum Interval extends InternalLattice[Interval] {
     case _ => true
   })
 
-  def join(other: Interval): Interval =
-    (this, other) match {
+}
+
+given Lattice[Interval] with
+  import Interval.*
+
+  def lub(x: Interval, other: Interval): Interval =
+    (x, other) match {
       case (Top, b) => Top
       case (Bottom, b) => b
       case (ConcreteInterval(l1, u1, w1), ConcreteInterval(l2, u2, w2)) if w1 == w2 =>
@@ -42,8 +47,9 @@ enum Interval extends InternalLattice[Interval] {
         throw Exception("Joining intervals of mismatching bitvector sizes")
       case (a, b) => b.join(a)
     }
-  def meet(other: Interval): Interval =
-    (this, other) match {
+
+  override def glb(x: Interval, other: Interval): Interval =
+    (x, other) match {
       case (Top, b) => b
       case (Bottom, b) => Bottom
       case (ConcreteInterval(l1, u1, w1), ConcreteInterval(l2, u2, w2)) if w1 == w2 => {
@@ -56,11 +62,8 @@ enum Interval extends InternalLattice[Interval] {
       case (a, b) => b.meet(a)
     }
 
-  def top: Interval = Top
-  def bottom: Interval = Bottom
-}
-
-given Lattice[Interval] = InternalLatticeLattice(Interval.Top)
+  override val top: Interval = Top
+  val bottom: Interval = Bottom
 
 class IntervalDomain(
   procedure: Option[Procedure] = None,
@@ -256,8 +259,6 @@ class UnsignedIntervalDomain(procedure: Option[Procedure] = None)
 
 class DoubleIntervalDomain(procedure: Option[Procedure] = None)
     extends PredProductDomain(SignedIntervalDomain(procedure), UnsignedIntervalDomain(procedure))
-
-class IntervalLattice extends InternalLatticeLattice[Interval](Interval.Bottom)
 
 class TopDomain extends PredicateEncodingDomain[Unit] {
   def join(a: Unit, b: Unit, pos: Block): Unit = {}

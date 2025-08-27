@@ -3,46 +3,6 @@ package analysis
 import ir.*
 import ir.transforms.AbstractDomain
 
-/**
- * Lattice structure internal to a type.
- *
- * For new lattices, it is recommended to implement [[Lattice]] instead,
- * as [[InternalLattice]] defines all its methods on the `this` value.
- * This (1) forces the user to pass around an arbitrary value to access
- * "static" functions like [[InternalLattice#top]], and (2) restricts
- * flexibility because the type constraint forces this trait to be
- * implemented on the class type itself.
- *
- * If you have a type that extends [[InternalLattice]], you can convert
- * it to a [[Lattice]] given instance using [[InternalLatticeLattice]].
- * For example, for the [[Interval]] type:
- * {{{
- * given Lattice[Interval] = InternalLatticeLattice(Interval.Top)
- * }}}
- * This will create a [[Lattice]] instance and allow access to methods
- * and classes which require such an instance.
- */
-trait InternalLattice[T <: InternalLattice[T]] {
-  def join(other: T): T
-  def meet(other: T): T
-
-  def top: T
-  def bottom: T
-}
-
-/**
- * A Lattice over a type that implements the InternalLattice trait.
- *
- * The `term` parameter can be any term of the type L, it just needs to exist to be able to call the top and bottom methods.
- */
-class InternalLatticeLattice[L <: InternalLattice[L]](term: L) extends Lattice[L] {
-  def lub(x: L, y: L): L = x.join(y)
-  override def glb(x: L, y: L): L = x.meet(y)
-
-  val bottom: L = term.bottom
-  override val top: L = term.top
-}
-
 object LatticeSet {
 
   /** Create a FiniteSet only if `s` is non-empty, else make Bottom. */
@@ -56,7 +16,7 @@ object LatticeSet {
  * An element of a powerset lattice. This type represents Top and Bottom and finite sets, and is closed under
  * unions, intersections, and set difference.
  */
-enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
+enum LatticeSet[T] {
   import LatticeSet.{finiteSet, diffSet}
 
   /* The set of all terms of type T */
@@ -74,28 +34,6 @@ enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
       case Bottom() => false
       case FiniteSet(s) => s.contains(v)
       case DiffSet(s) => !s.contains(v)
-    }
-  }
-
-  def join(other: LatticeSet[T]): LatticeSet[T] = {
-    (this, other) match {
-      case (Top(), _) => Top()
-      case (Bottom(), b) => b
-      case (FiniteSet(a), FiniteSet(b)) => finiteSet(a.union(b))
-      case (FiniteSet(a), DiffSet(b)) => diffSet(b -- a)
-      case (DiffSet(a), DiffSet(b)) => diffSet(a.intersect(b))
-      case (a, b) => b.join(a)
-    }
-  }
-
-  def meet(other: LatticeSet[T]): LatticeSet[T] = {
-    (this, other) match {
-      case (Top(), b) => b
-      case (Bottom(), _) => Bottom()
-      case (FiniteSet(a), FiniteSet(b)) => finiteSet(a.intersect(b))
-      case (FiniteSet(a), DiffSet(b)) => finiteSet(a.filter(x => !b.contains(x)))
-      case (DiffSet(a), DiffSet(b)) => diffSet(a.union(b))
-      case (a, b) => b.meet(a)
     }
   }
 
@@ -123,9 +61,6 @@ enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
   def --(other: LatticeSet[T]): LatticeSet[T] = this.diff(other)
   def --(other: Iterable[T]): LatticeSet[T] = this.diff(FiniteSet(other.toSet))
 
-  def top: LatticeSet[T] = Top()
-  def bottom: LatticeSet[T] = Bottom()
-
   /** Try to convert to a finitely represented set. Returns None if this set is infinite
     */
   def tryToSet: Option[Set[T]] = {
@@ -146,7 +81,33 @@ enum LatticeSet[T] extends InternalLattice[LatticeSet[T]] {
   }
 }
 
-given [T]: Lattice[LatticeSet[T]] = InternalLatticeLattice(LatticeSet.Bottom())
+given [T]: Lattice[LatticeSet[T]] with
+  import LatticeSet.*
+
+  def lub(x: LatticeSet[T], other: LatticeSet[T]): LatticeSet[T] = {
+    (x, other) match {
+      case (Top(), _) => Top()
+      case (Bottom(), b) => b
+      case (FiniteSet(a), FiniteSet(b)) => finiteSet(a.union(b))
+      case (FiniteSet(a), DiffSet(b)) => diffSet(b -- a)
+      case (DiffSet(a), DiffSet(b)) => diffSet(a.intersect(b))
+      case (a, b) => b.join(a)
+    }
+  }
+
+  override def glb(x: LatticeSet[T], other: LatticeSet[T]): LatticeSet[T] = {
+    (x, other) match {
+      case (Top(), b) => b
+      case (Bottom(), _) => Bottom()
+      case (FiniteSet(a), FiniteSet(b)) => finiteSet(a.intersect(b))
+      case (FiniteSet(a), DiffSet(b)) => finiteSet(a.filter(x => !b.contains(x)))
+      case (DiffSet(a), DiffSet(b)) => diffSet(a.union(b))
+      case (a, b) => b.meet(a)
+    }
+  }
+
+  override def top: LatticeSet[T] = Top()
+  val bottom: LatticeSet[T] = Bottom()
 
 object LatticeMap {
 
@@ -288,23 +249,6 @@ def latticeMapApply[D, L](m: LatticeMap[D, L], d: D)(using l: Lattice[L]): L = {
     case BottomMap(m) => m.getOrElse(d, l.bottom)
   }
 }
-
-/**
- * A terrible hack to translate a [[Lattice]] value into a trait
- * superclass by forwarding its methods to the [[Lattice]] value.
- *
- * Think twice before using.
- */
-trait LatticeLattice[L](l: Lattice[L]) extends Lattice[L] {
-  def lub(a: L, b: L): L = l.lub(a, b)
-
-  override def glb(a: L, b: L): L = l.glb(a, b)
-
-  override def top: L = l.top
-  val bottom: L = l.bottom
-}
-
-private def check[T](l: Lattice[T]) = new LatticeLattice(l) {}
 
 given [D, L](using l: Lattice[L]): Lattice[LatticeMap[D, L]] with
   def lub(a: LatticeMap[D, L], b: LatticeMap[D, L]): LatticeMap[D, L] =
