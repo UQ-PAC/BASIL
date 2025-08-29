@@ -103,7 +103,7 @@ enum LatticeSet[T] {
   }
 }
 
-given [T]: Lattice[LatticeSet[T]] with
+class LatticeSetLattice[T]() extends Lattice[LatticeSet[T]] {
   import LatticeSet.*
 
   val top: LatticeSet[T] = Top()
@@ -111,6 +111,9 @@ given [T]: Lattice[LatticeSet[T]] with
 
   def lub(x: LatticeSet[T], y: LatticeSet[T]) = x.join(y)
   def glb(x: LatticeSet[T], y: LatticeSet[T]) = x.meet(y)
+}
+
+given [T]: Lattice[LatticeSet[T]] = LatticeSetLattice()
 
 object LatticeMap {
 
@@ -253,7 +256,9 @@ def latticeMapApply[D, L](m: LatticeMap[D, L], d: D)(using l: Lattice[L]): L = {
   }
 }
 
-given [D, L](using l: Lattice[L]): Lattice[LatticeMap[D, L]] with
+class LatticeMapLattice[D, L](l: Lattice[L]) extends Lattice[LatticeMap[D, L]] {
+  protected given Lattice[L] = l
+
   def lub(a: LatticeMap[D, L], b: LatticeMap[D, L]): LatticeMap[D, L] =
     latticeMapJoin(a, b, (x, y) => l.lub(x, y), l.top, l.bottom)
 
@@ -262,6 +267,9 @@ given [D, L](using l: Lattice[L]): Lattice[LatticeMap[D, L]] with
 
   override def top: LatticeMap[D, L] = LatticeMap.Top()
   val bottom: LatticeMap[D, L] = LatticeMap.Bottom()
+}
+
+given [D, L](using l: Lattice[L]): Lattice[LatticeMap[D, L]] = LatticeMapLattice(l)
 
 /** A domain which has terms as maps. Implementing a MapDomain involves only defining operations element wise on the
   * codomain of the map (along with the transfer function).

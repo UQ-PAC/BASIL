@@ -34,7 +34,7 @@ enum Interval {
 
 }
 
-given Lattice[Interval] with
+object IntervalLattice extends Lattice[Interval] {
   import Interval.*
 
   def lub(x: Interval, other: Interval): Interval =
@@ -64,6 +64,9 @@ given Lattice[Interval] with
 
   override val top: Interval = Top
   val bottom: Interval = Bottom
+}
+
+given Lattice[Interval] = IntervalLattice
 
 class IntervalDomain(
   procedure: Option[Procedure] = None,
