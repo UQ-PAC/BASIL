@@ -21,6 +21,19 @@ import util.assertion.*
  *
  * [type-class]: https://docs.scala-lang.org/scala3/book/ca-type-classes.html
  * [given syntax]: https://docs.scala-lang.org/scala3/reference/contextual/previous-givens.html
+ *
+ * To invoke a method or class constructor which has a "using" clause, you will
+ * need to either:
+ *
+ * - (1) explicitly pass a value for the using parameter by suffixing `(using l)`
+ *   to the method/constructor call (where `l` is a value of the correct type), or
+ * - (2) have a `given` clause in scope which declares a [[Lattice]] value with a
+ *   compatible type. When a `given` clause appears in a different file, it may
+ *   need to be imported with `import package_name.given` - the compiler should
+ *   help you with this. Note that not all subtypes of [[Lattice]] are declared
+ *   as `given`. If you need to use a non-given instance, you can either use
+ *   (1) or, if the instance is canonical for its type, you can add a new
+ *   `given Lattice[TheType] = ...` statement.
  */
 trait Lattice[T]:
 
