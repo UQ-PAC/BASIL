@@ -57,19 +57,11 @@ trait Lattice[T]:
     def join(y: T) = lub(x, y)
     def meet(y: T) = glb(x, y)
 
-/**
- * A terrible hack to translate a [[Lattice]] value into a trait
- * superclass by forwarding its methods to the [[Lattice]] value.
- *
- * Think twice before using.
- */
-trait LatticeLattice[L](l: Lattice[L]) extends Lattice[L] {
-  def lub(a: L, b: L): L = l.lub(a, b)
+object Lattice {
 
-  def glb(a: L, b: L): L = l.glb(a, b)
-
-  val top: L = l.top
-  val bottom: L = l.bottom
+  /** Summons a [[Lattice]] instance for the required type. By using this method,
+   *  the [[Lattice]] methods can be accessed by, for example, `Lattice().top`. */
+  def apply[T](using l: Lattice[T]) = l
 }
 
 trait StridedWrappedInterval

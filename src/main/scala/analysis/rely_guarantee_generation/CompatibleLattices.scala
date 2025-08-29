@@ -10,8 +10,6 @@ trait InterferenceCompatibleLattice[S] extends Lattice[S] {
   def contains(s: S, v: Variable): Boolean
   // weakens s by eliminating v
   def drop(v: Variable, s: S): S
-  // greatest lower bound, i.e. meet
-  def glb(s1: S, s2: S): S
   // display s as a boogie predicate
   def toPredString(s: S): String
 }
@@ -23,8 +21,7 @@ trait InterferenceCompatibleLattice[S] extends Lattice[S] {
   * @param l: A lattice over individual intervals, like [4, 7].
   */
 class IntervalLatticeExtension()(using lattice: Lattice[LatticeMap[Variable, Interval]])
-    extends InterferenceCompatibleLattice[LatticeMap[Variable, Interval]]
-    with LatticeLattice(lattice) {
+    extends InterferenceCompatibleLattice[LatticeMap[Variable, Interval]] {
 
   def contains(s: LatticeMap[Variable, Interval], v: Variable): Boolean =
     s.toMap.contains(v)
@@ -36,4 +33,6 @@ class IntervalLatticeExtension()(using lattice: Lattice[LatticeMap[Variable, Int
   coupled with this lattice is SignedIntervalDomain().transfer */
   def toPredString(s: LatticeMap[Variable, Interval]): String =
     SignedIntervalDomain().toPred(s).toString()
+
+  export lattice.*
 }
