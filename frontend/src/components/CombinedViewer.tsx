@@ -112,7 +112,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
                 console.warn("Prism.js or 'ir' language not fully loaded. Highlighting may not apply.");
             }
         }
-    }, [irCode]);
+    }, [irCode, irCodeRef.current]);
 
     useEffect(() => {
         if (!selectedStartEpoch || !selectedEndEpoch || !selectedProcedureName) {
