@@ -1,3 +1,5 @@
+// src/lib/prism-ir.ts
+
 import Prism from 'prismjs';
 
 Prism.languages.ir = {
@@ -17,8 +19,9 @@ Prism.languages.ir = {
         pattern: /\b[a-zA-Z_][a-zA-Z0-9_]*?(?=\s*\()/,
         alias: 'function',
     },
+    label: /%[a-zA-Z0-9_]+/,
     variable: {
-        pattern: /\b[a-zA-Z_][a-zA-Z0-9_]*_\d+\b/,
+        pattern: /\$[a-zA-Z0-9_]+|\b[a-zA-Z_][a-zA-Z0-9_]*_\d+\b|\bR\d+(_\d+)?\b/,
         alias: 'variable',
     },
     string: {
@@ -31,4 +34,5 @@ Prism.languages.ir = {
     },
     operator: /:=|->|=>|==|!=|<=|>=|<|>|\+|-|\*|\/|=/,
     punctuation: /[()\[\]:{};,]/,
+    property: /.+/,
 };

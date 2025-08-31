@@ -58,30 +58,21 @@
 
 .ir-code-panel h3 {
     text-align: center;
-    padding: 10px 0;
+    padding: 6px 0;
     margin: 0;
     background-color: var(--combined--header-background-color);
     border-bottom: 1px solid var(--combined-border-background-color);
     color: var(--text-color);
-    font-size: 1.2em;
-    flex-shrink: 0;
 }
 
 .ir-code-display {
     flex: 1;
-    margin: 0;
-    padding: 15px;
-    overflow-y: auto;
-    font-family: 'Fira Code', 'JetBrains Mono', monospace; /* TODO: Is this consistent with the others??? */
-    font-size: 1em;
-    line-height: 1.4;
-    color: #abb2bf;
-    white-space: pre;
-    background-color: black;
+    margin: 0 !important;
+    background-color: var(--combined-ir-code-panel-background-color) !important;
 }
 
-.ir-code-display code {
-    display: block;
+.language-ir {
+    text-shadow: none !important;
 }
 
 .ir-code-message {

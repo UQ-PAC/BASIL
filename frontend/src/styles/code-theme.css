@@ -1,12 +1,15 @@
 
 /* These are the colour components for the code style. */
-.token.keyword    { color: var(--token-keyword-color); font-weight: 600; }
-.token.variable   { color: var(--token-variable-color); }
-.token.function   { color: var(--token-function-color); font-weight: 600; }
-.token.type       { color: var(--token-type-color); font-weight: 600; }
-.token.boolean    { color: var(--token-boolean-color); font-weight: 600; }
-.token.number     { color: var(--token-number-color); }
-.token.comment    { color: var(--token-comment-color); font-style: italic; }
-.token.string     { color: var(--token-string-color); font-style: italic; }
-.token.operator   { color: var(--token-operator-color); font-weight: 600; background: transparent; }
-.token.punctuation { color: var(--token-punctuation-color); }
+.token.comment    { color: var(--token-comment-color); font-style: italic; text-shadow: none }
+.token.keyword    { color: var(--token-keyword-color); font-weight: 600; text-shadow: none }
+.token.boolean    { color: var(--token-boolean-color); font-weight: 600; text-shadow: none }
+.token.number     { color: var(--token-number-color); text-shadow: none }
+.token.type       { color: var(--token-type-color); font-weight: 600; text-shadow: none }
+.token.function   { color: var(--token-function-color); font-weight: 600; text-shadow: none }
+.token.label      { color: var(--token-label-color); }
+.token.variable   { color: var(--token-variable-color); text-shadow: none }
+.token.string     { color: var(--token-string-color); font-style: italic; text-shadow: none }
+.toke.register    { color: white; text-shadow: none }
+.token.operator   { color: var(--token-operator-color); font-weight: 600; background: transparent; text-shadow: none }
+.token.punctuation { color: var(--token-punctuation-color); text-shadow: none }
+.token.property   { color: var(--token-property-color); text-shadow: none }

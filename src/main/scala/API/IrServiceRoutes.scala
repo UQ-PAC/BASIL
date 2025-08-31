@@ -342,7 +342,7 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean])(
     program.procedures.map { proc =>
       val originalDotOutput = dotBlockGraph(proc)
       val cleanedDotOutput = removeFontAttributes(originalDotOutput)
-      proc.name -> cleanedDotOutput
+      proc.procName -> cleanedDotOutput
     }.toMap
   }
 

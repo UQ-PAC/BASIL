@@ -58,6 +58,7 @@
     /* Colour scheme */
     --token-keyword-color: #569cd6;
     --token-variable-color: #9cdcfe;
+    --token-label-color: #FFCC66;
     --token-function-color: #dcdcaa;
     --token-type-color: #4ec9b0;
     --token-boolean-color: #569cd6;
@@ -66,6 +67,7 @@
     --token-string-color: #ce9178;
     --token-operator-color: #d4d4d4;
     --token-punctuation-color: #808080;
+    --token-property-color: #9CDCFE;
 }
 
 [data-theme='light'] {
@@ -114,6 +116,7 @@
     /* Color Scheme */
     --token-keyword-color: #005cc5;
     --token-variable-color: #e36209;
+    --token-label-color: #E69900;
     --token-function-color: #6f42c1;
     --token-type-color: #005cc5;
     --token-boolean-color: #d73a49;
@@ -122,6 +125,7 @@
     --token-string-color: #032f62;
     --token-operator-color: #d73a49;
     --token-punctuation-color: #24292e;
+    --token-property-color: #A52A2A;
 }
 
 /* TODO: Check that this works */

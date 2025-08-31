@@ -17,6 +17,8 @@ import { FIT_VIEW_OPTIONS, ZOOM_CONFIGS } from '../constants';
 declare const Prism: any;
 
 import '../lib/prism-ir.ts';
+import 'prismjs/plugins/line-numbers/prism-line-numbers.js'
+import 'prismjs/plugins/line-numbers/prism-line-numbers.css'
 
 interface DotGraphResponse {
     [procedureName: string]: string;
@@ -99,24 +101,18 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
     }, []);
 
     useEffect(() => {
-        if (irCodeRef.current) {
-            if (irCode && typeof Prism !== 'undefined' && Prism.languages && Prism.languages.ir) {
+        if (irCodeRef.current && irCode) {
+            if (typeof Prism !== 'undefined' && Prism.languages.ir) {
                 try {
-                    // Use Prism.highlight() to get the HTML string directly
-                    const highlightedHtml = Prism.highlight(irCode, Prism.languages.ir, 'ir');
-                    irCodeRef.current.innerHTML = highlightedHtml;
+                    Prism.highlightElement(irCodeRef.current);
                 } catch (e) {
                     console.error("Prism.highlight failed:", e);
-                    irCodeRef.current.textContent = irCode;
                 }
             } else {
-                irCodeRef.current.textContent = irCode || '';
-                if (irCode) {
-                    console.warn("Prism.js or 'ir' language not fully loaded. Highlighting may not apply.");
-                }
+                console.warn("Prism.js or 'ir' language not fully loaded. Highlighting may not apply.");
             }
         }
-    }, [irCode, irCodeRef.current]);
+    }, [irCode]);
 
     useEffect(() => {
         if (!selectedStartEpoch || !selectedEndEpoch || !selectedProcedureName) {
@@ -285,8 +281,8 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
                 <div className="ir-code-panel">
                     <h3>Intermediate Representation (IR)</h3>
                     {irCode ? (
-                        <pre className="ir-code-display">
-                            <div ref={irCodeRef} className="language-ir">{irCode}</div>
+                        <pre className="ir-code-display line-numbers">
+                            <code ref={irCodeRef} className="language-ir"> {irCode} </code>
                         </pre>
                     ) : (
                         <div className="ir-code-message">No IR code available for this procedure.</div>
