@@ -275,7 +275,7 @@ class TestKnownBitsInterpreter
     }
 
     expr match {
-      case BitVecLiteral(n, _) => Some(BitVecLiteral(n.min(BigInt(2).pow(newSize)-1), newSize))
+      case BitVecLiteral(n, _) => Some(BitVecLiteral(n.min(BigInt(2).pow(newSize) - 1), newSize))
       case n: Literal => Some(n)
       case Extract(ed, start, arg) => crudeSliceExprToSize(arg, newSize)
       case Repeat(repeats, arg) if ir.size(arg).get >= newSize => crudeSliceExprToSize(arg, newSize)
@@ -291,10 +291,11 @@ class TestKnownBitsInterpreter
           a1 <- crudeSliceExprToSize(arg, half)
           a2 <- crudeSliceExprToSize(arg2, otherhalf)
         } yield BinaryExpr(BVCONCAT, a1, a2)
-      case BinaryExpr(op, arg, arg2) => for {
-        a1 <- crudeSliceExprToSize(arg, newSize)
-        a2 <- crudeSliceExprToSize(arg2, newSize)
-      } yield BinaryExpr(op, a1, a2)
+      case BinaryExpr(op, arg, arg2) =>
+        for {
+          a1 <- crudeSliceExprToSize(arg, newSize)
+          a2 <- crudeSliceExprToSize(arg2, newSize)
+        } yield BinaryExpr(op, a1, a2)
       case b @ AssocExpr(op, arg) => None
       case UnaryExpr(op, arg) =>
         crudeSliceExprToSize(arg, newSize).map(UnaryExpr(op, _))
@@ -309,7 +310,8 @@ class TestKnownBitsInterpreter
 
   def shrinkExprSizes(expr: Expr) =
     val oldSize = ir.size(expr).getOrElse(8)
-    Shrink.shrinkWithOrig(oldSize)
+    Shrink
+      .shrinkWithOrig(oldSize)
       .filter(_ > 0)
       .toList
 
@@ -325,9 +327,10 @@ class TestKnownBitsInterpreter
       case _ if expr.isInstanceOf[Literal] => Nil
       case BoolType => Iterable(TrueLiteral, FalseLiteral)
       case IntType => Shrink.shrink(IntLiteral(BigInt(12389)))
-      case BitVecType(_) if sizes.length <= 1 => inputSize.iterator.flatMap { size =>
-        Shrink.shrinkWithOrig(BitVecLiteral(BigInt(2).pow(size) - 1, size))
-      }
+      case BitVecType(_) if sizes.length <= 1 =>
+        inputSize.iterator.flatMap { size =>
+          Shrink.shrinkWithOrig(BitVecLiteral(BigInt(2).pow(size) - 1, size))
+        }
       case _ => Nil
     }
 
@@ -355,17 +358,19 @@ class TestKnownBitsInterpreter
         for {
           newArg <- Shrink.shrink(arg)
         } yield SignExtend(bits, newArg)
-      case BinaryExpr(op: (BVCmpOp | PolyCmp), arg, arg2) => for {
-        a1 <- shrinkExprToSmallerSize.shrink(arg)
-        a2 <- shrinkExprToSize(Some(ir.size(a1).getOrElse(8)), arg2)
-      } yield BinaryExpr(op, a1, a2)
+      case BinaryExpr(op: (BVCmpOp | PolyCmp), arg, arg2) =>
+        for {
+          a1 <- shrinkExprToSmallerSize.shrink(arg)
+          a2 <- shrinkExprToSize(Some(ir.size(a1).getOrElse(8)), arg2)
+        } yield BinaryExpr(op, a1, a2)
       case BinaryExpr(op, arg, arg2) =>
         LazyList(arg, arg2).filter(_.getType == expr.getType) ++
           (for {
             (a1, a2) <- Shrink.shrink((arg, arg2))
             // if { require(a1.getType != a2.getType); true }
           } yield BinaryExpr(op, a1, a2)).filter {
-            case BinaryExpr(BVSREM | BVSDIV | BVUREM | BVSMOD | BVUDIV, _, BitVecLiteral(n, _)) if n == BigInt(0) => false
+            case BinaryExpr(BVSREM | BVSDIV | BVUREM | BVSMOD | BVUDIV, _, BitVecLiteral(n, _)) if n == BigInt(0) =>
+              false
             case _ => true
           }
       case b @ AssocExpr(op, arg) => Nil
@@ -388,11 +393,11 @@ class TestKnownBitsInterpreter
       size <- sizes.sorted.iterator
       expr <- literalShrinks.iterator ++ normalShrinks.iterator
       out <- crudeSliceExprToSize(expr, size)
-    } yield out).filter {
-            case BinaryExpr(BVSREM | BVSDIV | BVUREM | BVSMOD | BVUDIV, _, BitVecLiteral(n, _)) if n == BigInt(0) => false
-            case _ => true
-          }
-
+    } yield out)
+      .filter {
+        case BinaryExpr(BVSREM | BVSDIV | BVUREM | BVSMOD | BVUDIV, _, BitVecLiteral(n, _)) if n == BigInt(0) => false
+        case _ => true
+      }
       .distinct
       .to(LazyList)
 
@@ -415,7 +420,7 @@ class TestKnownBitsInterpreter
   }
 
   implicit lazy val shrinkExprToSmallerSize: Shrink[Expr] = Shrink.withLazyList { expr =>
-      shrinkExprToSize(None, expr)
+    shrinkExprToSize(None, expr)
       .to(LazyList)
   }
 
