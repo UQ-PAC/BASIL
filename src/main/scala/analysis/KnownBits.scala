@@ -102,7 +102,7 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
   def TAND(that: TNum): TNum = {
     require(this.width == that.width, s"$this $that bv width")
     val alpha = this.value | this.mask
-    val beta = that.value | that.mask
+    val beta = that.value
     val v = this.value & that.value
     TNum(v, (alpha & beta & ~v))
   }

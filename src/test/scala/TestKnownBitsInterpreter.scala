@@ -2,12 +2,14 @@ import analysis.*
 import ir.dsl.*
 import ir.eval.*
 import ir.{dsl, *}
-import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.{Arbitrary, Gen, Shrink}
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import org.scalatestplus.scalacheck.*
 import test_util.TestValueDomainWithInterpreter
 import translating.PrettyPrinter.*
+
+import scala.collection.immutable.LazyList
 
 @test_util.tags.UnitTest
 class TestKnownBitsInterpreter
@@ -264,6 +266,107 @@ class TestKnownBitsInterpreter
     sz <- Gen.chooseNum(0, 70)
     e <- genExpr(Some(sz))
   } yield (e))
+
+  def sliceExprToSize(expr: Expr, newSize: Int): Option[Expr] =
+    if (newSize == 0) {
+      return None
+    }
+    if (ir.size(expr).forall(_ == newSize)) {
+      return Some(expr)
+    }
+    val (simplified, changed) = ir.eval.simplifyPaddingAndSlicingExprFixpoint(Extract(0, newSize, expr))
+    println("" + expr + " -> " + newSize + " -> " + simplified + changed)
+
+    val result = Option.when(changed)(simplified)
+    result
+
+  def shrinkExprToSameSize(expr: Expr) =
+    shrinkExprToSize(ir.size(expr).getOrElse(8), expr)
+
+  def shrinkExprToSize(size: Int, expr: Expr): Iterable[Expr] = {
+    val literalShrinks = (expr, expr.getType) match {
+      case (_: Literal, _) => Nil
+      case (_, BoolType) => Iterable(TrueLiteral, FalseLiteral)
+      case (_, BitVecType(1)) if size == 1 => Iterable(BitVecLiteral(BigInt(0), 1), BitVecLiteral(BigInt(1), 1))
+      case (_, BitVecType(_)) =>
+        Shrink.shrink(BitVecLiteral(BigInt(2).pow(size) - 1, size))
+      case _ => Nil
+    }
+
+    implicit val shrink: Shrink[Expr] = Shrink.withLazyList(x => shrinkExprToSameSize(x).to(LazyList))
+
+    val normalShrinks = expr match {
+      case BitVecLiteral(n, _) =>
+        for {
+          newN <- Shrink.shrink(n)
+          if 0 <= newN && newN < BigInt(2).pow(size)
+        } yield BitVecLiteral(newN, size)
+      case IntLiteral(x) => Shrink.shrink(x).map(IntLiteral(_))
+      case n: Literal => Nil
+      case Extract(ed, start, arg) =>
+        for {
+          newArg <- Shrink.shrink(arg)
+        } yield Extract(ed, start, newArg)
+      case Repeat(repeats, arg) =>
+        ZeroExtend(ir.size(expr).get - ir.size(arg).get, arg) +:
+          Shrink.shrink(arg).map(Repeat(repeats, _))
+      case ZeroExtend(bits, arg) =>
+        for {
+          newArg <- Shrink.shrink(arg)
+        } yield ZeroExtend(bits, newArg)
+      case SignExtend(bits, arg) =>
+        for {
+          newArg <- Shrink.shrink(arg)
+        } yield ZeroExtend(bits, newArg)
+      case BinaryExpr(op, arg, arg2) =>
+        LazyList(arg, arg2).filter(_.getType == expr.getType) ++
+          (for {
+            (a1, a2) <- Shrink.shrink((arg, arg2))
+          } yield BinaryExpr(op, a1, a2))
+      case b @ AssocExpr(op, arg) => Nil
+      case UnaryExpr(op, arg) =>
+        println(arg.getType)
+        println(expr.getType)
+        LazyList(arg).filter(_.getType == expr.getType) ++ Shrink.shrink(arg).map(UnaryExpr(op, _))
+      case v: Variable => Nil
+      case f @ FApplyExpr(n, params, rt, _) => Nil
+      case q: QuantifierExpr => Nil
+      case q: LambdaExpr => Nil
+      case OldExpr(x) => Shrink.shrink(x).map(OldExpr(_))
+      case r: SharedMemory => Nil
+      case r: StackMemory => Nil
+    }
+
+    var result: Iterable[Expr] = literalShrinks ++ normalShrinks
+    result = result.flatMap(sliceExprToSize(_, size))
+    val first = result.take(20).toList
+    println("========================")
+    println("size = " + size)
+    println(expr)
+    if (result.isEmpty) {
+      println("no shrinks :( ")
+    } else {
+      println("shrinks: " + " -> " + first)
+    }
+    val conflicting = first.filterNot(x => ir.size(x).forall(_ == size)).toList
+    if (conflicting.nonEmpty) {
+      println("incorrect types!")
+      println(conflicting)
+    }
+    result
+  }
+
+  implicit lazy val shrinkExpr: Shrink[Expr] = Shrink.withLazyList { expr =>
+    val oldSize = ir.size(expr).getOrElse(8)
+    Shrink
+      .shrinkWithOrig(oldSize)
+      .filter(_ > 0)
+      .toList
+      .reverse
+      .iterator
+      .flatMap(size => shrinkExprToSize(size, expr))
+      .to(LazyList)
+  }
 
   def evaluateAbstract(e: Expr): TNum = TNumDomain().evaluateExprToTNum(Map(), e)
 
