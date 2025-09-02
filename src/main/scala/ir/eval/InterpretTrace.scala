@@ -4,9 +4,6 @@ import boogie.Scope
 import ir.*
 import util.IRContext
 import util.functional.*
-import util.functional.State.*
-
-import scala.collection.immutable
 
 enum ExecEffect:
   case Call(target: String, begin: ExecutionContinuation, returnTo: ExecutionContinuation)

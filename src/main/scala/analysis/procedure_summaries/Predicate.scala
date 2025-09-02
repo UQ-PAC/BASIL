@@ -262,7 +262,6 @@ enum GammaTerm {
    * Determines whether the term contains only variables in vars
    */
   def containsOnly(vars: Set[Variable]): Boolean = {
-    import GammaTerm.*
     this match {
       case Lit(x) => true
       case Var(v) => vars.contains(v)
@@ -275,7 +274,6 @@ enum GammaTerm {
 }
 
 object GammaTerm {
-  import GammaTerm.*
 
   val Low = Lit(TrueLiteral)
   val High = Lit(FalseLiteral)

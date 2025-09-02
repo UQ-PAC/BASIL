@@ -3,7 +3,6 @@ package ir.transforms
 import ir.*
 import ir.cilvisitor.*
 import translating.*
-import translating.PrettyPrinter.*
 import util.Logger
 import util.assertion.*
 

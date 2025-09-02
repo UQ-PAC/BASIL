@@ -2,13 +2,11 @@ package gtirb
 
 import com.google.protobuf.ByteString
 import com.grammatech.gtirb.proto.ByteInterval.{Block, ByteInterval}
-import com.grammatech.gtirb.proto.CFG.EdgeType.*
 import com.grammatech.gtirb.proto.CodeBlock.CodeBlock
 import com.grammatech.gtirb.proto.DataBlock.DataBlock
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Section.Section
 import com.grammatech.gtirb.proto.Symbol.Symbol
-import com.grammatech.gtirb.proto.Symbol.Symbol.OptionalPayload
 import gtirb.AuxDecoder.{AuxKind, decodeAux}
 
 import scala.collection.immutable.SortedMap

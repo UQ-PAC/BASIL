@@ -7,7 +7,6 @@ import ir.eval.*
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
-import translating.PrettyPrinter.*
 import util.functional.*
 import util.{ILLoadingConfig, IRContext, IRLoading, IRTransform, LogLevel, Logger, PerformanceTimer}
 

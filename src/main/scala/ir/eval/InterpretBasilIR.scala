@@ -5,8 +5,6 @@ import util.functional.*
 import util.functional.State.*
 import util.{IRContext, Logger}
 
-import scala.collection.immutable
-
 /** Abstraction for memload and variable lookup used by the expression evaluator.
   */
 case class StVarLoader[S, F <: Effects[S, InterpreterError]](f: F) extends Loader[S, InterpreterError] {
