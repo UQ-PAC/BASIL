@@ -309,7 +309,9 @@ class TestKnownBitsInterpreter
 
   def shrinkExprSizes(expr: Expr) =
     val oldSize = ir.size(expr).getOrElse(8)
-    List(1, 3, 8, oldSize).filter(_ <= oldSize)
+    Shrink.shrinkWithOrig(oldSize)
+      .filter(_ > 0)
+      .toList
 
   def shrinkExprToSameSize(expr: Expr) =
     shrinkExprToSize(ir.size(expr), expr)
@@ -383,7 +385,7 @@ class TestKnownBitsInterpreter
     }
 
     val result = (for {
-      size <- sizes.sorted
+      size <- sizes.sorted.iterator
       expr <- literalShrinks.iterator ++ normalShrinks.iterator
       out <- crudeSliceExprToSize(expr, size)
     } yield out).filter {
@@ -391,6 +393,7 @@ class TestKnownBitsInterpreter
             case _ => true
           }
 
+      .distinct
       .to(LazyList)
 
     val first = result.take(20).toList
