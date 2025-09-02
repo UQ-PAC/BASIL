@@ -267,37 +267,72 @@ class TestKnownBitsInterpreter
     e <- genExpr(Some(sz))
   } yield (e))
 
-  def sliceExprToSize(expr: Expr, newSize: Int): Option[Expr] =
-    if (newSize == 0) {
-      return None
+  def crudeSliceExprToSize(expr: Expr, newSize: Int): Option[Expr] =
+    ir.size(expr) match {
+      case Some(size) if size < newSize => return None
+      case None => return Some(expr)
+      case _ => ()
     }
-    if (ir.size(expr).forall(_ == newSize)) {
-      return Some(expr)
-    }
-    val (simplified, changed) = ir.eval.simplifyPaddingAndSlicingExprFixpoint(Extract(0, newSize, expr))
-    println("" + expr + " -> " + newSize + " -> " + simplified + changed)
 
-    val result = Option.when(changed)(simplified)
-    result
+    expr match {
+      case BitVecLiteral(n, _) => Some(BitVecLiteral(n.min(BigInt(2).pow(newSize)-1), newSize))
+      case n: Literal => Some(n)
+      case Extract(ed, start, arg) => crudeSliceExprToSize(arg, newSize)
+      case Repeat(repeats, arg) if ir.size(arg).get >= newSize => crudeSliceExprToSize(arg, newSize)
+      case Repeat(_, _) => None
+      case ZeroExtend(bits, arg) if ir.size(arg).get < newSize => Some(ZeroExtend(newSize - ir.size(arg).get, arg))
+      case SignExtend(bits, arg) if ir.size(arg).get < newSize => Some(SignExtend(newSize - ir.size(arg).get, arg))
+      case ZeroExtend(bits, arg) => crudeSliceExprToSize(arg, newSize)
+      case SignExtend(bits, arg) => crudeSliceExprToSize(arg, newSize)
+      case BinaryExpr(BVCONCAT, arg, arg2) =>
+        val half = newSize / 2
+        val otherhalf = newSize - half
+        for {
+          a1 <- crudeSliceExprToSize(arg, half)
+          a2 <- crudeSliceExprToSize(arg2, otherhalf)
+        } yield BinaryExpr(BVCONCAT, a1, a2)
+      case BinaryExpr(op, arg, arg2) => for {
+        a1 <- crudeSliceExprToSize(arg, newSize)
+        a2 <- crudeSliceExprToSize(arg2, newSize)
+      } yield BinaryExpr(op, a1, a2)
+      case b @ AssocExpr(op, arg) => None
+      case UnaryExpr(op, arg) =>
+        crudeSliceExprToSize(arg, newSize).map(UnaryExpr(op, _))
+      case v: Variable => None
+      case f @ FApplyExpr(n, params, rt, _) => None
+      case q: QuantifierExpr => None
+      case q: LambdaExpr => None
+      case OldExpr(x) => crudeSliceExprToSize(x, newSize).map(OldExpr(_))
+      case r: SharedMemory => None
+      case r: StackMemory => None
+    }
+
+  def shrinkExprSizes(expr: Expr) =
+    val oldSize = ir.size(expr).getOrElse(8)
+    List(1, 3, 8, oldSize).filter(_ <= oldSize)
 
   def shrinkExprToSameSize(expr: Expr) =
-    shrinkExprToSize(ir.size(expr).getOrElse(8), expr)
+    shrinkExprToSize(ir.size(expr), expr)
 
-  def shrinkExprToSize(size: Int, expr: Expr): Iterable[Expr] = {
-    val literalShrinks = (expr, expr.getType) match {
-      case (_: Literal, _) => Nil
-      case (_, BoolType) => Iterable(TrueLiteral, FalseLiteral)
-      case (_, BitVecType(1)) if size == 1 => Iterable(BitVecLiteral(BigInt(0), 1), BitVecLiteral(BigInt(1), 1))
-      case (_, BitVecType(_)) =>
-        Shrink.shrink(BitVecLiteral(BigInt(2).pow(size) - 1, size))
-      case _ => Nil
-    }
+  def shrinkExprToSize(inputSize: Option[Int], expr: Expr): Iterable[Expr] = {
 
     implicit val shrink: Shrink[Expr] = Shrink.withLazyList(x => shrinkExprToSameSize(x).to(LazyList))
+
+    val sizes = inputSize.map(List(_)).getOrElse(shrinkExprSizes(expr))
+    val literalShrinks = expr.getType match {
+      case _ if expr.isInstanceOf[Literal] => Nil
+      case BoolType => Iterable(TrueLiteral, FalseLiteral)
+      case IntType => Shrink.shrink(IntLiteral(BigInt(12389)))
+      case BitVecType(_) if sizes.length <= 1 => inputSize.iterator.flatMap { size =>
+        Shrink.shrinkWithOrig(BitVecLiteral(BigInt(2).pow(size) - 1, size))
+      }
+      case _ => Nil
+    }
 
     val normalShrinks = expr match {
       case BitVecLiteral(n, _) =>
         for {
+          size <- sizes
           newN <- Shrink.shrink(n)
           if 0 <= newN && newN < BigInt(2).pow(size)
         } yield BitVecLiteral(newN, size)
@@ -317,13 +352,23 @@ class TestKnownBitsInterpreter
       case SignExtend(bits, arg) =>
         for {
           newArg <- Shrink.shrink(arg)
-        } yield ZeroExtend(bits, newArg)
+        } yield SignExtend(bits, newArg)
+      case BinaryExpr(op: (BVCmpOp | PolyCmp), arg, arg2) => for {
+        a1 <- shrinkExprToSmallerSize.shrink(arg)
+        a2 <- shrinkExprToSize(Some(ir.size(a1).getOrElse(8)), arg2)
+      } yield BinaryExpr(op, a1, a2)
       case BinaryExpr(op, arg, arg2) =>
         LazyList(arg, arg2).filter(_.getType == expr.getType) ++
           (for {
             (a1, a2) <- Shrink.shrink((arg, arg2))
-          } yield BinaryExpr(op, a1, a2))
+            // if { require(a1.getType != a2.getType); true }
+          } yield BinaryExpr(op, a1, a2)).filter {
+            case BinaryExpr(BVSREM | BVSDIV | BVUREM | BVSMOD | BVUDIV, _, BitVecLiteral(n, _)) if n == BigInt(0) => false
+            case _ => true
+          }
       case b @ AssocExpr(op, arg) => Nil
+      case UnaryExpr(op @ BoolToBV1, arg) =>
+        shrinkExprToSmallerSize.shrink(arg).map(UnaryExpr(op, _))
       case UnaryExpr(op, arg) =>
         println(arg.getType)
         println(expr.getType)
@@ -337,18 +382,28 @@ class TestKnownBitsInterpreter
       case r: StackMemory => Nil
     }
 
-    var result: Iterable[Expr] = literalShrinks ++ normalShrinks
-    result = result.flatMap(sliceExprToSize(_, size))
+    val result = (for {
+      size <- sizes.sorted
+      expr <- literalShrinks.iterator ++ normalShrinks.iterator
+      out <- crudeSliceExprToSize(expr, size)
+    } yield out).filter {
+            case BinaryExpr(BVSREM | BVSDIV | BVUREM | BVSMOD | BVUDIV, _, BitVecLiteral(n, _)) if n == BigInt(0) => false
+            case _ => true
+          }
+
+      .to(LazyList)
+
     val first = result.take(20).toList
     println("========================")
-    println("size = " + size)
+    println("size = " + sizes)
     println(expr)
     if (result.isEmpty) {
       println("no shrinks :( ")
     } else {
       println("shrinks: " + " -> " + first)
     }
-    val conflicting = first.filterNot(x => ir.size(x).forall(_ == size)).toList
+    val sizeSet = sizes.toSet
+    val conflicting = first.filterNot(x => ir.size(x).toSet.subsetOf(sizeSet)).toList
     if (conflicting.nonEmpty) {
       println("incorrect types!")
       println(conflicting)
@@ -356,15 +411,8 @@ class TestKnownBitsInterpreter
     result
   }
 
-  implicit lazy val shrinkExpr: Shrink[Expr] = Shrink.withLazyList { expr =>
-    val oldSize = ir.size(expr).getOrElse(8)
-    Shrink
-      .shrinkWithOrig(oldSize)
-      .filter(_ > 0)
-      .toList
-      .reverse
-      .iterator
-      .flatMap(size => shrinkExprToSize(size, expr))
+  implicit lazy val shrinkExprToSmallerSize: Shrink[Expr] = Shrink.withLazyList { expr =>
+      shrinkExprToSize(None, expr)
       .to(LazyList)
   }
 
