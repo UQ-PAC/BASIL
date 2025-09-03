@@ -574,96 +574,95 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
     TNum(v, mu)
   }
 
-  private inline def mapBoth(f: BitVecLiteral => BitVecLiteral) =
+  inline def mapBoth(f: BitVecLiteral => BitVecLiteral) =
     TNum(f(value), f(mask))
+}
+
+given TypedValueLattice[TNum, IRType] with {
+  def getType(x: TNum) = BitVecType(x.width)
 
   def top(ty: IRType): TNum = ty match {
     case BitVecType(w) => TNum.top(w)
     case ty => throw Exception("unable to construct top TNum for type: " + ty)
   }
 
-  def bottom(ty: IRType): TNum = bottom
-
   // XXX: the reference defines "bottom" as having at least one
   // position which is simultaneously set in the mask and value.
   // it is not clear if this is something that we can do without
   // adding special cases for all the operations to detect and
   // propagate this.
-  def bottom: TNum = throw Exception("TNum has no bit-specific bottom")
-  def meet(x: TNum): TNum = intersect(x)
+  def bottom(ty: IRType): TNum = throw Exception("TNum has no bottom")
+  def bottom: TNum = throw Exception("TNum has no bottom")
 
-  def booland(other: TNum): TNum = bvand(other)
-  def boolnot(): TNum = bvnot()
-  def boolor(other: TNum): TNum = bvor(other)
-  def booltobv1(): TNum = this // bools are already bv1
-  def bvadd(other: TNum): TNum = TADD(other)
-  def bvand(other: TNum): TNum = TAND(other)
-  def bvashr(other: TNum): TNum = TASHR(other)
-  def bvcomp(other: TNum): TNum = TCOMP(other)
-  def bvconcat(other: TNum): TNum = TCONCAT(other)
-  def bvlshr(other: TNum): TNum = TLSHR(other)
-  def bvmul(other: TNum): TNum = TMUL(other)
-  def bvneg(): TNum = TNEG()
-  def bvnot(): TNum = TNOT()
-  def bvor(other: TNum): TNum = TOR(other)
-  def bvsge(other: TNum): TNum = TSGE(other)
-  def bvsgt(other: TNum): TNum = TSGT(other)
-  def bvshl(other: TNum): TNum = TSHL(other)
-  def bvsle(other: TNum): TNum = TSLE(other)
-  def bvslt(other: TNum): TNum = TSLT(other)
-  def bvsub(other: TNum): TNum = TSUB(other)
-  def bvuge(other: TNum): TNum = TUGE(other)
-  def bvugt(other: TNum): TNum = TUGT(other)
-  def bvule(other: TNum): TNum = TULE(other)
-  def bvult(other: TNum): TNum = TULT(other)
-
-  // TODO: TNum division-related functions currently broken
-  def bvsmod(other: TNum): TNum = top
-  def bvsrem(other: TNum): TNum = top
-  def bvudiv(other: TNum): TNum = top
-  def bvurem(other: TNum): TNum = top
-  def bvsdiv(other: TNum): TNum = top
-
-  def bvxor(other: TNum): TNum = TXOR(other)
   def constant(v: ir.Literal): TNum = v match {
     case x: BitVecLiteral => constant(x)
     case TrueLiteral => trueBool
     case FalseLiteral => falseBool
     case IntLiteral(x) => throw Exception("TNum undefined for integers")
   }
-  def equal(other: TNum): TNum = TEQ(other)
-  def extract(hi: Int, lo: Int): TNum = TNum(value(hi, lo), mask(hi, lo))
 
-  def intadd(other: TNum): TNum = bvadd(other)
-  def intdiv(other: TNum): TNum = bvsdiv(other)
-  def intge(other: TNum): TNum = bvsge(other)
-  def intgt(other: TNum): TNum = bvsgt(other)
-  def intle(other: TNum): TNum = bvsle(other)
-  def intlt(other: TNum): TNum = bvslt(other)
-  def intmod(other: TNum): TNum = bvsmod(other)
-  def intmul(other: TNum): TNum = bvmul(other)
-  def intneg(): TNum = bvneg()
-  def intsub(other: TNum): TNum = bvsub(other)
-  def repeat(repeats: Int): TNum =
-    mapBoth(BitVectorEval.repeat_bits(repeats, _))
-  def sign_extend(extend: Int): TNum =
-    mapBoth(InfixBitVectorEval.sign_extend(extend, _))
-  def zero_extend(extend: Int): TNum =
-    mapBoth(InfixBitVectorEval.zero_extend(extend, _))
+  def booland(x: TNum, other: TNum): TNum = x.bvand(other)
+  def boolnot(x: TNum): TNum = x.bvnot()
+  def boolor(x: TNum, other: TNum): TNum = x.bvor(other)
+  def booltobv1(x: TNum): TNum = x.this // bools are already bv1
+  def bvadd(x: TNum, other: TNum): TNum = x.TADD(other)
+  def bvand(x: TNum, other: TNum): TNum = x.TAND(other)
+  def bvashr(x: TNum, other: TNum): TNum = x.TASHR(other)
+  def bvcomp(x: TNum, other: TNum): TNum = x.TCOMP(other)
+  def bvconcat(x: TNum, other: TNum): TNum = x.TCONCAT(other)
+  def bvlshr(x: TNum, other: TNum): TNum = x.TLSHR(other)
+  def bvmul(x: TNum, other: TNum): TNum = x.TMUL(other)
+  def bvneg(x: TNum): TNum = x.TNEG()
+  def bvnot(x: TNum): TNum = x.TNOT()
+  def bvor(x: TNum, other: TNum): TNum = x.TOR(other)
+  def bvsge(x: TNum, other: TNum): TNum = x.TSGE(other)
+  def bvsgt(x: TNum, other: TNum): TNum = x.TSGT(other)
+  def bvshl(x: TNum, other: TNum): TNum = x.TSHL(other)
+  def bvsle(x: TNum, other: TNum): TNum = x.TSLE(other)
+  def bvslt(x: TNum, other: TNum): TNum = x.TSLT(other)
+  def bvsub(x: TNum, other: TNum): TNum = x.TSUB(other)
+  def bvuge(x: TNum, other: TNum): TNum = x.TUGE(other)
+  def bvugt(x: TNum, other: TNum): TNum = x.TUGT(other)
+  def bvule(x: TNum, other: TNum): TNum = x.TULE(other)
+  def bvult(x: TNum, other: TNum): TNum = x.TULT(other)
 
-}
+  // TODO: TNum division-related functions currently broken
+  def bvsmod(x: TNum, other: TNum): TNum = top(x.getType)
+  def bvsrem(x: TNum, other: TNum): TNum = top(x.getType)
+  def bvudiv(x: TNum, other: TNum): TNum = top(x.getType)
+  def bvurem(x: TNum, other: TNum): TNum = top(x.getType)
+  def bvsdiv(x: TNum, other: TNum): TNum = top(x.getType)
+
+  def bvxor(x: TNum, other: TNum): TNum = x.TXOR(other)
+  def equal(x: TNum, other: TNum): TNum = x.TEQ(other)
+  def extract(x: TNum, hi: Int, lo: Int): TNum = TNum(x.value(hi, lo), x.mask(hi, lo))
+
+  def intadd(x: TNum, other: TNum): TNum = x.bvadd(other)
+  def intdiv(x: TNum, other: TNum): TNum = x.bvsdiv(other)
+  def intge(x: TNum, other: TNum): TNum = x.bvsge(other)
+  def intgt(x: TNum, other: TNum): TNum = x.bvsgt(other)
+  def intle(x: TNum, other: TNum): TNum = x.bvsle(other)
+  def intlt(x: TNum, other: TNum): TNum = x.bvslt(other)
+  def intmod(x: TNum, other: TNum): TNum = x.bvsmod(other)
+  def intmul(x: TNum, other: TNum): TNum = x.bvmul(other)
+  def intneg(x: TNum): TNum = x.bvneg()
+  def intsub(x: TNum, other: TNum): TNum = x.bvsub(other)
+  def repeat(x: TNum, repeats: Int): TNum = x.mapBoth(BitVectorEval.repeat_bits(repeats, _))
+  def sign_extend(x: TNum, extend: Int): TNum = x.mapBoth(InfixBitVectorEval.sign_extend(extend, _))
+  def zero_extend(x: TNum, extend: Int): TNum = x.mapBoth(InfixBitVectorEval.zero_extend(extend, _))
+  }
 
 def knownBitsAnalysis(p: Program) = {
   applyRPO(p)
-  val lattice = DefaultValueLattice(TypedLattice.Top(TNum.top(1)), None)
-  val solver = transforms.worklistSolver(ValueStateDomain(lattice.top, DefaultTransfer(lattice), lattice))
+  // val lattice = DefaultValueLattice(TypedLattice.Top(TNum.top(1)), None)
+  // val solver = transforms.worklistSolver(ValueStateDomain(lattice.top, DefaultTransfer(lattice), lattice))
   val (beforeIn, afterIn) = solver.solveProgIntraProc(p, backwards = false)
   (beforeIn, afterIn)
 }
 
 class SimplifyKnownBits() {
-  val lattice = DefaultValueLattice(TypedLattice.Top(TNum.top(1)), None)
-  val solver = transforms.worklistSolver(ValueStateDomain(lattice.top, DefaultTransfer(lattice), lattice))
+  // val lattice = DefaultValueLattice(TypedLattice.Top(TNum.top(1)), None)
+  // val solver = transforms.worklistSolver(ValueStateDomain(lattice.top, DefaultTransfer(lattice), lattice))
 
   def applyTransform(p: Program): Unit = {
     for (proc <- p.procedures) {

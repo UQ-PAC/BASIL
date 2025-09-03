@@ -494,14 +494,11 @@ class DefaultTransfer[L](eval: AbsEvalExpr[L])(using lattice: Lattice[L])
   def jump(v: LatticeMap[Variable, L], m: Jump): LatticeMap[Variable, L] = v
 }
 
-class ValueStateDomain[L <: InternalLattice[L]](
-  lattice: L,
+class ValueStateDomain[L](
   transferFn: TransferFun[LatticeMap[Variable, L]],
   innerLattice: AbsEvalExpr[L]
-) extends MapDomain[Variable, L] {
+)(using lattice: ValueLattice[L]) extends MapDomain[Variable, L] {
   //  val innerLattice : DefaultValueLattice[L] = DefaultValueLattice[L](topValue)
-
-  given v: L = lattice
 
   def botTerm: L = lattice.bottom
   def joinTerm(a: L, b: L, pos: ir.Block): L = a.join(b)

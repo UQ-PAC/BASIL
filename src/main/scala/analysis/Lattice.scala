@@ -47,11 +47,11 @@ trait Lattice[T]:
     */
   def top: T
 
-  /** The least upper bound of `x` and `y`.
+  /** The least upper bound of `x` and `y`, i.e., "join".
     */
   def lub(x: T, y: T): T
 
-  /** The greatest lower bound of `x` and `y`.
+  /** The greatest lower bound of `x` and `y`, i.e., "meet".
     */
   def glb(x: T, y: T): T
 
