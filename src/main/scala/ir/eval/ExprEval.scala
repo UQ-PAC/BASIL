@@ -189,7 +189,7 @@ def fastPartialEvalExprTopLevel(exp: Expr): (Expr, Boolean) = {
       logSimp(exp, if (evalBoolLogBinExpr(op, l.value, r.value)) then TrueLiteral else FalseLiteral)
     case ZeroExtend(e, l: BitVecLiteral) => logSimp(exp, BitVectorEval.smt_zero_extend(e, l))
     case SignExtend(e, l: BitVecLiteral) => logSimp(exp, BitVectorEval.smt_sign_extend(e, l))
-    case Extract(e, b, l: BitVecLiteral) => logSimp(exp, BitVectorEval.boogie_extract(b, e, l))
+    case Extract(e, b, l: BitVecLiteral) => logSimp(exp, BitVectorEval.boogie_extract(e, b, l))
     case Repeat(reps, b: BitVecLiteral) => {
       debugAssert(reps > 0)
       if (reps == 1) logSimp(exp, b)

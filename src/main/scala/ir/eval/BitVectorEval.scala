@@ -149,22 +149,13 @@ object BitVectorEval {
   /** ((_ extract i j) (_ BitVec m) (_ BitVec n))
     *
     * extraction of bits i down to j from a bitvector of size m to yield a new bitvector of size n, where n = i - j + 1
-    * ```
-    * [[((_ extract i j) s))]] := λx:[0, i-j+1). [[s]](j + x)
-    * where s is of sort (_ BitVec l), 0 ≤ j ≤ i < l.
-    * ```
-    *
-    * That is, `smt_extract(hi, lo, e)` where `hi` and `lo` are both *inclusive*.
     */
   def smt_extract(i: Int, j: Int, s: BitVecLiteral): BitVecLiteral = {
     require(i >= j)
     BitVecLiteral((s.value >> j) & ((BigInt(1) << (i - j + 1)) - 1), i - j + 1)
   }
 
-  /** Boogie unintuitively uses a slightly different extract operator to SMT-Lib. We are matching the Boogie semantics.
-    *
-    * I gather this means `boogie_extract(hi_exclusive, lo, e)`, where `hi_exclusive` is exclusive
-    * (unlike [[smt_extract]]).
+  /** Boogie unintuitively uses a slightly different extract operator to SMT-Lib. We are matching the Boogie semantics
     */
   def boogie_extract(i: Int, j: Int, s: BitVecLiteral): BitVecLiteral = smt_extract(i - 1, j, s)
 
