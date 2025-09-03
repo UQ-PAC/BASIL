@@ -579,6 +579,8 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
 }
 
 given TypedValueLattice[TNum, IRType] with {
+  import TNum.*
+
   def getType(x: TNum) = BitVecType(x.width)
 
   def top(ty: IRType): TNum = ty match {
@@ -604,7 +606,7 @@ given TypedValueLattice[TNum, IRType] with {
   def booland(x: TNum, other: TNum): TNum = x.bvand(other)
   def boolnot(x: TNum): TNum = x.bvnot()
   def boolor(x: TNum, other: TNum): TNum = x.bvor(other)
-  def booltobv1(x: TNum): TNum = x.this // bools are already bv1
+  def booltobv1(x: TNum): TNum = x // bools are already bv1
   def bvadd(x: TNum, other: TNum): TNum = x.TADD(other)
   def bvand(x: TNum, other: TNum): TNum = x.TAND(other)
   def bvashr(x: TNum, other: TNum): TNum = x.TASHR(other)

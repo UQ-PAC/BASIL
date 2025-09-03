@@ -184,17 +184,17 @@ given [T, I](using lattice: TypedValueLattice[T, I]): ValueLattice[IndexedLattic
       case (Elem(x), Elem(y)) => Right((x, y))
     }
 
-  inline def checkBinaryWidths(x: T, y: T): Either[IndexedLattice[T, I], (T, T)] =
+  inline def checkBinaryWidths(x: IndexedLattice[T, I], y: IndexedLattice[T, I]): Either[IndexedLattice[T, I], (T, T)] =
     (x, y) match {
       case (Elem(x), Elem(y)) if x.getType != y.getType => Left(lattice.handleConflictingTypes(x, y))
       case (Elem(x), Elem(y)) => Right((x, y))
     }
 
   def checkBinary(x: IndexedLattice[T, I], y: IndexedLattice[T, I])(f: (T, T) => T): IndexedLattice[T, I] =
-    (for {
-      (x, y) <- checkBinaryTopBot(x, y)
-      (x, y) <- checkBinaryWidths(x, y)
-    } yield Elem(f(x, y))).fold(identity, identity)
+    checkBinaryTopBot(x, y)
+      .flatMap { case (x, y) => checkBinaryWidths(Elem(x), Elem(y)) }
+      .map { case (x, y) => Elem[T, I](f(x, y)) }
+      .fold(identity, identity)
 
   def checkUnary(x: IndexedLattice[T, I])(f: T => T): IndexedLattice[T, I] = {
     x match {
@@ -245,7 +245,7 @@ given [T, I](using lattice: TypedValueLattice[T, I]): ValueLattice[IndexedLattic
   def bvsgt(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvsgt` _)
   def bvsge(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvsge` _)
   def bvuge(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvuge` _)
-  def bvconcat(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinaryTopBot(x, y)(_ `bvconcat` _)
+  def bvconcat(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinaryTopBot(x, y).map(_ `bvconcat` _).map(Elem[T, I](_)).fold(identity, identity)
 
   def intlt(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `intlt` _)
   def intle(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `intle` _)
@@ -497,7 +497,7 @@ class DefaultTransfer[L](eval: AbsEvalExpr[L])(using lattice: Lattice[L])
 class ValueStateDomain[L](
   transferFn: TransferFun[LatticeMap[Variable, L]],
   innerLattice: AbsEvalExpr[L]
-)(using lattice: ValueLattice[L]) extends MapDomain[Variable, L] {
+)(using lattice: Lattice[L]) extends MapDomain[Variable, L] {
   //  val innerLattice : DefaultValueLattice[L] = DefaultValueLattice[L](topValue)
 
   def botTerm: L = lattice.bottom
@@ -530,13 +530,16 @@ def valueAnalysis[L <: ValueLattice[L]](topValue: L)(p: Procedure) = {
   solve.solveProc(p, backwards = false)
 }
 
-def productValueAnalysis[L1 <: ValueLattice[L1], L2 <: ValueLattice[L2]](topValue1: L1, topValue2: L2)(p: Procedure) = {
-  val l = ProductValueLattice[L1, L2](topValue1, topValue2)
+def productValueAnalysis[L1, L2](l1: TypedValueLattice[L1, IRType], l2: TypedValueLattice[L2, IRType])(p: Procedure) = {
+
+  given TypedValueLattice[L1, IRType] = l1
+  given TypedValueLattice[L2, IRType] = l2
+
+  val l = ProductValueLattice[L1, L2](using l1, l2)
   val d = ValueStateDomain[ProductInternalLattice[L1, L2]](
-    ProductInternalLattice(topValue1, topValue2),
     DefaultTransfer(l),
-    l
-  )
+    ProductValueLattice(using l1, l2)
+  )(using l)
   val solve = ir.transforms.worklistSolver(d)
   solve.solveProc(p, backwards = false)
 }
