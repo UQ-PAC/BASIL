@@ -4,8 +4,6 @@ import ir.*
 
 type VarGammaMap = LatticeMap[Variable, LatticeSet[Variable]]
 
-implicit val variableLatticeSetTerm: LatticeSet[Variable] = LatticeSet.Bottom()
-
 /**
  * An abstract domain that determines for each variable, a set of variables whose gammas (at
  * the start of a procedure) are "affected" this variable's gamma. This is paramaterised by
@@ -220,13 +218,19 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
       case SimulAssign(assigns, _) => {
-        val terms = assigns.map((l, r) => (BVTerm.Var(l), exprToBVTerm(r).get))
-        val gammas = assigns.map((l, r) => (GammaTerm.Var(l), exprToGammaTerm(r).get))
+        val terms = assigns.map((l, r) => (BVTerm.Var(l), exprToBVTerm(r)))
+        val gammas = assigns.map((l, r) => (GammaTerm.Var(l), exprToGammaTerm(r)))
         val nb = terms.foldLeft(b) { case (acc, (l, r)) =>
-          acc.replace(l, r)
+          r match {
+            case Some(rhs) => acc.replace(l, rhs)
+            case None => acc.remove(l, Predicate.True) // TODO verify soundness
+          }
         }
         gammas.foldLeft(nb) { case (acc, (l, r)) =>
-          acc.replace(l, r)
+          r match {
+            case Some(rhs) => acc.replace(l, rhs)
+            case None => acc.remove(l, Predicate.True) // TODO verify soundness
+          }
         }
       }
       case a: MemoryAssign =>

@@ -24,8 +24,10 @@ trait EdgeFunction[T] extends (T => T) {
 class EdgeFunctionLattice[T, L <: Lattice[T]](val valuelattice: L) extends Lattice[EdgeFunction[T]] {
 
   val bottom: ConstEdge = ConstEdge(valuelattice.bottom)
+  def top: Nothing = ???
 
   def lub(x: EdgeFunction[T], y: EdgeFunction[T]): EdgeFunction[T] = x.joinWith(y)
+  def glb(x: EdgeFunction[T], y: EdgeFunction[T]): Nothing = ???
 
   /** Edge labeled with identity function.
     */

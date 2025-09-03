@@ -1,4 +1,5 @@
 import analysis.*
+import analysis.given
 import ir.*
 import ir.dsl.*
 import ir.transforms.{reversePostOrder, worklistSolver}
@@ -15,6 +16,13 @@ class GammaDomainTests extends AnyFunSuite, CaptureOutput {
   def getMustGammaDomainResults(procedure: Procedure, initialState: VarGammaMap): Map[Block, VarGammaMap] = {
     reversePostOrder(procedure)
     val (before, after) = worklistSolver(MustGammaDomain(initialState)).solveProc(procedure, false)
+    after
+  }
+
+  def getWpDualResults(procedure: Procedure): Map[Block, Predicate] = {
+    reversePostOrder(procedure)
+    val domain = WpDualDomain(_ => ProcedureSummary(List(), List()))
+    val (before, after) = worklistSolver(domain).solveProc(procedure, true)
     after
   }
 
@@ -35,7 +43,7 @@ class GammaDomainTests extends AnyFunSuite, CaptureOutput {
     val gammaResults = getMustGammaDomainResults(f, initialState)
     val reachability = getReachabilityConditions(f)
 
-    assert(latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0, LatticeSetLattice()) == LatticeSet.Bottom())
+    assert(latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0) == LatticeSet.Bottom())
     assert(reachability(f.labelToBlock("returnBlock")) == Predicate.True)
   }
 
@@ -57,7 +65,7 @@ class GammaDomainTests extends AnyFunSuite, CaptureOutput {
     val reachability = getReachabilityConditions(f)
 
     assert(
-      latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0, LatticeSetLattice()) == LatticeSet
+      latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0) == LatticeSet
         .FiniteSet(Set(R0))
     )
     // TODO is this right?!
@@ -87,7 +95,7 @@ class GammaDomainTests extends AnyFunSuite, CaptureOutput {
     val gammaResults = getMustGammaDomainResults(f, initialState)
 
     assert(
-      latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0, LatticeSetLattice()) == LatticeSet
+      latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0) == LatticeSet
         .FiniteSet(Set(R2))
     )
     assert(
@@ -97,5 +105,23 @@ class GammaDomainTests extends AnyFunSuite, CaptureOutput {
         .split
         .contains(Predicate.gammaLeq(GammaTerm.Var(R0), GammaTerm.OldVar(R2)))
     )
+  }
+
+  test("fApplyExpr") {
+    val program = prog(
+      proc("main", block("main", directCall("f"), goto("mainRet")), block("mainRet", ret)),
+      proc(
+        "f",
+        block(
+          "assign",
+          LocalAssign(R0, FApplyExpr("__VERIFIER_nondet_uint", Seq(), BitVecType(32), true), None),
+          goto("returnBlock")
+        ),
+        block("returnBlock", ret)
+      )
+    )
+    val f = program.nameToProcedure("f")
+    val wpDualResults = getWpDualResults(f)
+    // should have not panicked
   }
 }

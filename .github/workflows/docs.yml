@@ -48,6 +48,10 @@ jobs:
         with:
           path: ${{ steps.allDocs.outputs.dir }}
 
+      - run: |
+          ! grep --after-context=3 'Error\|Warning' out/scalaDocGenerated.log
+        name: check for scaladoc warnings
+
       - id: docArgs
         run: echo "args=$(.github/workflows/check-doc-links.sh)" >> "$GITHUB_OUTPUT"
         env:

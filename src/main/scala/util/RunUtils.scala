@@ -2,6 +2,7 @@ package util
 
 import Parsers.*
 import analysis.data_structure_analysis.*
+import analysis.given
 import analysis.{Interval as _, *}
 import bap.*
 import boogie.*
