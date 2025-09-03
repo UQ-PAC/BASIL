@@ -1,5 +1,4 @@
-import analysis.*
-import analysis.given_TypedValueLattice_TNum_IRType
+import analysis.{given_TypedValueLattice_TNum_IRType, *}
 import ir.dsl.*
 import ir.eval.*
 import ir.{dsl, *}

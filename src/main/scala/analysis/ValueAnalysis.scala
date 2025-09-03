@@ -55,7 +55,6 @@ trait ValueLattice[ValueType] extends Lattice[ValueType] {
   def repeat(x: ValueType, repeats: Int): ValueType
   def extract(x: ValueType, hi: Int, lo: Int): ValueType
 
-
 }
 
 extension [ValueType](x: ValueType)(using lattice: ValueLattice[ValueType]) {
@@ -111,8 +110,6 @@ extension [ValueType](x: ValueType)(using lattice: ValueLattice[ValueType]) {
   def extract(hi: Int, lo: Int): ValueType = lattice.extract(x, hi: Int, lo: Int)
 }
 
-
-
 /**
  * A lattice which extends [[ValueLattice]] with an understanding of lattice
  * element *types*. That is, lattice elements each have an intrinsic "type",
@@ -141,16 +138,12 @@ trait TypedValueLattice[ValueType, TypeType] extends ValueLattice[ValueType] {
   def bottom(ty: TypeType): ValueType
 
   def handleConflictingTypes(x: ValueType, y: ValueType): IndexedLattice[ValueType, TypeType] =
-    throw new Exception(
-      s"attempted lattice operation on incompatible ${getClass.getName} values: '$x' and '$y'"
-    )
+    throw new Exception(s"attempted lattice operation on incompatible ${getClass.getName} values: '$x' and '$y'")
 }
-
 
 extension [ValueType, TypeType](x: ValueType)(using lattice: TypedValueLattice[ValueType, TypeType]) {
   def getType: TypeType = lattice.getType(x)
 }
-
 
 /**
  * Derives a lattice for all types from the given type-specific [[TypedValueLattice]].
@@ -245,7 +238,8 @@ given [T, I](using lattice: TypedValueLattice[T, I]): ValueLattice[IndexedLattic
   def bvsgt(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvsgt` _)
   def bvsge(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvsge` _)
   def bvuge(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvuge` _)
-  def bvconcat(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinaryTopBot(x, y).map(_ `bvconcat` _).map(Elem[T, I](_)).fold(identity, identity)
+  def bvconcat(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) =
+    checkBinaryTopBot(x, y).map(_ `bvconcat` _).map(Elem[T, I](_)).fold(identity, identity)
 
   def intlt(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `intlt` _)
   def intle(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `intle` _)
@@ -427,7 +421,10 @@ given [V1, V2](using a: Lattice[V1], b: Lattice[V2]): Lattice[ProductInternalLat
   def bottom = (ProductInternalLattice(a.bottom, b.bottom))
 }
 
-class ProductValueLattice[V1, V2](using lattice1: TypedValueLattice[V1, IRType], lattice2: TypedValueLattice[V2, IRType]) extends AbsEvalExpr[ProductInternalLattice[V1, V2]] {
+class ProductValueLattice[V1, V2](using
+  lattice1: TypedValueLattice[V1, IRType],
+  lattice2: TypedValueLattice[V2, IRType]
+) extends AbsEvalExpr[ProductInternalLattice[V1, V2]] {
 
   val top = ProductInternalLattice(lattice1.top, lattice2.top)
   def bottom: ProductInternalLattice[V1, V2] = ???
@@ -448,17 +445,14 @@ class ProductValueLattice[V1, V2](using lattice1: TypedValueLattice[V1, IRType],
   val eval1 = EvaluateInLattice[V1]()
   val eval2 = EvaluateInLattice[V2]()
 
-  def evalExpr(
-    read: Variable => Option[ProductInternalLattice[V1, V2]]
-  )(e: Expr): ProductInternalLattice[V1, V2] = {
+  def evalExpr(read: Variable => Option[ProductInternalLattice[V1, V2]])(e: Expr): ProductInternalLattice[V1, V2] = {
     val v1 = eval1.evalExpr(v => read(v).map(_._1))(e)
     val v2 = eval2.evalExpr(v => read(v).map(_._2))(e)
     refine((v1, v2))
   }
 }
 
-class DefaultValueLattice[Value](using lattice: TypedValueLattice[Value, IRType])
-    extends AbsEvalExpr[Value] {
+class DefaultValueLattice[Value](using lattice: TypedValueLattice[Value, IRType]) extends AbsEvalExpr[Value] {
   val eval = EvaluateInLattice[Value]()
 
   def top = lattice.top
@@ -475,8 +469,7 @@ trait TransferFun[L] {
   def jump(v: L, m: Jump): L
 }
 
-class DefaultTransfer[L](eval: AbsEvalExpr[L])(using lattice: Lattice[L])
-    extends TransferFun[LatticeMap[Variable, L]] {
+class DefaultTransfer[L](eval: AbsEvalExpr[L])(using lattice: Lattice[L]) extends TransferFun[LatticeMap[Variable, L]] {
 
   def assign(v: LatticeMap[Variable, L], assignments: Seq[(Variable, Expr)]): LatticeMap[Variable, L] = {
     val get = v.toMap.get
@@ -501,10 +494,9 @@ class DefaultTransfer[L](eval: AbsEvalExpr[L])(using lattice: Lattice[L])
   def jump(v: LatticeMap[Variable, L], m: Jump): LatticeMap[Variable, L] = v
 }
 
-class ValueStateDomain[L](
-  transferFn: TransferFun[LatticeMap[Variable, L]],
-  innerLattice: AbsEvalExpr[L]
-)(using lattice: Lattice[L]) extends MapDomain[Variable, L] {
+class ValueStateDomain[L](transferFn: TransferFun[LatticeMap[Variable, L]], innerLattice: AbsEvalExpr[L])(using
+  lattice: Lattice[L]
+) extends MapDomain[Variable, L] {
   //  val innerLattice : DefaultValueLattice[L] = DefaultValueLattice[L](topValue)
 
   def botTerm: L = lattice.bottom

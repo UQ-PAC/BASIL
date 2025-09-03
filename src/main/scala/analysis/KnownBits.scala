@@ -657,7 +657,7 @@ given TypedValueLattice[TNum, IRType] with {
   def repeat(x: TNum, repeats: Int): TNum = x.mapBoth(BitVectorEval.repeat_bits(repeats, _))
   def sign_extend(x: TNum, extend: Int): TNum = x.mapBoth(InfixBitVectorEval.sign_extend(extend, _))
   def zero_extend(x: TNum, extend: Int): TNum = x.mapBoth(InfixBitVectorEval.zero_extend(extend, _))
-  }
+}
 
 def knownBitsAnalysis(p: Program) = {
   applyRPO(p)
