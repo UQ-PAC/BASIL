@@ -1,4 +1,5 @@
 import analysis.*
+import analysis.given_TypedValueLattice_TNum_IRType
 import ir.dsl.*
 import ir.eval.*
 import ir.{dsl, *}
@@ -142,8 +143,8 @@ class TestKnownBitsInterpreter
   )
 
   def testInterpret(arg1: BigInt, arg2: BigInt) = {
-    def convert(map: LatticeMap[Variable, TypedLattice[TNum]]): Map[Variable, TNum] = {
-      map.toMap.collect { case (k, TypedLattice.Elem(v)) => k -> v }
+    def convert(map: LatticeMap[Variable, TNum]): Map[Variable, TNum] = {
+      map.toMap.collect { case (k, (v)) => k -> v }
     }
     val testResult = analysis
       .knownBitsAnalysis(kbitsCtx.program)
@@ -273,7 +274,7 @@ class TestKnownBitsInterpreter
     e <- genExpr(Some(sz))
   } yield (e))
 
-  def evaluateAbstract(e: Expr): TNum = EvaluateInLattice(TNum.top(1)).evalExpr(_ => None)(e)
+  def evaluateAbstract(e: Expr): TNum = EvaluateInLattice[TNum]().evalExpr(_ => None)(e)
 
   test("TNUM soundness property") {
     forAll(minSuccessful(50000)) { (e: Expr) =>

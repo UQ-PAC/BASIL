@@ -184,15 +184,15 @@ given [T, I](using lattice: TypedValueLattice[T, I]): ValueLattice[IndexedLattic
       case (Elem(x), Elem(y)) => Right((x, y))
     }
 
-  inline def checkBinaryWidths(x: IndexedLattice[T, I], y: IndexedLattice[T, I]): Either[IndexedLattice[T, I], (T, T)] =
+  inline def checkBinaryWidths(x: T, y: T): Either[IndexedLattice[T, I], (T, T)] =
     (x, y) match {
-      case (Elem(x), Elem(y)) if x.getType != y.getType => Left(lattice.handleConflictingTypes(x, y))
-      case (Elem(x), Elem(y)) => Right((x, y))
+      case (x, y) if x.getType != y.getType => Left(lattice.handleConflictingTypes(x, y))
+      case (x, y) => Right((x, y))
     }
 
   def checkBinary(x: IndexedLattice[T, I], y: IndexedLattice[T, I])(f: (T, T) => T): IndexedLattice[T, I] =
     checkBinaryTopBot(x, y)
-      .flatMap { case (x, y) => checkBinaryWidths(Elem(x), Elem(y)) }
+      .flatMap { case (x, y) => checkBinaryWidths(x, y) }
       .map { case (x, y) => Elem[T, I](f(x, y)) }
       .fold(identity, identity)
 
@@ -267,8 +267,13 @@ given [T, I](using lattice: TypedValueLattice[T, I]): ValueLattice[IndexedLattic
 }
 
 class NOPValueAnalysis[ValueType]() extends ValueLattice[ValueType] {
+  def top: ValueType = ???
+  def bottom: ValueType = ???
   def top(ty: IRType): ValueType = ???
   def bottom(ty: IRType): ValueType = ???
+
+  def glb(x: ValueType, y: ValueType) = top
+  def lub(x: ValueType, y: ValueType) = top
 
   def bvnot(x: ValueType): ValueType = top
   def bvneg(x: ValueType): ValueType = top
@@ -402,7 +407,7 @@ class EvaluateInLattice[Value](using lattice: TypedValueLattice[Value, IRType]) 
   }
 }
 
-trait AbsEvalExpr[AbsValue] extends Lattice[AbsValue] {
+trait AbsEvalExpr[AbsValue] {
   def top: AbsValue
   def evalExpr(read: Variable => Option[AbsValue])(e: Expr): AbsValue
 }
@@ -424,9 +429,10 @@ given [V1, V2](using a: Lattice[V1], b: Lattice[V2]): Lattice[ProductInternalLat
 
 class ProductValueLattice[V1, V2](using lattice1: TypedValueLattice[V1, IRType], lattice2: TypedValueLattice[V2, IRType]) extends AbsEvalExpr[ProductInternalLattice[V1, V2]] {
 
-  override val top = ProductInternalLattice(lattice1.top, lattice2.top)
-  override def bottom: ProductInternalLattice[V1, V2] = ???
-  override def lub(x: ProductInternalLattice[V1, V2], y: ProductInternalLattice[V1, V2]) = x.join(y)
+  val top = ProductInternalLattice(lattice1.top, lattice2.top)
+  def bottom: ProductInternalLattice[V1, V2] = ???
+  def lub(x: ProductInternalLattice[V1, V2], y: ProductInternalLattice[V1, V2]) = x.join(y)
+  def glb(x: ProductInternalLattice[V1, V2], y: ProductInternalLattice[V1, V2]) = ???
 
   def refine(v: (V1, V2)): ProductInternalLattice[V1, V2] = {
     val (v1, v2) = v
@@ -451,10 +457,11 @@ class ProductValueLattice[V1, V2](using lattice1: TypedValueLattice[V1, IRType],
   }
 }
 
-class DefaultValueLattice[Value](using TypedValueLattice[Value, IRType])
+class DefaultValueLattice[Value](using lattice: TypedValueLattice[Value, IRType])
     extends AbsEvalExpr[Value] {
   val eval = EvaluateInLattice[Value]()
 
+  def top = lattice.top
   def evalExpr(read: Variable => Option[Value])(e: Expr): Value = eval.evalExpr(read)(e)
 }
 
@@ -523,23 +530,20 @@ class ValueStateDomain[L](
 
 }
 
-def valueAnalysis[L <: ValueLattice[L]](topValue: L)(p: Procedure) = {
-  val l = DefaultValueLattice(topValue)
-  val d = ValueStateDomain(topValue, DefaultTransfer(l), l)
+def valueAnalysis[L](lattice: TypedValueLattice[L, IRType])(p: Procedure) = {
+  val l = DefaultValueLattice(using lattice)
+  val d = ValueStateDomain(DefaultTransfer(l)(using lattice), l)(using lattice)
   val solve = ir.transforms.worklistSolver(d)
   solve.solveProc(p, backwards = false)
 }
 
 def productValueAnalysis[L1, L2](l1: TypedValueLattice[L1, IRType], l2: TypedValueLattice[L2, IRType])(p: Procedure) = {
-
-  given TypedValueLattice[L1, IRType] = l1
-  given TypedValueLattice[L2, IRType] = l2
-
+  val productLattice = given_Lattice_ProductInternalLattice(using l1, l2)
   val l = ProductValueLattice[L1, L2](using l1, l2)
   val d = ValueStateDomain[ProductInternalLattice[L1, L2]](
-    DefaultTransfer(l),
+    DefaultTransfer(l)(using productLattice),
     ProductValueLattice(using l1, l2)
-  )(using l)
+  )(using productLattice)
   val solve = ir.transforms.worklistSolver(d)
   solve.solveProc(p, backwards = false)
 }

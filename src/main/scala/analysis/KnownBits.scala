@@ -596,12 +596,17 @@ given TypedValueLattice[TNum, IRType] with {
   def bottom(ty: IRType): TNum = throw Exception("TNum has no bottom")
   def bottom: TNum = throw Exception("TNum has no bottom")
 
+  def top: TNum = throw Exception("TNum has no universal top")
+
   def constant(v: ir.Literal): TNum = v match {
     case x: BitVecLiteral => constant(x)
     case TrueLiteral => trueBool
     case FalseLiteral => falseBool
     case IntLiteral(x) => throw Exception("TNum undefined for integers")
   }
+
+  def glb(x: TNum, y: TNum) = x.meet(y)
+  def lub(x: TNum, y: TNum) = x.join(y)
 
   def booland(x: TNum, other: TNum): TNum = x.bvand(other)
   def boolnot(x: TNum): TNum = x.bvnot()
@@ -656,15 +661,16 @@ given TypedValueLattice[TNum, IRType] with {
 
 def knownBitsAnalysis(p: Program) = {
   applyRPO(p)
-  // val lattice = DefaultValueLattice(TypedLattice.Top(TNum.top(1)), None)
-  // val solver = transforms.worklistSolver(ValueStateDomain(lattice.top, DefaultTransfer(lattice), lattice))
+  val lattice = DefaultValueLattice[TNum]()
+  val solver = transforms.worklistSolver(ValueStateDomain(DefaultTransfer(lattice), lattice))
+
   val (beforeIn, afterIn) = solver.solveProgIntraProc(p, backwards = false)
   (beforeIn, afterIn)
 }
 
 class SimplifyKnownBits() {
-  // val lattice = DefaultValueLattice(TypedLattice.Top(TNum.top(1)), None)
-  // val solver = transforms.worklistSolver(ValueStateDomain(lattice.top, DefaultTransfer(lattice), lattice))
+  val lattice = DefaultValueLattice[TNum]()
+  val solver = transforms.worklistSolver(ValueStateDomain(DefaultTransfer(lattice), lattice))
 
   def applyTransform(p: Program): Unit = {
     for (proc <- p.procedures) {
