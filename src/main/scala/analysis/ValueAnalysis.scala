@@ -126,23 +126,12 @@ extension [ValueType](x: ValueType)(using lattice: ValueLattice[ValueType]) {
  */
 trait TypedValueLattice[ValueType, TypeType] extends ValueLattice[ValueType] {
 
-  /**
-   * Returns the "type" of the given lattice element.
-   */
-  def getType(x: ValueType): TypeType
-
   /** Returns a type-*dependent* top value. */
   def top(ty: TypeType): ValueType
 
   /** Returns a type-*dependent* bottom value. */
   def bottom(ty: TypeType): ValueType
 
-  def handleConflictingTypes(x: ValueType, y: ValueType): IndexedLattice[ValueType, TypeType] =
-    throw new Exception(s"attempted lattice operation on incompatible ${getClass.getName} values: '$x' and '$y'")
-}
-
-extension [ValueType, TypeType](x: ValueType)(using lattice: TypedValueLattice[ValueType, TypeType]) {
-  def getType: TypeType = lattice.getType(x)
 }
 
 /**
@@ -160,36 +149,41 @@ extension [ValueType, TypeType](x: ValueType)(using lattice: TypedValueLattice[V
  * methods are _never_ called&mdash;instead, these are implemented by returning [[TypedLattice.Top]]
  * and [[TypedLattice.Bot]], respectively.
  */
-enum IndexedLattice[T, I] {
-  case Bot[T, I]() extends IndexedLattice[T, I]
-  case Elem[T, I](inner: T) extends IndexedLattice[T, I]
-  case Top[T, I]() extends IndexedLattice[T, I]
+enum IndexedLattice[T] {
+  case Bot[T]() extends IndexedLattice[T]
+  case Elem[T](inner: T) extends IndexedLattice[T]
+  case Top[T]() extends IndexedLattice[T]
 }
 
-given [T, I](using lattice: TypedValueLattice[T, I]): ValueLattice[IndexedLattice[T, I]] with {
+def defaultHandleConflictingTypes[T](x: T, y: T): IndexedLattice[T] =
+  throw new Exception(s"attempted lattice operation on incompatible ${x.getClass.getName} values: '$x' and '$y'")
+
+class IndexedValueLattice[T, I](getType: T => I,
+  handleConflictingTypes: (T, T) => IndexedLattice[T] = defaultHandleConflictingTypes[T]
+  )(using lattice: TypedValueLattice[T, I]) extends TypedValueLattice[IndexedLattice[T], I] {
 
   import IndexedLattice.{Bot, Elem, Top}
 
-  inline def checkBinaryTopBot(x: IndexedLattice[T, I], y: IndexedLattice[T, I]): Either[IndexedLattice[T, I], (T, T)] =
+  inline def checkBinaryTopBot(x: IndexedLattice[T], y: IndexedLattice[T]): Either[IndexedLattice[T], (T, T)] =
     (x, y) match {
       case (Bot(), _) | (_, Bot()) => Left(Bot())
       case (Top(), _) | (_, Top()) => Left(Top())
       case (Elem(x), Elem(y)) => Right((x, y))
     }
 
-  inline def checkBinaryWidths(x: T, y: T): Either[IndexedLattice[T, I], (T, T)] =
+  inline def checkBinaryWidths(x: T, y: T): Either[IndexedLattice[T], (T, T)] =
     (x, y) match {
-      case (x, y) if x.getType != y.getType => Left(lattice.handleConflictingTypes(x, y))
+      case (x, y) if getType(x) != getType(y) => Left(handleConflictingTypes(x, y))
       case (x, y) => Right((x, y))
     }
 
-  def checkBinary(x: IndexedLattice[T, I], y: IndexedLattice[T, I])(f: (T, T) => T): IndexedLattice[T, I] =
+  def checkBinary(x: IndexedLattice[T], y: IndexedLattice[T])(f: (T, T) => T): IndexedLattice[T] =
     checkBinaryTopBot(x, y)
       .flatMap { case (x, y) => checkBinaryWidths(x, y) }
-      .map { case (x, y) => Elem[T, I](f(x, y)) }
+      .map { case (x, y) => Elem[T](f(x, y)) }
       .fold(identity, identity)
 
-  def checkUnary(x: IndexedLattice[T, I])(f: T => T): IndexedLattice[T, I] = {
+  def checkUnary(x: IndexedLattice[T])(f: T => T): IndexedLattice[T] = {
     x match {
       case Bot() => Bot()
       case Top() => Top()
@@ -197,67 +191,67 @@ given [T, I](using lattice: TypedValueLattice[T, I]): ValueLattice[IndexedLattic
     }
   }
 
-  def top: IndexedLattice[T, I] = Top()
-  def bottom: IndexedLattice[T, I] = Bot()
+  def top: IndexedLattice[T] = Top()
+  def bottom: IndexedLattice[T] = Bot()
 
-  def top(ty: I): IndexedLattice[T, I] = Elem(lattice.top(ty))
-  def bottom(ty: I): IndexedLattice[T, I] = Elem(lattice.bottom(ty))
+  def top(ty: I): IndexedLattice[T] = Elem(lattice.top(ty))
+  def bottom(ty: I): IndexedLattice[T] = Elem(lattice.bottom(ty))
 
-  def lub(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `join` _)
-  def glb(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `meet` _)
+  def lub(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `join` _)
+  def glb(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `meet` _)
 
   def constant(v: Literal) = Elem(lattice.constant(v))
 
-  def bvnot(x: IndexedLattice[T, I]) = checkUnary(x)(_.bvnot())
-  def bvneg(x: IndexedLattice[T, I]) = checkUnary(x)(_.bvneg())
-  def boolnot(x: IndexedLattice[T, I]) = checkUnary(x)(_.boolnot())
-  def intneg(x: IndexedLattice[T, I]) = checkUnary(x)(_.intneg())
-  def booltobv1(x: IndexedLattice[T, I]) = checkUnary(x)(_.booltobv1())
+  def bvnot(x: IndexedLattice[T]) = checkUnary(x)(_.bvnot())
+  def bvneg(x: IndexedLattice[T]) = checkUnary(x)(_.bvneg())
+  def boolnot(x: IndexedLattice[T]) = checkUnary(x)(_.boolnot())
+  def intneg(x: IndexedLattice[T]) = checkUnary(x)(_.intneg())
+  def booltobv1(x: IndexedLattice[T]) = checkUnary(x)(_.booltobv1())
 
-  def equal(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `equal` _)
-  def bvcomp(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvcomp` _)
-  def bvand(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvand` _)
-  def bvor(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvor` _)
-  def bvadd(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvadd` _)
-  def bvmul(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvmul` _)
-  def bvshl(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvshl` _)
-  def bvlshr(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvlshr` _)
-  def bvashr(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvashr` _)
-  def bvult(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvult` _)
-  def bvxor(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvxor` _)
-  def bvsub(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvsub` _)
-  def bvurem(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvurem` _)
-  def bvsrem(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvsrem` _)
-  def bvsmod(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvsmod` _)
-  def bvudiv(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvudiv` _)
-  def bvsdiv(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvsdiv` _)
-  def bvule(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvule` _)
-  def bvugt(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvugt` _)
-  def bvslt(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvslt` _)
-  def bvsle(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvsle` _)
-  def bvsgt(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvsgt` _)
-  def bvsge(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvsge` _)
-  def bvuge(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `bvuge` _)
-  def bvconcat(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) =
-    checkBinaryTopBot(x, y).map(_ `bvconcat` _).map(Elem[T, I](_)).fold(identity, identity)
+  def equal(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `equal` _)
+  def bvcomp(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvcomp` _)
+  def bvand(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvand` _)
+  def bvor(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvor` _)
+  def bvadd(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvadd` _)
+  def bvmul(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvmul` _)
+  def bvshl(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvshl` _)
+  def bvlshr(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvlshr` _)
+  def bvashr(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvashr` _)
+  def bvult(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvult` _)
+  def bvxor(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvxor` _)
+  def bvsub(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvsub` _)
+  def bvurem(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvurem` _)
+  def bvsrem(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvsrem` _)
+  def bvsmod(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvsmod` _)
+  def bvudiv(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvudiv` _)
+  def bvsdiv(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvsdiv` _)
+  def bvule(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvule` _)
+  def bvugt(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvugt` _)
+  def bvslt(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvslt` _)
+  def bvsle(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvsle` _)
+  def bvsgt(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvsgt` _)
+  def bvsge(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvsge` _)
+  def bvuge(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `bvuge` _)
+  def bvconcat(x: IndexedLattice[T], y: IndexedLattice[T]) =
+    checkBinaryTopBot(x, y).map(_ `bvconcat` _).map(Elem[T](_)).fold(identity, identity)
 
-  def intlt(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `intlt` _)
-  def intle(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `intle` _)
-  def intgt(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `intgt` _)
-  def intge(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `intge` _)
-  def intadd(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `intadd` _)
-  def intsub(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `intsub` _)
-  def intmul(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `intmul` _)
-  def intdiv(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `intdiv` _)
-  def intmod(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `intmod` _)
+  def intlt(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `intlt` _)
+  def intle(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `intle` _)
+  def intgt(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `intgt` _)
+  def intge(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `intge` _)
+  def intadd(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `intadd` _)
+  def intsub(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `intsub` _)
+  def intmul(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `intmul` _)
+  def intdiv(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `intdiv` _)
+  def intmod(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `intmod` _)
 
-  def booland(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `booland` _)
-  def boolor(x: IndexedLattice[T, I], y: IndexedLattice[T, I]) = checkBinary(x, y)(_ `boolor` _)
+  def booland(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `booland` _)
+  def boolor(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `boolor` _)
 
-  def zero_extend(x: IndexedLattice[T, I], extend: Int) = checkUnary(x)(_.zero_extend(extend))
-  def sign_extend(x: IndexedLattice[T, I], extend: Int) = checkUnary(x)(_.zero_extend(extend))
-  def repeat(x: IndexedLattice[T, I], repeats: Int) = checkUnary(x)(_.repeat(repeats))
-  def extract(x: IndexedLattice[T, I], hi: Int, lo: Int) = checkUnary(x)(_.extract(hi, lo))
+  def zero_extend(x: IndexedLattice[T], extend: Int) = checkUnary(x)(_.zero_extend(extend))
+  def sign_extend(x: IndexedLattice[T], extend: Int) = checkUnary(x)(_.zero_extend(extend))
+  def repeat(x: IndexedLattice[T], repeats: Int) = checkUnary(x)(_.repeat(repeats))
+  def extract(x: IndexedLattice[T], hi: Int, lo: Int) = checkUnary(x)(_.extract(hi, lo))
 }
 
 class NOPValueAnalysis[ValueType]() extends ValueLattice[ValueType] {
@@ -322,7 +316,6 @@ class NOPValueAnalysis[ValueType]() extends ValueLattice[ValueType] {
 }
 
 class EvaluateInLattice[Value](using lattice: TypedValueLattice[Value, IRType]) {
-
   def evalExpr(evalVar: Variable => Option[Value])(e: Expr): Value = {
     e match {
       case e: Variable => evalVar(e).getOrElse(lattice.top(e.getType))

@@ -578,8 +578,10 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
     TNum(f(value), f(mask))
 }
 
-given TypedValueLattice[TNum, IRType] with {
+protected class TNumLattice() extends TypedValueLattice[TNum, IRType] {
   import TNum.*
+
+  given TypedValueLattice[TNum, IRType] = this
 
   def getType(x: TNum) = BitVecType(x.width)
 
@@ -599,7 +601,7 @@ given TypedValueLattice[TNum, IRType] with {
   def top: TNum = throw Exception("TNum has no universal top")
 
   def constant(v: ir.Literal): TNum = v match {
-    case x: BitVecLiteral => constant(x)
+    case x: BitVecLiteral => unkBool.constant(x)
     case TrueLiteral => trueBool
     case FalseLiteral => falseBool
     case IntLiteral(x) => throw Exception("TNum undefined for integers")
@@ -659,18 +661,25 @@ given TypedValueLattice[TNum, IRType] with {
   def zero_extend(x: TNum, extend: Int): TNum = x.mapBoth(InfixBitVectorEval.zero_extend(extend, _))
 }
 
+type TypedTNum = IndexedLattice[TNum]
+given TypedValueLattice[TypedTNum, IRType] = IndexedValueLattice[TNum, IRType](_.getType)(using TNumLattice())
+
 def knownBitsAnalysis(p: Program) = {
   applyRPO(p)
-  val lattice = DefaultValueLattice[TNum]()
-  val solver = transforms.worklistSolver(ValueStateDomain(DefaultTransfer(lattice), lattice))
+  val lattice = DefaultValueLattice[TypedTNum]()
+  val transfer = DefaultTransfer[TypedTNum](lattice)
+  val domain = ValueStateDomain[TypedTNum](transfer, lattice)
+  val solver = transforms.worklistSolver(domain)
 
   val (beforeIn, afterIn) = solver.solveProgIntraProc(p, backwards = false)
   (beforeIn, afterIn)
 }
 
 class SimplifyKnownBits() {
-  val lattice = DefaultValueLattice[TNum]()
-  val solver = transforms.worklistSolver(ValueStateDomain(DefaultTransfer(lattice), lattice))
+  val lattice = DefaultValueLattice[TypedTNum]()
+  val transfer = DefaultTransfer[TypedTNum](lattice)
+  val domain = ValueStateDomain[TypedTNum](transfer, lattice)
+  val solver = transforms.worklistSolver(domain)
 
   def applyTransform(p: Program): Unit = {
     for (proc <- p.procedures) {
