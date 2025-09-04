@@ -249,7 +249,7 @@ class IndexedValueLattice[T, I](getType: T => I,
   def boolor(x: IndexedLattice[T], y: IndexedLattice[T]) = checkBinary(x, y)(_ `boolor` _)
 
   def zero_extend(x: IndexedLattice[T], extend: Int) = checkUnary(x)(_.zero_extend(extend))
-  def sign_extend(x: IndexedLattice[T], extend: Int) = checkUnary(x)(_.zero_extend(extend))
+  def sign_extend(x: IndexedLattice[T], extend: Int) = checkUnary(x)(_.sign_extend(extend))
   def repeat(x: IndexedLattice[T], repeats: Int) = checkUnary(x)(_.repeat(repeats))
   def extract(x: IndexedLattice[T], hi: Int, lo: Int) = checkUnary(x)(_.extract(hi, lo))
 }
