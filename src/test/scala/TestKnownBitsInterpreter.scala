@@ -1,4 +1,4 @@
-import analysis.{given, *}
+import analysis.{*, given}
 import ir.dsl.*
 import ir.eval.*
 import ir.{dsl, *}

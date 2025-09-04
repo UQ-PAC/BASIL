@@ -158,9 +158,11 @@ enum IndexedLattice[T] {
 def defaultHandleConflictingTypes[T](x: T, y: T): IndexedLattice[T] =
   throw new Exception(s"attempted lattice operation on incompatible ${x.getClass.getName} values: '$x' and '$y'")
 
-class IndexedValueLattice[T, I](getType: T => I,
+class IndexedValueLattice[T, I](
+  getType: T => I,
   handleConflictingTypes: (T, T) => IndexedLattice[T] = defaultHandleConflictingTypes[T]
-  )(using lattice: TypedValueLattice[T, I]) extends TypedValueLattice[IndexedLattice[T], I] {
+)(using lattice: TypedValueLattice[T, I])
+    extends TypedValueLattice[IndexedLattice[T], I] {
 
   import IndexedLattice.{Bot, Elem, Top}
 
