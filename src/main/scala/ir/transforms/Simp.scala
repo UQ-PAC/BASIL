@@ -1273,6 +1273,9 @@ object OffsetProp {
     }
 
     def clob(v: Variable) = {
+      if (!st.get(v).exists(x => x == (None, None))) {
+        stSequenceNo += 1
+      }
       st(v) = (None, None)
     }
 
