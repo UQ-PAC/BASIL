@@ -283,8 +283,8 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       typedecls.foreach(psexp)
       decls.foreach(psexp)
       exprs.foreach(e => psexp(e.toSexp))
-      b.append("(check-sat-using (then (repeat (then (repeat (then euf-completion simplify)) (par-or (try-for smt 5000) skip))) smt))")
-      // psexp(list(sym("check-sat")))
+      // b.append("(check-sat-using (then (repeat (then (repeat (then euf-completion simplify)) (par-or (try-for smt 5000) skip))) smt))")
+      psexp(list(sym("check-sat")))
       getUnsat.foreach(psexp)
     }
 

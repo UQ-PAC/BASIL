@@ -1214,15 +1214,6 @@ object OffsetProp {
   // None, Some(Lit) -> Lit
   type Value = (Option[Variable], Option[BitVecLiteral])
 
-  def joinValue(l: Value, r: Value) = {
-    (l, r) match {
-      case ((None, None), _) => (None, None)
-      case (_, (None, None)) => (None, None)
-      case (l, r) if l != r => (None, None)
-      case (l, r) => l
-    }
-  }
-
   class CopyProp() {
     val st = mutable.Map[Variable, Value]()
     var giveUp = false
@@ -1247,18 +1238,6 @@ object OffsetProp {
       }
     }
 
-    def joinState(lhs: Variable, rhs: Expr) = {
-      specJoinState(lhs, rhs) match {
-        case Some((l, r)) => {
-          if ((!st.contains(l)) || (st.contains(l) && st(l) != r)) {
-            stSequenceNo += 1
-          }
-          st(l) = r
-        }
-        case _ => ()
-      }
-    }
-
     def specJoinState(lhs: Variable, rhs: Expr): Option[(Variable, Value)] = {
       rhs match {
         case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if (!st.contains(lhs)) =>
@@ -1272,11 +1251,11 @@ object OffsetProp {
       }
     }
 
-    def clob(v: Variable) = {
-      if (!st.get(v).exists(x => x == (None, None))) {
+    def update(v: Variable, r: Value) = {
+      if (!st.get(v).exists(_ == r)) {
         stSequenceNo += 1
+        st(v) = r
       }
-      st(v) = (None, None)
     }
 
     def transfer(s: Statement) = s match {
@@ -1289,11 +1268,11 @@ object OffsetProp {
             case (l: Variable, _) => Seq(l -> (None, None))
           }
           .foreach { case (l, r) =>
-            st(l) = r
+            update(l, r)
           }
       case a: Assign => {
         // memoryload and DirectCall
-        a.assignees.foreach(clob)
+        a.assignees.foreach(v => update(v, (None, None)))
       }
       case _: MemoryStore => ()
       case _: NOP => ()
