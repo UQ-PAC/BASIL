@@ -1078,10 +1078,10 @@ object TranslationValidator {
     val sourceAssumeFail =
       BinaryExpr(
         EQ,
-        sourceInfo.renameSSA(
+        exprInSource(sourceInfo.renameSSA(
           sourceInfo.cuts.cutLabelBlockInTr("EXIT").label.stripPrefix("source__"),
           TransitionSystem.programCounterVar
-        ),
+        )),
         PCMan.PCSym(PCMan.assumptionFailLabel)
       )
 
