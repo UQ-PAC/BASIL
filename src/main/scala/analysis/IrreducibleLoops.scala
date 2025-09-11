@@ -52,6 +52,7 @@ object LoopDetector {
   case class State(
     // Header -> Loop
     loops: Map[Block, Loop] = Map(),
+    loops_o: List[Loop] = List(),
     headers: Set[Block] = Set(),
 
     // Algorithm helpers
@@ -65,7 +66,8 @@ object LoopDetector {
     def identifiedLoops: Iterable[Loop] = loops.values
 
     def reducibleTransformIR(): State = {
-      this.copy(loops = LoopTransform.llvm_transform(loops.values).map(l => l.header -> l).toMap)
+      val nr = LoopTransform.llvm_transform(loops.values).map(l => l.header -> l).toMap
+      this.copy(loops = nr, loops_o = nr.values.toList)
     }
 
     def updateIrWithLoops() = {
@@ -116,7 +118,7 @@ object LoopDetector {
       }
 
       if (!st.loops.contains(edge.to)) {
-        st = st.copy(loops = st.loops.updated(edge.to, newLoop))
+        st = st.copy(loops = st.loops.updated(edge.to, newLoop), loops_o = newLoop :: st.loops_o)
       }
 
       st = tag_lhead(st, edge.from, edge.to)

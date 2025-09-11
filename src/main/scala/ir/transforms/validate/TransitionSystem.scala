@@ -169,7 +169,7 @@ object TransitionSystem {
     require(p.entryBlock.isDefined)
 
     val loops = analysis.LoopDetector.identify_loops(p.entryBlock.get)
-    val floops = loops.identifiedLoops.toList.sortBy(_.header.label)
+    val floops = loops.loops_o
     val cutPoints = procToTransition(p, floops)
     p.formalInParam.clear()
     p.formalOutParam.clear()
@@ -185,7 +185,7 @@ object TransitionSystem {
     val program = IRToDSL.convertProgram(iprogram).resolve
 
     val loops = analysis.LoopDetector.identify_loops(program)
-    val floops = loops.identifiedLoops.toList.sortBy(_.header.label)
+    val floops = loops.identifiedLoops.toList // .sortBy(_.header.label)
 
     val cutPoints = program.procedures
       .map(p => {
