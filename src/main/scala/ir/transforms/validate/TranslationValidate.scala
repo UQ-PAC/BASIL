@@ -1105,10 +1105,6 @@ object TranslationValidator {
     } else None
     lazy val npe = newProg.map(_.mainProcedure.entryBlock.get)
 
-    val cutR = sourceInfo.cutRestict.foreach(cutLabel => {
-      b.addAssert(exprInSource(BinaryExpr(EQ, PCMan.PCSym(cutLabel), TransitionSystem.programCounterVar)))
-    })
-
     count = 0
     for (e <- preInv) {
       count += 1

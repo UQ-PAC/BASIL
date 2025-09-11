@@ -76,7 +76,7 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
   override def sources = Task.Sources("main/scala")
 
   override def forkArgs = Task {
-    super.forkArgs() ++ z3.forkArgs()
+    super.forkArgs() ++ z3.forkArgs() ++ Seq("-Xss100M")
   }
   override def forkEnv = Task {
     super.forkEnv() ++ z3.forkEnv()
