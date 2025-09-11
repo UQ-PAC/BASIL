@@ -439,7 +439,6 @@ object TranslationValidator {
       case (l, r) => list(tx(l), tx(r))
     }
 
-    println(freevars)
     val r : Sexp[Expr] = list(sym("let"), list(inargs: _*), body)
     (r, freevars)
   }

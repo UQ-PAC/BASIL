@@ -263,6 +263,7 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   transforms.applyRPO(p)
   config = simplifyCFGValidated(config, p)
   transforms.applyRPO(p)
+  config = config.copy(verify = Some(util.SMT.Solver.Z3))
   config = dynamicSingleAssignment(config, p)
   transforms.applyRPO(p)
   config = copyProp(config, p)

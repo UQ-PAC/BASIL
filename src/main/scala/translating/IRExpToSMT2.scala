@@ -301,7 +301,13 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       typedecls.foreach(psexp)
       decls.foreach(psexp)
       exprs.foreach(e => psexp(e.toSexp))
-      b.append("(check-sat-using (then (repeat (then (repeat (then euf-completion simplify)) (par-or (try-for smt 5000) skip))) smt))")
+      // b.append("(check-sat-using (then (repeat (then (repeat (then euf-completion simplify)) (par-or (try-for smt 5000) skip))) smt))")
+      psexp(list(sym("check-sat")))
+      // (check-sat-using (repeat (par-then (or-else split-clause smt) (then (repeat (then euf-completion simplify)) (par-or (try-for smt 3000) skip)))))
+      
+//      b.append("(check-sat-using (repeat (par-then (or-else split-clause smt) (then (repeat (then euf-completion simplify)) (par-or (try-for smt 3000) skip)))))")
+      // b.append("(check-sat-using (then (repeat (then (repeat (then euf-completion simplify)) (par-or (try-for smt 5000) skip))) smt))")
+      // val checkSat = list(sym("check-sat-using", list(sym("repeat"), list(sym("par-then"), list()))))
       // psexp(list(sym("check-sat")))
       getUnsat.foreach(psexp)
     }
