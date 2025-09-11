@@ -251,7 +251,7 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   val p = ctx.program
   var config = mode match {
     case SimplifyMode.ValidatedSimplify(verifyMode, filePrefix) =>
-      TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = true)
+      TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = false)
     case _ => TVJob(None, None)
   }
   transforms.applyRPO(p)
