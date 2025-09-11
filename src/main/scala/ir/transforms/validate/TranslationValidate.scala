@@ -392,6 +392,58 @@ object TranslationValidator {
     assumes.reverse
   }
 
+
+  def extractProgLet(proc1: Procedure, proc2: Procedure, postConds: List[Expr], inVars: List[(Variable, Variable)], outVars: List[(Variable, Variable)]) = {
+    import translating.{sym, list, Sexp}
+
+
+    ir.transforms.reversePostOrder(proc1)
+    ir.transforms.reversePostOrder(proc2)
+
+
+    def assignsOfProc(p: Procedure) = 
+      val begin = p.entryBlock.get
+      val blocks = p.blocks.toList.sortBy(x => -x.rpoOrder).toList
+
+      blocks.flatMap(_.statements).flatMap {
+          case SimulAssign(assignments, _) => Some(assignments.toList)
+          case o => throw Exception(s"Program has other statements : $o")
+      }.toList
+
+    def tx(e: Expr) = translating.BasilIRToSMT2.vexpr(e)
+
+    def toLet(assigns: List[List[(Variable, Expr)]], bound : Set[Variable] = inVars.map(_._1).toSet, free: Set[Variable] = Set()) : (Sexp[Expr], Set[Variable]) = {
+      assigns match {
+        case a :: tl => {
+
+          val newbound = bound ++ a.map(_._1).toSet
+          val newfree = free ++ (a.flatMap(_._2.variables).toSet -- bound)
+
+          val (body, ffree) = toLet(tl, newbound, newfree)
+
+          (list(sym("let"), list(a.map {
+            case (v, d) => list(tx(v), tx(d))
+          } : _*), body), ffree)
+        }
+        case Nil => 
+          val newfree = free ++ (postConds.flatMap(_.variables).toSet -- bound)
+          (tx(boolAnd(outVars.map(polyEqual) ++ postConds)), newfree)
+      }
+    }
+
+    val assigns = assignsOfProc(proc1) ++ assignsOfProc(proc2)
+
+    val (body , freevars) = toLet(assigns)
+
+    val inargs = inVars.map {
+      case (l, r) => list(tx(l), tx(r))
+    }
+
+    println(freevars)
+    val r : Sexp[Expr] = list(sym("let"), list(inargs: _*), body)
+    (r, freevars)
+  }
+
   object toVariable {
     class SES extends CILVisitor {
       override def vrvar(v: Variable) = v match {
@@ -991,6 +1043,13 @@ object TranslationValidator {
         invariant.renamingSrcTgt
       )
 
+    val prerename = NamespaceState("PRE")
+    val postrename = NamespaceState("POST")
+
+    def exprInPre(e: Expr) = visit_expr(prerename, e)
+    def exprInPost(e: Expr) = visit_expr(postrename, e)
+
+
     val preInv = (concreteInvariant.map(
       invToPredicateInState(
         e => sourceInfo.renameSSA(sourceInfo.cuts.cutLabelBlockInTr("ENTRY").label, e),
@@ -1007,6 +1066,7 @@ object TranslationValidator {
       )
     ))
 
+
     val primedInv = concreteInvariant
       .map(
         invToPredicateInState(
@@ -1015,6 +1075,14 @@ object TranslationValidator {
         )
       )
       .map(_.body)
+
+
+    val preInvVars = preInv.flatMap {
+      case a : Assume => a.body.variables
+    }.toSet.toList
+
+    val postInvVars = primedInv.flatMap(_.variables).toSet.toList
+
 
     visit_proc(afterRenamer, source)
     visit_proc(beforeRenamer, target)
@@ -1049,45 +1117,62 @@ object TranslationValidator {
         case None => Some(s"inv$count")
         case Some(s) => Some(s"${s.replace(' ', '_')}_inv$count")
       }
-      b.addAssert(e.body, Some(s"inv$count"))
-      prover.map(_.addConstraint(e.body))
-      npe.map(_.statements.append(Assert(e.body, l)))
+      b.addAssert(exprInPre(e.body), Some(s"inv$count"))
+      prover.map(_.addConstraint(exprInPre(e.body)))
+      npe.map(_.statements.append(Assert(exprInPre(e.body), l)))
     }
 
-    count = 0
-    for ((ack, ackn) <- ackInv) {
-      count += 1
-      val l = Some(s"ackermann$ackn$count")
-      npe.map(_.statements.append(Assert(ack, l)))
-      prover.map(_.addConstraint(ack))
-      b.addAssert(ack, l)
-    }
-    count = 0
-    for (i <- extractProg(source)) {
-      count += 1
-      b.addAssert(i, Some(s"source$count"))
-      prover.map(_.addConstraint(i))
-    }
-    count = 0
-    for (i <- extractProg(target)) {
-      count += 1
-      prover.map(_.addConstraint(i))
-      b.addAssert(i, Some(s"tgt$count"))
-    }
+    val cutR = sourceInfo.cutRestict.foreach(cutLabel => {
+      b.addAssert(visit_expr(prerename, exprInSource(BinaryExpr(EQ, PCMan.PCSym(cutLabel), TransitionSystem.programCounterVar))))
+    })
+
+
+  // def extractProgLet(proc1: Procedure, proc2: Procedure, postConds: List[Expr], inVars: List[(Variable, Variable)], outVars: List[(Variable, Variable)]) = {
+
+    val (assert, freevars) = extractProgLet(source, target, 
+      ackInv.map(_._1).toList, 
+      preInvVars.map(v => (v -> visit_rvar(prerename, v))), 
+      postInvVars.map(v => (v -> visit_rvar(postrename, v))))
+
+    //count = 0
+    //for ((ack, ackn) <- ackInv) {
+    //  count += 1
+    //  val l = Some(s"ackermann$ackn$count")
+    //  npe.map(_.statements.append(Assert(ack, l)))
+    //  prover.map(_.addConstraint(ack))
+    //  b.addAssert(ack, l)
+    //}
+    //count = 0
+    //for (i <- extractProg(source)) {
+    //  count += 1
+    //  b.addAssert(i, Some(s"source$count"))
+    //  prover.map(_.addConstraint(i))
+    //}
+    //count = 0
+    //for (i <- extractProg(target)) {
+    //  count += 1
+    //  prover.map(_.addConstraint(i))
+    //  b.addAssert(i, Some(s"tgt$count"))
+    //}
 
     val sourceAssumeFail =
       BinaryExpr(
         EQ,
-        sourceInfo.renameSSA(
+        exprInSource(sourceInfo.renameSSA(
           sourceInfo.cuts.cutLabelBlockInTr("EXIT").label.stripPrefix("source__"),
           TransitionSystem.programCounterVar
-        ),
+        )),
         PCMan.PCSym(PCMan.assumptionFailLabel)
       )
 
+
+    freevars.foreach(b.addDecl)
+    b.addDecl(UnaryExpr(BoolToBV1,FalseLiteral))
+    b.addAssertSexp(assert, Some("tr"))
+
     val pinv = UnaryExpr(BoolNOT, BinaryExpr(BoolOR, sourceAssumeFail, AssocExpr(BoolAND, primedInv.toList)))
     npe.map(_.statements.append(Assert(pinv, Some("InvPrimed"))))
-    b.addAssert(pinv, Some("InvPrimed"))
+    b.addAssert(visit_expr(postrename, pinv), Some("InvPrimed"))
     prover.map(_.addConstraint(pinv))
     timer.checkPoint("extract prog")
 

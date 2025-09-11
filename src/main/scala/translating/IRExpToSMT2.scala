@@ -188,9 +188,15 @@ object Sexp {
     case Sexp.Symb(a) => b.append(a)
     case Sexp.Slist(v) => {
       b.append("(")
+      var count = 0
       for (s <- v) {
         write(b, s)
         b.append(" ")
+        count += 1
+        if (count > 3) {
+          b.append("\n")
+          count = 0
+        }
       }
       b.append(")")
     }
@@ -199,7 +205,7 @@ object Sexp {
 
   def print[T](s: Sexp[T]): String = s match {
     case Sexp.Symb(a) => a
-    case Sexp.Slist(v) => "(" + v.map(print).mkString(" ") + ")"
+    case Sexp.Slist(v) => "(" + v.map(print).grouped(20).map(_.mkString(" ")).mkString("\n") + ")"
   }
 }
 
@@ -258,6 +264,18 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       } else {
         exprs = Cmd.Raw(list(rawSexp.map(sym[Expr](_)): _*)) :: exprs
       }
+    }
+
+    def addAssertSexp(e: Sexp[Expr], name: Option[String] = None) = {
+      before = false
+      exprs = Cmd.Raw(list(sym("assert"), e)) :: exprs
+    }
+
+
+    def addDecl(e: Expr) = {
+      val (t, d) = BasilIRToSMT2.extractDecls(e)
+      decls = decls ++ d
+      typedecls = typedecls ++ t
     }
 
     def addAssert(e: Expr, name: Option[String] = None) = {
@@ -404,7 +422,15 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     if endian == Endian.LittleEndian then vexpr(FalseLiteral) else vexpr(TrueLiteral)
   }
   override def vfapply_expr(name: String, args: Seq[Sexp[Expr]]): Sexp[Expr] = {
-    list((sym(name) :: args.toList): _*)
+    name match {
+      case "ite" => {
+        val cases = args.grouped(2)
+        mkIte(cases.toList)
+      }
+      case _ => {
+        list(sym(name), Sexp.Slist(args.toList))
+      }
+    }
   }
 
   override def vrvar(e: Variable): Sexp[Variable] = sym(fixVname(e.name))
@@ -429,12 +455,21 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     )
   }
 
+  def mkIte(cases: List[Seq[Sexp[Expr]]]) : Sexp[Expr] = {
+    cases match {
+      case Seq(cond, casev) :: Nil => casev
+      case Seq(cond, casev) :: tl => list(sym("ite"), (cond), (casev), mkIte(tl))
+    }
+  }
+
   def interpretFun(x: FApplyExpr): Option[Sexp[Expr]] = {
     x.name match {
       case "bool2bv1" => {
         Some(booltoBVDef)
       }
       case "bvsaddo" => None
+      case "ite" => None
+
       case _ => {
         Some(
           list(
