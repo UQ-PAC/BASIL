@@ -185,6 +185,10 @@ object IRLoading {
     val fIn = FileInputStream(fileName)
     (0 to 7).map(_ => fIn.read()).toList match {
       case List('G', 'T', 'I', 'R', 'B', _, _, _) => fIn
+      case o if fileName.endsWith(".gtirb") => {
+        fIn.close()
+        throw Exception(s"Did not find gtirb magic at start of file: $o")
+      }
       case _ => {
         fIn.close()
         FileInputStream(fileName)
@@ -215,7 +219,8 @@ object IRLoading {
 
   /** Loads ELF data from the GTIRB input file. */
   def loadGTIRBReadELF(config: ILLoadingConfig): ReadELFData = {
-    val ir = IR.parseFrom(FileInputStream(config.inputFile))
+    val fIn = skipGTIRBMagic(config.inputFile)
+    val ir = IR.parseFrom(fIn)
     if (ir.modules.length != 1) {
       Logger.warn(s"GTIRB file ${config.inputFile} unexpectedly has ${ir.modules.length} modules")
     }
