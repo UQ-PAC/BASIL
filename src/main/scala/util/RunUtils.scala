@@ -62,11 +62,6 @@ object RunUtils {
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
 
     val analysisManager = AnalysisManager(ctx.program)
-    // these transforms depend on basil config parameters and thus need to be constructed here
-    val prepareForTranslation = getPrepareForTranslationTransform(q, Set("free"))
-    val genProcSummaries = getGenerateProcedureSummariesTransform(q.loading.parameterForm || q.simplify)
-    val genRgConditions = getGenerateRgConditionsTransform(ctx.program.procedures.toList.filter(_.returnBlock != None))
-    val stripUnreachableFunctions = getStripUnreachableFunctionsTransform(q.loading.procedureTrimDepth)
 
     if conf.simplify then doCleanupWithSimplify(ctx, analysisManager)
     else doCleanupWithoutSimplify(ctx, analysisManager)
@@ -77,7 +72,7 @@ object RunUtils {
 
     assert(ir.invariant.programDiamondForm(ctx.program))
 
-    if q.loading.trimEarly then stripUnreachableFunctions(ctx, analysisManager)
+    if q.loading.trimEarly then getStripUnreachableFunctionsTransform(q.loading.procedureTrimDepth)(ctx, analysisManager)
     // todo: since refactoring, there is some extra code that is run here
     // see StripUnreachableFunctions.getStripUnreachableFunctionsTransform
 
@@ -153,7 +148,7 @@ object RunUtils {
         memTransferTimer.checkPoint("Performed Memory Transform")
     }
 
-    if q.summariseProcedures then genProcSummaries(ctx, analysisManager)
+    if q.summariseProcedures then getGenerateProcedureSummariesTransform(q.loading.parameterForm || q.simplify)(ctx, analysisManager)
 
     if (!conf.staticAnalysis.exists(!_.irreducibleLoops) && conf.generateLoopInvariants) {
       if (!conf.staticAnalysis.exists(_.irreducibleLoops)) {
@@ -194,9 +189,9 @@ object RunUtils {
       }
     }
 
-    prepareForTranslation(ctx, analysisManager)
+    getPrepareForTranslationTransform(q, Set("free"))(ctx, analysisManager)
 
-    if conf.generateRelyGuarantees then genRgConditions(ctx, analysisManager)
+    if conf.generateRelyGuarantees then getGenerateRgConditionsTransform(ctx.program.procedures.toList.filter(_.returnBlock != None))(ctx, analysisManager)
 
     q.loading.dumpIL.foreach(s => {
       val timer = PerformanceTimer("Dump IL")
