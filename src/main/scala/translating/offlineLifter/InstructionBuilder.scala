@@ -113,9 +113,9 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
   def f_gen_FPCompareEQ(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
     stubUninterp("FPCompareEQ", Seq(arg0, arg1, arg2), BoolType)
   def f_gen_FPCompareGE(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
-    stubUninterp("FPCompareGE", Seq(arg0, arg1, arg2), arg0.getType)
+    stubUninterp("FPCompareGE", Seq(arg0, arg1, arg2), BoolType)
   def f_gen_FPCompareGT(targ0: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr = {
-    stubUninterp("FPCompareGT", Seq(arg0, arg1, arg2), arg0.getType)
+    stubUninterp("FPCompareGT", Seq(arg0, arg1, arg2), BoolType)
   }
   def f_gen_FPConvert(targ0: BigInt, targ1: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
     stubUninterp("FPConvert", Seq(arg0, arg1, arg2), BitVecType(targ0.toInt))
@@ -164,7 +164,7 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
   def f_gen_FPToFixedJS_impl(targ0: BigInt, targ1: BigInt, arg0: Expr, arg1: Expr, arg2: Expr): Expr =
     stubUninterp("FPToFixedJS_impl", Seq(arg0, arg1, arg2), BitVecType(targ0.toInt))
   def f_gen_FixedToFP(targ0: BigInt, targ1: BigInt, arg0: Expr, arg1: Expr, arg2: Expr, arg3: Expr, arg4: Expr): Expr =
-    stubUninterp("FPToFixedFP", Seq(arg0, arg1, arg2, arg3, arg4), BitVecType(64))
+    stubUninterp("FPToFixedFP", Seq(arg0, arg1, arg2, arg3, arg4), BitVecType(targ1.toInt))
 
   /* generate expressions */
 
