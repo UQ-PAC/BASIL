@@ -7,7 +7,6 @@ import translating.PrettyPrinter.*
 import util.assertion.*
 import util.{SimplifyLogger, condPropDebugLogger}
 
-import java.io.BufferedWriter
 import scala.collection.mutable
 import scala.util.boundary
 

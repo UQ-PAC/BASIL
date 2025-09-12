@@ -72,7 +72,8 @@ object RunUtils {
 
     assert(ir.invariant.programDiamondForm(ctx.program))
 
-    if q.loading.trimEarly then getStripUnreachableFunctionsTransform(q.loading.procedureTrimDepth)(ctx, analysisManager)
+    if q.loading.trimEarly then
+      getStripUnreachableFunctionsTransform(q.loading.procedureTrimDepth)(ctx, analysisManager)
     // todo: since refactoring, there is some extra code that is run here
     // see StripUnreachableFunctions.getStripUnreachableFunctionsTransform
 
@@ -148,7 +149,8 @@ object RunUtils {
         memTransferTimer.checkPoint("Performed Memory Transform")
     }
 
-    if q.summariseProcedures then getGenerateProcedureSummariesTransform(q.loading.parameterForm || q.simplify)(ctx, analysisManager)
+    if q.summariseProcedures then
+      getGenerateProcedureSummariesTransform(q.loading.parameterForm || q.simplify)(ctx, analysisManager)
 
     if (!conf.staticAnalysis.exists(!_.irreducibleLoops) && conf.generateLoopInvariants) {
       if (!conf.staticAnalysis.exists(_.irreducibleLoops)) {
@@ -191,7 +193,11 @@ object RunUtils {
 
     getPrepareForTranslationTransform(q, Set("free"))(ctx, analysisManager)
 
-    if conf.generateRelyGuarantees then getGenerateRgConditionsTransform(ctx.program.procedures.toList.filter(_.returnBlock != None))(ctx, analysisManager)
+    if conf.generateRelyGuarantees then
+      getGenerateRgConditionsTransform(ctx.program.procedures.toList.filter(_.returnBlock != None))(
+        ctx,
+        analysisManager
+      )
 
     q.loading.dumpIL.foreach(s => {
       val timer = PerformanceTimer("Dump IL")
