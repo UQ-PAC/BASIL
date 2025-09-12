@@ -7,7 +7,7 @@ import java.io.{FileReader, Reader, StringReader}
 object ParseBasilIL {
 
   /**
-   * Combines the parsed declarations and the parsed DSL program into a [[util.IRContext]],
+   * Combines the parsed declarations and the parsed DSL program into a [[ir.IRContext]],
    * including resolving the DSL program into a Basil IR program.
    */
   def makeBasilIRContext(decls: Declarations, prog: ir.dsl.EventuallyProgram) = {
