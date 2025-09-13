@@ -1,10 +1,19 @@
 package API
 
+import ir.Program
+import util.RunUtils
+import util.BASILConfig
+import util.ILLoadingConfig
+
+import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
+
 import java.lang
 import java.util.regex.Pattern
 
 import cats.effect._
 import cats.implicits._
+import cats.effect.std.Semaphore
 
 import org.http4s._
 import org.http4s.dsl.io._
@@ -21,20 +30,16 @@ import ir.Program
 import ir.dotBlockGraph
 import translating.PrettyPrinter
 
-class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean])(
+case class ConfigSelection(adt: String, relf: Option[String])
+
+implicit val selectionDecoder: EntityDecoder[IO, ConfigSelection] = jsonOf[IO, ConfigSelection]
+
+class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean], irProcessingSemaphore: Semaphore[IO])(
   implicit asyncIO: Async[IO],
     loggerFactory: LoggerFactory[IO]
 ) {
 
   private val logger: Logger[IO] = loggerFactory.getLogger(LoggerName(getClass.getName))
-
-  private def ensureReady(action: IO[Response[IO]]): IO[Response[IO]] =
-    isReady.get.flatMap {
-      case true => action
-      case false =>
-        logger.warn("IR data is still initializing. Please try again shortly.") *>
-          ServiceUnavailable("IR data is still initializing. Please try again shortly.")
-    }
 
   /**
    * Defines the HTTP routes for the IR API.
@@ -48,10 +53,75 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean])(
     getAfterIrRoute <+>
     getBeforeCfgRoute <+>
     getAfterCfgRoute <+>
-    getProceduresWithLinesRoute <+>
-    getProceduresRoute <+>
     getSpecificBeforeIrRoute <+>
-    getSpecificAfterIrRoute
+    getSpecificAfterIrRoute <+>
+    getConfigDatasetsRoute <+>
+    postSelectConfigRoute
+  }
+
+  private def ensureReady(action: IO[Response[IO]]): IO[Response[IO]] =
+    isReady.get.flatMap {
+      case true => action
+      case false =>
+        logger.warn("IR data is still initializing. Please try again shortly.") *>
+          ServiceUnavailable("IR data is still initializing. Please try again shortly.")
+    }
+
+  /** GET /config/datasets */
+  private val getConfigDatasetsRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
+    case GET -> Root / "config" / "datasets" =>
+      ensureReady {
+        IO.blocking {
+          ConfigScanner.scan()
+        }.flatMap { pairs =>
+          Ok(pairs.asJson)
+        }
+      }
+  }
+
+  /** POST /config/select */ // TODO: This still has to be tested
+  private val postSelectConfigRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
+    case req @ POST -> Root / "config" / "select" =>
+      for {
+        selection <- req.as[ConfigSelection]
+        _ <- logger.info(s"New config selected: ${selection.adt}, ${selection.relf.getOrElse("none")}")
+        _ <- runAnalysis(selection.adt, selection.relf).start // run in background
+        resp <- Ok(s"Analysis triggered for ${selection.adt} / ${selection.relf.getOrElse("none")}")
+      } yield resp
+  }
+
+  // TODO: Move to a better spot:
+
+  /** Reusable method to trigger analysis with new adt/relf */
+  private def runAnalysis(newAdt: String, newRelf: Option[String]): IO[Unit] = { // TODO: Does this really work...
+    for {
+      _ <- isReady.set(false)
+      _ <- logger.info("Starting analysis with new configuration...")
+      _ <- irProcessingSemaphore.permit.use { _ =>
+        IO.blocking {
+          val buffer = ArrayBuffer.empty[IREpoch]
+          val ilConfig = ILLoadingConfig(inputFile = newAdt, relfFile = newRelf, dumpIL = None)
+          val basilConfig = BASILConfig(
+            context = None,
+            loading = ilConfig,
+            simplify = true,
+            dsaConfig = None,
+            memoryTransform = true,
+            summariseProcedures = true,
+            staticAnalysis = None,
+            outputPrefix = "out/test_output"
+          )
+          val finalBasilResult = RunUtils.run(basilConfig, Some(buffer))
+          RunUtils.writeOutput(finalBasilResult)
+          buffer.toList
+        }.flatMap { epochs =>
+          // clear old epochs
+          epochStore.epochsRef.set(List.empty) *> epochs.traverse_(epochStore.addEpoch)
+        }
+      }
+      _ <- isReady.set(true)
+      _ <- logger.info("Analysis completed and ready.")
+    } yield ()
   }
 
   /**

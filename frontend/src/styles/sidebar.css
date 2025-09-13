@@ -96,7 +96,6 @@
 .collapse-icon {
     width: 14px;
     height: 14px;
-    color: #ffffff; /* TODO: What does this change? It appears to be nothing... :( */
 }
 
 .resize-handle {
@@ -115,3 +114,59 @@
 .resize-handle:hover {
     background-color: #ccc;
 }
+
+.dataset-label {
+    display: block;
+    margin-bottom: 1px;
+    margin-left: 4px;
+    font-weight: 500;
+    color: var(--sidebar-dataset-label-color);
+}
+
+.relative {
+    position: relative;
+}
+
+.dataset-select-container {
+    display: inline-block;
+    font-family: 'Inter', sans-serif;
+    padding: 10px;
+}
+
+.dataset-select {
+    display: block;
+    width: 100%;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-color: var(--sidebar-config-button-background-color);
+    color: var(--text-color);
+    border-width: 2px;
+    border-color: var(--sidebar-config-button-border-color);
+    border-radius: 9999px;
+    padding: 0.75rem 2.5rem 0.75rem 1rem;
+    transition: all 0.3s ease-in-out;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+}
+
+.dataset-select:hover {
+    background-color: var(--sidebar-config-button-background-hover-color);
+}
+
+.dataset-select:focus {
+    outline: none;
+    border-color: #6366f1;
+}
+
+.arrow-down-icon {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1rem;
+    height: 1rem;
+    pointer-events: none;
+    fill: var(--text-color)
+}
+

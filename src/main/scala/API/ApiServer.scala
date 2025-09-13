@@ -11,8 +11,9 @@ import org.typelevel.log4cats.LoggerName
 import org.typelevel.log4cats.LoggerFactory
 import org.http4s._
 import org.http4s.implicits._
-import com.comcast.ip4s.ipv4
-import com.comcast.ip4s.port
+import org.http4s.server.Router
+import org.http4s.ember.server.EmberServerBuilder
+import com.comcast.ip4s._
 
 import cats.implicits._
 import cats.effect._
@@ -22,8 +23,6 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.Selectable.reflectiveSelectable
 import ir.Procedure
-import org.http4s.server.Router
-import org.http4s.ember.server.EmberServerBuilder
 
 case class IREpoch(name: String, beforeTransform: ir.Program, afterTransform: ir.Program)
 
@@ -66,26 +65,23 @@ object ApiServer extends IOApp {
   private val logger: Logger[IO] = loggerFactory.getLogger(LoggerName(getClass.getName))
 
   override def run(args: List[String]): IO[ExitCode] = {
-    val program = for {
+    for {
       isReady <- Ref[IO].of(false)
       semaphoreInstance <- Semaphore[IO](1)
       epochStore <- IREpochStore.of
-      irServiceRoutes = new IrServiceRoutes(epochStore, isReady).routes
+      irServiceRoutes = new IrServiceRoutes(epochStore, isReady, semaphoreInstance).routes
       httpApp = Router("/" -> irServiceRoutes).orNotFound
-    } yield (httpApp, epochStore, semaphoreInstance, isReady)
-
-    program.flatMap { case (httpApp, epochStore, semaphoreInstance, isReady) =>
-      EmberServerBuilder.default[IO]
+      _ <- generateIRAsync(epochStore, semaphoreInstance, isReady).start
+      exitCode <- EmberServerBuilder.default[IO]
         .withHost(ipv4"0.0.0.0")
         .withPort(port"8080")
         .withHttpApp(httpApp)
         .build
         .use { server =>
           Console[IO].println(s"Server started at ${server.baseUri}") *>
-            generateIRAsync(epochStore, semaphoreInstance, isReady).start *>
             IO.never
         }
-    }.as(ExitCode.Success)
+    } yield exitCode
   }
   
   private def generateIRAsync(

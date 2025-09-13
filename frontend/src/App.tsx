@@ -9,6 +9,7 @@ import CfgViewer from './components/CfgViewer';
 import CombinedViewer from './components/CombinedViewer';
 import SettingsModal from './components/SettingsModal'
 import { API_BASE_URL } from './api';
+import type {DatasetConfig} from './utils/types';
 
 const LOCAL_STORAGE_PROCEDURE_KEY = 'cfgViewerSelectedProcedure';
 
@@ -25,6 +26,11 @@ function App() {
         (localStorage.getItem('theme') as 'light' | 'dark' | 'system') || 'system'
     );
 
+    const [datasets, setDatasets] = useState<DatasetConfig[]>([]);
+    const [selectedDataset, setSelectedDataset] = useState<string>(""); // TODO: Must be something
+    const [datasetLoading, setDatasetLoading] = useState(true);
+    const [datasetError, setDatasetError] = useState(null);
+
     const [procedureNames, setProcedureNames] = useState<string[]>([]);
     const [loadingProcedures, setLoadingProcedures] = useState(false);
     const [procedureError, setProcedureError] = useState<string | null>(null);
@@ -37,6 +43,31 @@ function App() {
             return null;
         }
     });
+
+    useEffect(() => {
+        const fetchDatasets = async () => {
+            try {
+                setDatasetLoading(true);
+                const response = await fetch(`${API_BASE_URL}/config/datasets`);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                const data: DatasetConfig[] = await response.json();
+                setDatasets(data);
+                if (data.length > 0) {
+                    setSelectedDataset(data[0].adt); // TODO: Just base it off adt file?
+                }
+                setDatasetError(null);
+                console.info("Successfully received '" + data.length + "' amount of possible conifg datasets");
+            } catch (err: any) {
+                console.error("Failed to fetch datasets:", err);
+                setDatasetError(err.message);
+            } finally {
+                setDatasetLoading(false);
+            }
+        };
+        fetchDatasets();
+    }, []);
 
     useEffect(() => {
         const fetchEpochNames = async () => {
@@ -183,6 +214,11 @@ function App() {
                           onEpochSelect={handleEpochSelect}
                           loading={loadingEpochs}
                           error={epochError}
+                          datasets={datasets}
+                          selectedDataset={selectedDataset}
+                          onDatasetChange={setSelectedDataset}
+                          datasetLoading={datasetLoading}
+                          datasetError={datasetError}
                         />
                     </ResizableSidebar>
                     {viewMode === 'IR' ? ( // TODO: Change to enums and a switch
