@@ -69,9 +69,10 @@ object ApiServer extends IOApp {
       isReady <- Ref[IO].of(false)
       semaphoreInstance <- Semaphore[IO](1)
       epochStore <- IREpochStore.of
-      irServiceRoutes = new IrServiceRoutes(epochStore, isReady, semaphoreInstance).routes
+      irServiceRoutes = new IrServiceRoutes(epochStore, isReady, semaphoreInstance, generateIRAsync(epochStore, semaphoreInstance, isReady)).routes
       httpApp = Router("/" -> irServiceRoutes).orNotFound
       _ <- generateIRAsync(epochStore, semaphoreInstance, isReady).start
+      _ <- generateIRAsync(epochStore, semaphoreInstance, isReady)("src/test/correct/secret_write/gcc/secret_write.adt", Some("src/test/correct/secret_write/gcc/secret_write.relf")).start
       exitCode <- EmberServerBuilder.default[IO]
         .withHost(ipv4"0.0.0.0")
         .withPort(port"8080")
@@ -88,18 +89,22 @@ object ApiServer extends IOApp {
                                epochStore: IREpochStore,
                                irProcessingSemaphore: Semaphore[IO],
                                isReady: Ref[IO, Boolean]
-                             ): IO[Unit] = {
+                             )(adt: String, relf: Option[String]): IO[Unit] = {
     
     irProcessingSemaphore.permit.use { _ =>
-      for {
+      val analysis: IO[Unit] = for {
         _ <- logger.info("Starting BASIL analysis...")
         startTime <- IO.monotonic
+
+        _ <- logger.info("Clearing previous epochs from store...")
+        _ <- epochStore.epochsRef.set(List.empty)
+        _ <- isReady.set(false)
         collectedEpochs <- IO.blocking {
           val buffer = ArrayBuffer.empty[IREpoch]
 
           val ilConfig = ILLoadingConfig(
-            inputFile = "src/test/correct/secret_write/gcc/secret_write.adt",
-            relfFile = Some("src/test/correct/secret_write/gcc/secret_write.relf"),
+            inputFile = adt,
+            relfFile  = relf,
             dumpIL = None
           )
 
@@ -131,6 +136,11 @@ object ApiServer extends IOApp {
         _ <- isReady.set(true)
 
       } yield ()
+
+      analysis.handleErrorWith { e =>
+        logger.error(e)(s"BASIL analysis failed for ADT=$adt, RELF=${relf.getOrElse("none")}") *>
+          isReady.set(true)
+      }
     }
   }
 }

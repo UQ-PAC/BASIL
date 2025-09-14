@@ -1,13 +1,9 @@
 // src/components/SideBar.tsx
 import '../styles/sidebar.css';
-import type {DatasetConfig} from '../utils/types';
+import {type DatasetConfig, getDatasetName} from '../utils/types';
 import React from "react";
 
 import DownArrow from '../assets/arrow-down-icon.svg';
-
-const getDatasetName = (path: string): string => {
-    return path.replace('.adt', '');
-};
 
 interface SidebarProps {
     epochNames: string[];
@@ -17,7 +13,7 @@ interface SidebarProps {
     error: string | null;
     datasets: DatasetConfig[];
     selectedDataset: string | null;
-    onDatasetChange: React.Dispatch<React.SetStateAction<string>>;
+    onDatasetChange: (name: string) => void;
     datasetLoading: boolean;
     datasetError: string | null;
 }

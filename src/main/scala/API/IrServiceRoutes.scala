@@ -1,6 +1,5 @@
 package API
 
-import ir.Program
 import util.RunUtils
 import util.BASILConfig
 import util.ILLoadingConfig
@@ -31,10 +30,16 @@ import ir.dotBlockGraph
 import translating.PrettyPrinter
 
 case class ConfigSelection(adt: String, relf: Option[String])
+case class AnalysisStatus(status: String)
 
 implicit val selectionDecoder: EntityDecoder[IO, ConfigSelection] = jsonOf[IO, ConfigSelection]
+implicit val statusEncoder: EntityEncoder[IO, AnalysisStatus] = jsonEncoderOf[AnalysisStatus]
 
-class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean], irProcessingSemaphore: Semaphore[IO])(
+class IrServiceRoutes(
+                       epochStore: IREpochStore, 
+                       isReady: Ref[IO, Boolean], 
+                       irProcessingSemaphore: Semaphore[IO],
+                       generateIRAsync: (String, Option[String]) => IO[Unit])(
   implicit asyncIO: Async[IO],
     loggerFactory: LoggerFactory[IO]
 ) {
@@ -46,6 +51,7 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean], irPro
    * This service handles requests related to retrieving IR program states and Control Flow Graphs (CFGs).
    */
   def routes: HttpRoutes[IO] = {
+    statusRoute <+>
     listEpochsRoute <+>
     getProceduresWithLinesRoute <+>
     getProceduresRoute <+>
@@ -57,6 +63,14 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean], irPro
     getSpecificAfterIrRoute <+>
     getConfigDatasetsRoute <+>
     postSelectConfigRoute
+  }
+
+  private val statusRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
+    case GET -> Root / "status" =>
+      isReady.get.flatMap { ready =>
+        val status = if (ready) "completed" else "running"
+        Ok(AnalysisStatus(status).asJson)
+      }
   }
 
   private def ensureReady(action: IO[Response[IO]]): IO[Response[IO]] =
@@ -79,51 +93,23 @@ class IrServiceRoutes(epochStore: IREpochStore, isReady: Ref[IO, Boolean], irPro
       }
   }
 
-  /** POST /config/select */ // TODO: This still has to be tested
+  /** POST /config/select */
   private val postSelectConfigRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case req @ POST -> Root / "config" / "select" =>
+    case req@POST -> Root / "config" / "select" =>
       for {
         selection <- req.as[ConfigSelection]
         _ <- logger.info(s"New config selected: ${selection.adt}, ${selection.relf.getOrElse("none")}")
-        _ <- runAnalysis(selection.adt, selection.relf).start // run in background
+
+        fiber <- generateIRAsync(selection.adt, selection.relf)
+          .handleErrorWith(e => logger.error(e)("IR analysis failed"))
+          .start
+
+        _ <- fiber.join
+
         resp <- Ok(s"Analysis triggered for ${selection.adt} / ${selection.relf.getOrElse("none")}")
       } yield resp
   }
-
-  // TODO: Move to a better spot:
-
-  /** Reusable method to trigger analysis with new adt/relf */
-  private def runAnalysis(newAdt: String, newRelf: Option[String]): IO[Unit] = { // TODO: Does this really work...
-    for {
-      _ <- isReady.set(false)
-      _ <- logger.info("Starting analysis with new configuration...")
-      _ <- irProcessingSemaphore.permit.use { _ =>
-        IO.blocking {
-          val buffer = ArrayBuffer.empty[IREpoch]
-          val ilConfig = ILLoadingConfig(inputFile = newAdt, relfFile = newRelf, dumpIL = None)
-          val basilConfig = BASILConfig(
-            context = None,
-            loading = ilConfig,
-            simplify = true,
-            dsaConfig = None,
-            memoryTransform = true,
-            summariseProcedures = true,
-            staticAnalysis = None,
-            outputPrefix = "out/test_output"
-          )
-          val finalBasilResult = RunUtils.run(basilConfig, Some(buffer))
-          RunUtils.writeOutput(finalBasilResult)
-          buffer.toList
-        }.flatMap { epochs =>
-          // clear old epochs
-          epochStore.epochsRef.set(List.empty) *> epochs.traverse_(epochStore.addEpoch)
-        }
-      }
-      _ <- isReady.set(true)
-      _ <- logger.info("Analysis completed and ready.")
-    } yield ()
-  }
-
+  
   /**
    * **Endpoint:** `GET /epochs`
    *
