@@ -848,7 +848,11 @@ def coalesceBlocks(proc: Procedure): Boolean = {
       val stmts = b.statements.map(b.statements.remove).toList
       nextBlock.statements.prependAll(stmts)
       // leave empty block b and cleanup with removeEmptyBlocks
-    } else if (b.jump.isInstanceOf[Unreachable] && b.statements.isEmpty && b.prevBlocks.size == 1 && b.prevBlocks.head.nextBlocks.size == 1) {
+    } else if (
+      b.jump.isInstanceOf[
+        Unreachable
+      ] && b.statements.isEmpty && b.prevBlocks.size == 1 && b.prevBlocks.head.nextBlocks.size == 1
+    ) {
       b.prevBlocks.head.replaceJump(Unreachable())
       b.parent.removeBlocks(b)
     }

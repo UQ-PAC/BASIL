@@ -252,7 +252,7 @@ object TranslationValidator {
     callParams: CallParamMapping,
     private val ssaRenamingFun: ((String, Expr) => Expr),
     private val ssaDefines: Map[BlockID, Map[Variable, Variable]],
-    cutRestict: Option[String] = None,
+    cutRestict: Option[String] = None
   ) {
 
     def defines(block: BlockID): Set[Variable] = {
@@ -552,7 +552,10 @@ object TranslationValidator {
       val lhsTgt = lhs.map(paramTgt(false))
       val rhsTgt = rhs.map(paramTgt(true))
 
-      (CallParamMapping(invParam ++ lhsSrc, invParam ++ rhsSrc), CallParamMapping(invParam ++ lhsTgt, invParam ++ rhsTgt))
+      (
+        CallParamMapping(invParam ++ lhsSrc, invParam ++ rhsSrc),
+        CallParamMapping(invParam ++ lhsTgt, invParam ++ rhsTgt)
+      )
     }
 
     program.procedures.map(p => p.name -> getParams(p, afterFrame.getOrElse(p.name, Frame()))).toMap
@@ -620,7 +623,9 @@ object TranslationValidator {
     val invs = (cuts.map {
       case (label) => {
         if (!(targetInfo.cutBlockLabels.contains(label) && sourceInfo.cutBlockLabels.contains(label))) {
-          throw Exception(s"Mismatched cut labels (missing $label)\nsource: ${sourceInfo.cutBlockLabels}\ntarget: ${targetInfo.cutBlockLabels}")
+          throw Exception(
+            s"Mismatched cut labels (missing $label)\nsource: ${sourceInfo.cutBlockLabels}\ntarget: ${targetInfo.cutBlockLabels}"
+          )
         }
         val tgtCut = targetInfo.cutBlockLabels(label)
         val srcCut = sourceInfo.cutBlockLabels(label)
@@ -1048,6 +1053,22 @@ object TranslationValidator {
       b.addAssert(exprInSource(BinaryExpr(EQ, PCMan.PCSym(cutLabel), TransitionSystem.programCounterVar)))
     })
 
+    val pcPost = boolOr(
+      (targetInfo.cutBlockLabels.keys ++ sourceInfo.cutBlockLabels.keys)
+        .map(cutLabel => PCMan.PCSym(cutLabel))
+        .map(cutSym => BinaryExpr(EQ, cutSym, TransitionSystem.programCounterVar))
+    )
+
+    b.addAssert(
+      exprInSource(sourceInfo.renameSSA(sourceInfo.cuts.cutLabelBlockInTr("EXIT").label, pcPost)),
+      Some("PCDomainPostSource")
+    )
+
+    b.addAssert(
+      exprInTarget(targetInfo.renameSSA(sourceInfo.cuts.cutLabelBlockInTr("EXIT").label, pcPost)),
+      Some("PCDomainPostTarget")
+    )
+
     count = 0
     for (e <- preInv) {
       count += 1
@@ -1084,10 +1105,12 @@ object TranslationValidator {
     val sourceAssumeFail =
       BinaryExpr(
         EQ,
-        exprInSource(sourceInfo.renameSSA(
-          sourceInfo.cuts.cutLabelBlockInTr("EXIT").label.stripPrefix("source__"),
-          TransitionSystem.programCounterVar
-        )),
+        exprInSource(
+          sourceInfo.renameSSA(
+            sourceInfo.cuts.cutLabelBlockInTr("EXIT").label.stripPrefix("source__"),
+            TransitionSystem.programCounterVar
+          )
+        ),
         PCMan.PCSym(PCMan.assumptionFailLabel)
       )
 
@@ -1257,13 +1280,12 @@ object TranslationValidator {
       val source = procToTrInplace(sourceProc, sourceParams, invariant.introducedAsserts)
       val target = procToTrInplace(targetProc, targetParams, Set())
 
-      val runNamePrefix = runName + "-" + proc.name 
+      val runNamePrefix = runName + "-" + proc.name
       tvLogger.debug(runNamePrefix)
 
       config.outputPath.foreach(path => {
         tvLogger.writeToFile(File(s"${path}/${runNamePrefix}.il"), translating.PrettyPrinter.pp_proc(proc))
       })
-
 
       val concreteInvariant = inferInvariant(interproc, invariant, source, target)
 

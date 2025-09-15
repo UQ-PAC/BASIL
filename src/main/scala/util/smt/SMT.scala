@@ -7,13 +7,13 @@ import org.sosy_lab.common.configuration.Configuration
 import org.sosy_lab.common.log.LogManager
 import org.sosy_lab.java_smt.SolverContextFactory
 import org.sosy_lab.java_smt.api.{
-  FunctionDeclaration,
   BitvectorFormula,
   BooleanFormula,
   Evaluator,
   Formula,
   FormulaManager,
   FormulaType,
+  FunctionDeclaration,
   ProverEnvironment,
   SolverContext
 }
