@@ -1,4 +1,4 @@
-import analysis.*
+import analysis.{*, given}
 import ir.dsl.*
 import ir.eval.*
 import ir.{dsl, *}
@@ -12,7 +12,7 @@ import translating.PrettyPrinter.*
 @test_util.tags.UnitTest
 class TestKnownBitsInterpreter
     extends AnyFunSuite
-    with TestValueDomainWithInterpreter[TNum]
+    with TestValueDomainWithInterpreter[TypedTNum]
     with org.scalatestplus.scalacheck.ScalaCheckPropertyChecks {
 
   def valueInAbstractValue(absVal: TNum, concrete: Expr) = {
@@ -23,6 +23,11 @@ class TestKnownBitsInterpreter
         BinaryExpr(EQ, v, BinaryExpr(BVAND, UnaryExpr(BoolToBV1, concrete), UnaryExpr(BVNOT, m)))
       case _ => ???
     }
+  }
+  def valueInAbstractValue(absVal: TypedTNum, concrete: Expr) = absVal match {
+    case IndexedLattice.Bot() => FalseLiteral
+    case IndexedLattice.Top() => TrueLiteral
+    case IndexedLattice.Elem(x) => valueInAbstractValue(x, concrete)
   }
 
   val kbitsProg = prog(
@@ -142,7 +147,15 @@ class TestKnownBitsInterpreter
   )
 
   def testInterpret(arg1: BigInt, arg2: BigInt) = {
-    val (testResult, _) = analysis.knownBitsAnalysis(kbitsCtx.program)
+    def convert(map: LatticeMap[Variable, TypedTNum]): Map[Variable, TypedTNum] = {
+      map.toMap.collect { case (k, v) => k -> v }
+    }
+    val testResult = analysis
+      .knownBitsAnalysis(kbitsCtx.program)
+      ._1
+      .view
+      .mapValues(convert)
+      .toMap
     val res = runTestInterpreter(kbitsCtx, testResult, callParams = params(arg1, arg2))
     assert(res.checksPassed.nonEmpty)
     assert(
@@ -265,7 +278,7 @@ class TestKnownBitsInterpreter
     e <- genExpr(Some(sz))
   } yield (e))
 
-  def evaluateAbstract(e: Expr): TNum = TNumDomain().evaluateExprToTNum(Map(), e)
+  def evaluateAbstract(e: Expr): TypedTNum = EvaluateInLattice[TypedTNum]().evalExpr(_ => None)(e)
 
   test("TNUM soundness property") {
     forAll(minSuccessful(50000)) { (e: Expr) =>
