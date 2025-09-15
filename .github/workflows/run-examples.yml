@@ -43,6 +43,7 @@ jobs:
       - uses: actions/download-artifact@v5
         with:
           name: mill-out
+          path: out
       - run: 'ls -l'
       - run: 'chmod -R 777 out'
 
