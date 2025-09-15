@@ -31,22 +31,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - uses: coursier/cache-action@v6
-        with:
-          extraMillFiles: '**/*.mill'
-          ignoreJob: true
-          ignoreMatrix: true
-
-      - uses: actions/cache@v4
-        with:
-          path: out
-          key: |
-            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
-          restore-keys: |
-            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
-            build-${{ runner.os }}-
-            build-
-
       - run: ./mill fmt
 
       - name: Check source formatting and imports
