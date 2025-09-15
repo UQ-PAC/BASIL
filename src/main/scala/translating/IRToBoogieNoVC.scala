@@ -103,9 +103,12 @@ object BoogieTranslator {
     BBlock(b.label, slToBoogie(b.statements.toList) ++ translateJump(b.jump))
   }
 
-  def translateProc(freeRequires: Iterable[BExpr] = Set(), freeEnsures: Iterable[BExpr] = Set())(
-    e: Procedure
-  ): BProcedure = {
+  def translateProc(
+    freeRequires: Iterable[BExpr] = Seq(),
+    freeEnsures: Iterable[BExpr] = Seq(),
+    extraRequires: Iterable[BExpr] = Seq(),
+    extraEnsures: Iterable[BExpr] = Seq()
+  )(e: Procedure): BProcedure = {
 
     val body: List[BCmdOrBlock] =
       (e.entryBlock.view ++ e.blocks.filterNot(x => e.entryBlock.contains(x))).map(x => translateBlock(x)).toList
@@ -117,8 +120,8 @@ object BoogieTranslator {
       e.name,
       inparams,
       outparams,
-      e.ensures ++ e.ensuresExpr.map(translateExpr),
-      e.requires ++ e.requiresExpr.map(translateExpr),
+      e.ensures ++ e.ensuresExpr.map(translateExpr) ++ extraEnsures,
+      e.requires ++ e.requiresExpr.map(translateExpr) ++ extraRequires,
       List(),
       List(),
       freeEnsures.toList,
@@ -147,8 +150,10 @@ object BoogieTranslator {
     decls
   }
 
-  def translateProg(p: Program, fname: String = "output.bpl") = {
+  def translateProg(p: Program, spec: Option[specification.Specification], fname: String = "output.bpl") = {
     p.setModifies(Map())
+
+    val procSpecs = spec.toSeq.flatMap(_.subroutines).map(s => s.name -> s).toMap
 
     val vvis = FindVars()
     visit_prog(vvis, p)
@@ -176,10 +181,15 @@ object BoogieTranslator {
     val memGlobals = (readOnlyMemory ++ initialMemory).flatMap(_.globals).map(BVarDecl(_))
     val globalVarDecls = vvis.globals.map(translateGlobal).map(BVarDecl(_)) ++ memGlobals
 
-    val procs = p.procedures.map {
-      case proc if p.mainProcedure eq proc => translateProc(initialMemory ++ readOnlyMemory)(proc)
-      case proc => translateProc(readOnlyMemory)(proc)
-    }
+    val procs = p.procedures.map(proc => {
+      val requires = procSpecs.get(proc.procName).toSeq.flatMap(_.requires)
+      val ensures = procSpecs.get(proc.procName).toSeq.flatMap(_.ensures)
+      if (p.mainProcedure eq proc) {
+        translateProc(initialMemory ++ readOnlyMemory, Seq(), requires, ensures)(proc)
+      } else {
+        translateProc(readOnlyMemory, Seq(), requires, ensures)(proc)
+      }
+    })
 
     val functionOpDefinitions = functionOpToDecl(globalDecls ++ globalVarDecls ++ procs)
     val decls = globalVarDecls.toList ++ globalDecls ++ functionOpDefinitions ++ procs
