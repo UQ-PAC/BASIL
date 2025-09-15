@@ -47,7 +47,7 @@ jobs:
             build-${{ runner.os }}-
             build-
 
-      - run: ./mill fmt
+      - run: ./mill -i fmt
 
       - name: Check source formatting and imports
         id: diff
@@ -98,7 +98,7 @@ jobs:
           ```
           or, run the formatter locally:
           ```bash
-          ./mill fmt
+          ./mill -i fmt
           ```
 
           </details>
