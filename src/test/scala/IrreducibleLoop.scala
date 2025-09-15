@@ -1,9 +1,9 @@
 import analysis.LoopDetector
-import ir.{Block, Program, dotBlockGraph}
+import ir.{Block, IRLoading, Program, dotBlockGraph}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
 import translating.{BAPToIR, ReadELFData}
-import util.{ILLoadingConfig, IRLoading, LogLevel, Logger}
+import util.{ILLoadingConfig, LogLevel, Logger}
 
 import scala.sys.process.*
 

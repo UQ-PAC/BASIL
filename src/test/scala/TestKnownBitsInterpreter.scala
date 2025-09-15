@@ -132,7 +132,7 @@ class TestKnownBitsInterpreter
     )
   )
 
-  val kbitsCtx = util.IRLoading.load(kbitsProg)
+  val kbitsCtx = ir.IRLoading.load(kbitsProg)
 
   def params(v1: BigInt, v2: BigInt) = Some(
     Seq(
