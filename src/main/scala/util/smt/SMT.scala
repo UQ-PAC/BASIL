@@ -7,6 +7,7 @@ import org.sosy_lab.common.configuration.Configuration
 import org.sosy_lab.common.log.LogManager
 import org.sosy_lab.java_smt.SolverContextFactory
 import org.sosy_lab.java_smt.api.{
+  FunctionDeclaration,
   BitvectorFormula,
   BooleanFormula,
   Evaluator,
@@ -17,6 +18,7 @@ import org.sosy_lab.java_smt.api.{
   SolverContext
 }
 
+import scala.collection.mutable
 import scala.jdk.CollectionConverters.{SeqHasAsJava, SetHasAsJava}
 
 // TODO
@@ -40,7 +42,7 @@ enum Solver {
  *  (!!) It is very important (!!) to close the solver with [[close]] once you are done with it to prevent memory leaks!
  *
  *  This class contains an SMT solver context. This means that ideally, you should create a single solver, and make many
- *  queries to it. Queries can be either BASIL [[Expr]]s of type [[BoolType]] or [[Predicate]]s. Alternatively one can
+ *  queries to it. Queries can be either BASIL [[ir.Expr]]s of type [[ir.BoolType]] or [[analysis.Predicate]]s. Alternatively one can
  *  pass a string representation of an SMT2 query using [[smt2Sat]].
  *
  *  A solver wide default timeout can optionally be given with the [[defaultTimeoutMillis]] variable, but this can be
@@ -98,12 +100,12 @@ class SMTSolver(var defaultTimeoutMillis: Option[Int] = None, solver: Solver = S
     r
   }
 
-  /** Run solver on a [[Predicate]] */
+  /** Run solver on a [[analysis.Predicate]] */
   def predSat(p: Predicate, timeoutMillis: Option[Int] = None, obtainModel: Boolean = false): SatResult = {
     sat(formulaConverter.convertPredicate(p), timeoutMillis.orElse(defaultTimeoutMillis), obtainModel)
   }
 
-  /** Run solver on a boolean typed BASIL [[Expr]] */
+  /** Run solver on a boolean typed BASIL [[ir.Expr]] */
   def exprSat(p: Expr, timeoutMillis: Option[Int] = None, obtainModel: Boolean = false): SatResult = {
     sat(formulaConverter.convertBoolExpr(p), timeoutMillis.orElse(defaultTimeoutMillis), obtainModel)
   }
@@ -215,6 +217,8 @@ class FormulaConverter(formulaManager: FormulaManager) {
   lazy val bitvectorFormulaManager = formulaManager.getBitvectorFormulaManager()
   lazy val booleanFormulaManager = formulaManager.getBooleanFormulaManager()
   lazy val integerFormulaManager = formulaManager.getIntegerFormulaManager()
+  lazy val uninterpretedFunctionManager = formulaManager.getUFManager()
+  var uninterpretedFunctions: mutable.Map[String, FunctionDeclaration[BitvectorFormula]] = mutable.Map()
 
   def convertBoolLit(lit: BoolLit): BooleanFormula = {
     lit match {
@@ -401,6 +405,16 @@ class FormulaConverter(formulaManager: FormulaManager) {
       }
       case ZeroExtend(extension, body) => bitvectorFormulaManager.extend(convertBVTerm(body), extension, false)
       case SignExtend(extension, body) => bitvectorFormulaManager.extend(convertBVTerm(body), extension, true)
+      case FApply(name, params, returnWidth, uninterpreted) => {
+        if (!uninterpretedFunctions.contains(name)) {
+          uninterpretedFunctions += (name -> uninterpretedFunctionManager.declareUF(
+            name,
+            FormulaType.getBitvectorTypeWithSize(returnWidth),
+            params.map(b => FormulaType.getBitvectorTypeWithSize(b.size)).asJava
+          ))
+        }
+        uninterpretedFunctionManager.callUF(uninterpretedFunctions(name), params.map(convertBVTerm(_)).asJava)
+      }
     }
   }
 

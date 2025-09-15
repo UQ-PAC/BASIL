@@ -414,8 +414,8 @@ object LocalVar {
 
   /**
    * Construct a LocalVar by infering its index from the provided name corresponding to [[LocalVar.name]].
-   * It matches the value of [[name]] result, dropping an '_0' suffix or otherwise extracting index [[${name}_${index}]].
-   * Use only when the [[index]] field has been lost/mangled with the name, e.g. due to serialisation & parsing.
+   * It matches the value of `name` result, dropping an '_0' suffix or otherwise extracting index `${name}_${index}`.
+   * Use only when the `index` field has been lost/mangled with the name, e.g. due to serialisation & parsing.
    */
   def ofIndexed(name: String, ty: IRType) =
     val rname = Sigil.BASIR.unsigil(name) match {

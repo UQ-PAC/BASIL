@@ -27,7 +27,7 @@ object BitVectorEval {
     if isNegative(b) then b.value - BigInt(2).pow(b.size)
     else b.value
 
-  /** Converts a signed integer value to its corresponding Bitvector, 
+  /** Converts a signed integer value to its corresponding Bitvector,
    *  assuming it falls within the representable range of the bitvector
    *  with size [[size]].
    *
@@ -38,19 +38,21 @@ object BitVectorEval {
   /** (bvadd (_ BitVec m) (_ BitVec m) (_ BitVec m))
     *   - addition modulo 2^m
     *
+    * ```
     * [[(bvadd s t)]] := nat2bv[m](bv2nat([[s]]) + bv2nat([[t]]))
+    * ```
     */
   def smt_bvadd(s: BitVecLiteral, t: BitVecLiteral): BitVecLiteral = {
     require(s.size == t.size)
     nat2bv(s.size, bv2nat(s) + bv2nat(t))
   }
 
-  /** */
-
   /** (bvmul (_ BitVec m) (_ BitVec m) (_ BitVec m))
     *   - multiplication modulo 2^m
     *
+    * ```
     * [[(bvmul s t)]] := nat2bv[m](bv2nat([[s]]) * bv2nat([[t]]))
+    * ```
     */
   def smt_bvmul(s: BitVecLiteral, t: BitVecLiteral): BitVecLiteral = {
     nat2bv(s.size, bv2nat(s) * bv2nat(t))
@@ -59,7 +61,9 @@ object BitVectorEval {
   /** (bvneg (_ BitVec m) (_ BitVec m))
     *   - 2's complement unary minus
     *
+    * ```
     * [[(bvneg s)]] := nat2bv[m](2^m - bv2nat([[s]]))
+    * ```
     */
   def smt_bvneg(s: BitVecLiteral): BitVecLiteral = {
     nat2bv(s.size, BigInt(2).pow(s.size) - bv2nat(s))
@@ -85,7 +89,9 @@ object BitVectorEval {
   /** (bvor (_ BitVec m) (_ BitVec m) (_ BitVec m))
     *   - bitwise or
     *
+    * ```
     * [[(bvor s t)]] := λx:[0, m). if [[s]](x) = 1 then 1 else [[t]](x)
+    * ```
     */
   def smt_bvor(s: BitVecLiteral, t: BitVecLiteral): BitVecLiteral = {
     require(s.size == t.size, "bitvector sizes must be the same")
@@ -96,7 +102,9 @@ object BitVectorEval {
   /** (bvnot (_ BitVec m) (_ BitVec m))
     *   - bitwise negation
     *
+    * ```
     * [[(bvnot s)]] := λx:[0, m). if [[s]](x) = 0 then 1 else 0
+    * ```
     */
   def smt_bvnot(s: BitVecLiteral): BitVecLiteral = {
     BitVecLiteral(BigInt(2).pow(s.size) - (s.value + 1), s.size)
@@ -105,7 +113,9 @@ object BitVectorEval {
   /** (bvudiv (_ BitVec m) (_ BitVec m) (_ BitVec m))
     *   - unsigned division, truncating towards 0
     *
+    * ```
     * [[(bvudiv s t)]] := if bv2nat([[t]]) = 0 then λx:[0, m). 1 else nat2bv[m](bv2nat([[s]]) div bv2nat([[t]]))
+    * ```
     */
   def smt_bvudiv(s: BitVecLiteral, t: BitVecLiteral): BitVecLiteral = {
     require(s.size == t.size, "bitvector sizes must be the same")

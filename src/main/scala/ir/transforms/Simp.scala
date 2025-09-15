@@ -1877,8 +1877,8 @@ class DefinitelyExits(knownExit: Set[Procedure]) extends ProcedureSummaryGenerat
 
   def transfer(a: ir.transforms.PathExit, b: ir.Procedure): ir.transforms.PathExit = ???
 
-  /** 
-   *  Join the summary [[summaryForTarget]] for a call [[p]] into the local abstract state [[l]]
+  /**
+   *  Join the summary `summaryForTarget` for a call `p` into the local abstract state `l`.
    */
   def localTransferCall(
     l: ir.transforms.PathExit,

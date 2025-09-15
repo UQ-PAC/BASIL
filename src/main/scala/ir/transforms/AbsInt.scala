@@ -52,7 +52,7 @@ trait PowerSetDomain[T] extends AbstractDomain[Set[T]] {
 /** A solver which solve for a single global lattice value across a procedrure. This traverses blocks in
   * reverse-post-order.
   *
-  * This expects blocks [[rpoOrder()]] to have been run on the blocks in the procedure.
+  * This expects blocks [[Procedure#sort]] to have been run on the blocks in the procedure.
   *
   * E.g. used for flow-insensitive analyses.
   *
@@ -107,8 +107,8 @@ class DomainWithFunctionSummaries[L, Summary](
 
 trait ProcedureSummaryGenerator[L, LocalDomain] extends ProcAbstractDomain[L] {
 
-  /** 
-   *  Join the summary [[summaryForTarget]] for a call [[p]] into the local abstract state [[l]]
+  /**
+   *  Join the summary `summaryForTarget` for a call `p` into the local abstract state `l`.
    */
   def localTransferCall(l: LocalDomain, summaryForTarget: L, p: DirectCall): LocalDomain
 
@@ -125,7 +125,7 @@ trait ProcedureSummaryGenerator[L, LocalDomain] extends ProcAbstractDomain[L] {
 
 /** A general worklist solver which optionally supports widening and narrowing on loop heads.
   *
-  * Traverses blocks in reverse-post-order so requires [[rpoOrder()]] to have been run on the procedure.
+  * Traverses blocks in reverse-post-order so requires [[Procedure#sort]] to have been run on the procedure.
   *
   * @tparam L:
   *   the lattice value type
@@ -250,7 +250,7 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A, widen: Boolean = fals
 /** Perform an interprocedural analysis by running an intraprocedural analysis on each procedure, computing a summary
   * based on the result, and computing the fixed point of summaries over the call graph.
   *
-  * Recommended to call [[Procedure.sortProceduresRPO]] before using this so that we traverse the call graph in
+  * Recommended to call [[Program#sortProceduresRPO]] before using this so that we traverse the call graph in
   * reverse-post-order.
   *
   * @tparam SummaryAbsVal
@@ -264,8 +264,8 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A, widen: Boolean = fals
   * @param sg
   *   The ProcedureSummaryGenerator defining the analysis of a procedure using summaries.
   *
-  * This internally creates a new abstract domain that overrides transfer of [[DirectCall]] in [[localDomain]] with the
-  * transfer function defined in [[sg]] which utilises procedure summaries.
+  * This internally creates a new abstract domain that overrides transfer of [[DirectCall]] in `localDomain` with the
+  * transfer function defined in `sg` which utilises procedure summaries.
   */
 class interprocSummaryFixpointSolver[SummaryAbsVal, LocalAbsVal, A <: AbstractDomain[LocalAbsVal]](
   localDomain: A,
