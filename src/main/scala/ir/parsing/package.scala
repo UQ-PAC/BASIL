@@ -70,7 +70,7 @@ package ir
  *    The visitor returns an unresolved Basil DSL structure, [[ir.dsl.EventuallyProgram]].
  * 6. In [[ir.parsing.ParseBasilIL.makeBasilIRContext]], the DSL structure is resolved into a
  *    real Basil IR [[ir.Program]] and combined with the [[ir.parsing.Declarations]]
- *    to produce a [[util.IRContext]].
+ *    to produce a [[ir.IRContext]].
  *
  */
 package object parsing {}

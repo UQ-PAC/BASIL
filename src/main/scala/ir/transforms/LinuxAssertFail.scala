@@ -1,9 +1,8 @@
 package ir.transforms
 
-import ir.*
 import ir.cilvisitor.*
 import ir.eval.*
-import util.IRContext
+import ir.{IRContext, *}
 import util.functional.*
 
 def liftLinuxAssertFail(ctx: IRContext) = {
