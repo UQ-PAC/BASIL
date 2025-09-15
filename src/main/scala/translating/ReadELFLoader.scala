@@ -175,7 +175,10 @@ object ReadELFLoader {
   def getSymbolTableRow(ctx: SymbolTableRowContext): ELFSymbol = {
     val bind = ELFBind.valueOf(ctx.bind.getText)
     val etype = ELFSymType.valueOf(ctx.entrytype.getText)
-    val size = ctx.size.getText.toInt
+    val size = ctx.size.getText match {
+      case hex if hex.startsWith("0x") => Integer.parseInt(hex.stripPrefix("0x"), 16)
+      case s => s.toInt
+    }
     val name = ctx.name match {
       case null => ""
       case x => x.getText

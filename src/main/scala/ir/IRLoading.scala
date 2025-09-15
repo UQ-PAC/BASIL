@@ -186,7 +186,7 @@ object IRLoading {
     parser.setErrorHandler(BailErrorStrategy())
     parser.setBuildParseTree(true)
 
-    val relf = ReadELFLoader.visitSyms(parser.syms(), config)
+    val relf = ReadELFLoader.visitSyms(util.catchAntlrParseErrors(parser.syms()), config)
 
     val gtirbRelf = if (config.inputFile.endsWith(".gts") || config.inputFile.endsWith(".gtirb")) {
       val gtirbRelf = loadGTIRBReadELF(config)
