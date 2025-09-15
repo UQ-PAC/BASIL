@@ -616,7 +616,7 @@ object TranslationValidator {
 
     val cuts = (targetInfo.cutBlockLabels.keys ++ sourceInfo.cutBlockLabels.keys).toSet.toList
 
-    println(s"cuts source: ${sourceInfo.cutBlockLabels}\ntarget: ${targetInfo.cutBlockLabels}")
+    tvLogger.debug(s"cuts source: ${sourceInfo.cutBlockLabels}\ntarget: ${targetInfo.cutBlockLabels}")
     val invs = (cuts.map {
       case (label) => {
         if (!(targetInfo.cutBlockLabels.contains(label) && sourceInfo.cutBlockLabels.contains(label))) {
@@ -1258,7 +1258,7 @@ object TranslationValidator {
       val target = procToTrInplace(targetProc, targetParams, Set())
 
       val runNamePrefix = runName + "-" + proc.name 
-      println(runNamePrefix)
+      tvLogger.debug(runNamePrefix)
 
       config.outputPath.foreach(path => {
         tvLogger.writeToFile(File(s"${path}/${runNamePrefix}.il"), translating.PrettyPrinter.pp_proc(proc))
@@ -1267,7 +1267,6 @@ object TranslationValidator {
 
       val concreteInvariant = inferInvariant(interproc, invariant, source, target)
 
-      if (false) {
       if (
         config.splitLargeProceduresThreshold
           .exists(_ <= (procComplexity(source.transition) + procComplexity(target.transition)))
@@ -1312,7 +1311,6 @@ object TranslationValidator {
           targetSSA
         )
         result = result.copy(results = res :: result.results)
-      }
       }
     })
 
