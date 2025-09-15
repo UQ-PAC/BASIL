@@ -44,7 +44,6 @@ jobs:
         with:
           name: mill-out
           path: out
-      - run: 'ls -l'
       - run: 'chmod -R 777 out'
 
       - run: './mill test.compile'
@@ -82,6 +81,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: mill-out
+          path: out
+      - run: 'chmod -R 777 out'
 
       - run: sudo apt-get update
       - run: sudo apt-get install -y z3='4.8.12-*'
@@ -136,6 +141,12 @@ jobs:
         with:
           dotnet-version: '6.0.x'
 
+      - uses: actions/download-artifact@v5
+        with:
+          name: mill-out
+          path: out
+      - run: 'chmod -R 777 out'
+
       - run: choco install z3
       - run: dotnet tool install --global boogie --version '3.4.3'
 
@@ -158,6 +169,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: mill-out
+          path: out
+      - run: 'chmod -R 777 out'
 
       - run: sudo apt-get update
       - run: sudo apt-get install -y z3='4.8.12-*'
@@ -196,6 +213,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: mill-out
+          path: out
+      - run: 'chmod -R 777 out'
 
       - run: sudo apt-get update
       - run: sudo apt-get install -y z3='4.8.12-*'
