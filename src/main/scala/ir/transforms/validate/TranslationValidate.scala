@@ -515,6 +515,8 @@ object TranslationValidator {
     renaming: TransformDataRelationFun
   ): Map[String, (CallParamMapping, CallParamMapping)] = {
 
+    val invParam = List(TransitionSystem.traceVar, TransitionSystem.programCounterVar).map(a => (a, Some(a)))
+
     def param(v: Variable | Memory): (Variable | Memory, Option[Variable]) = v match {
       case g: GlobalVar => (g -> Some(g))
       case g: LocalVar => (g -> None)
@@ -550,7 +552,7 @@ object TranslationValidator {
       val lhsTgt = lhs.map(paramTgt(false))
       val rhsTgt = rhs.map(paramTgt(true))
 
-      (CallParamMapping(lhsSrc, rhsSrc), CallParamMapping(lhsTgt, rhsTgt))
+      (CallParamMapping(invParam ++ lhsSrc, invParam ++ rhsSrc), CallParamMapping(invParam ++ lhsTgt, invParam ++ rhsTgt))
     }
 
     program.procedures.map(p => p.name -> getParams(p, afterFrame.getOrElse(p.name, Frame()))).toMap
@@ -614,8 +616,12 @@ object TranslationValidator {
 
     val cuts = (targetInfo.cutBlockLabels.keys ++ sourceInfo.cutBlockLabels.keys).toSet.toList
 
+    println(s"cuts source: ${sourceInfo.cutBlockLabels}\ntarget: ${targetInfo.cutBlockLabels}")
     val invs = (cuts.map {
       case (label) => {
+        if (!(targetInfo.cutBlockLabels.contains(label) && sourceInfo.cutBlockLabels.contains(label))) {
+          throw Exception(s"Mismatched cut labels (missing $label)\nsource: ${sourceInfo.cutBlockLabels}\ntarget: ${targetInfo.cutBlockLabels}")
+        }
         val tgtCut = targetInfo.cutBlockLabels(label)
         val srcCut = sourceInfo.cutBlockLabels(label)
 
@@ -1251,8 +1257,17 @@ object TranslationValidator {
       val source = procToTrInplace(sourceProc, sourceParams, invariant.introducedAsserts)
       val target = procToTrInplace(targetProc, targetParams, Set())
 
+      val runNamePrefix = runName + "-" + proc.name 
+      println(runNamePrefix)
+
+      config.outputPath.foreach(path => {
+        tvLogger.writeToFile(File(s"${path}/${runNamePrefix}.il"), translating.PrettyPrinter.pp_proc(proc))
+      })
+
+
       val concreteInvariant = inferInvariant(interproc, invariant, source, target)
 
+      if (false) {
       if (
         config.splitLargeProceduresThreshold
           .exists(_ <= (procComplexity(source.transition) + procComplexity(target.transition)))
@@ -1297,6 +1312,7 @@ object TranslationValidator {
           targetSSA
         )
         result = result.copy(results = res :: result.results)
+      }
       }
     })
 

@@ -185,7 +185,7 @@ object TransitionSystem {
     val program = IRToDSL.convertProgram(iprogram).resolve
 
     val loops = analysis.LoopDetector.identify_loops(program)
-    val floops = loops.identifiedLoops.toList // .sortBy(_.header.label)
+    val floops = loops.loops_o 
 
     val cutPoints = program.procedures
       .map(p => {
