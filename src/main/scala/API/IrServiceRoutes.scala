@@ -29,8 +29,8 @@ implicit val selectionDecoder: EntityDecoder[IO, ConfigSelection] = jsonOf[IO, C
 implicit val statusEncoder: EntityEncoder[IO, AnalysisStatus] = jsonEncoderOf[AnalysisStatus]
 
 class IrServiceRoutes(
-                       epochStore: IREpochStore, 
-                       isReady: Ref[IO, Boolean], 
+                       epochStore: IREpochStore,
+                       isReady: Ref[IO, Boolean],
                        irProcessingSemaphore: Semaphore[IO],
                        generateIRAsync: (String, Option[String]) => IO[Unit])(
   implicit asyncIO: Async[IO],
@@ -74,7 +74,13 @@ class IrServiceRoutes(
           ServiceUnavailable("IR data is still initializing. Please try again shortly.")
     }
 
-  /** GET /config/datasets */
+  /** GET /config/datasets
+   *
+   * Retrieves all available configuration datasets.
+   *
+   * @return A JSON array of dataset names or identifiers.
+   * @throws ServiceUnavailable if the IR data is not ready.
+   */
   private val getConfigDatasetsRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
     case GET -> Root / "config" / "datasets" =>
       ensureReady {
@@ -86,7 +92,17 @@ class IrServiceRoutes(
       }
   }
 
-  /** POST /config/select */
+  /** POST /config/select
+   *
+   * Selects a specific configuration dataset to analyze.
+   *
+   * Param: selection JSON payload containing:
+   *                  - `adt`: The ADT input file path
+   *                  - `relf`: Optional RELF file path
+   * @return Success message indicating that analysis has been triggered.
+   * @throws ServiceUnavailable if IR data cannot be updated.
+   * @note Runs `generateIRAsync` asynchronously and waits for completion before responding.
+   */
   private val postSelectConfigRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
     case req@POST -> Root / "config" / "select" =>
       for {
@@ -102,7 +118,7 @@ class IrServiceRoutes(
         resp <- Ok(s"Analysis triggered for ${selection.adt} / ${selection.relf.getOrElse("none")}")
       } yield resp
   }
-  
+
   /**
    * **Endpoint:** `GET /epochs`
    *
