@@ -5,7 +5,7 @@ set -o pipefail
 test_dir=src/test
 
 echo '::group::All test suites:'
-tests="$(./mill test.testOnly -- -t '' -oW | grep ':$' | tr -d ':' | cut -d' ' -f2 | sort)"
+tests="$(./mill -i test.testOnly -- -t '' -oW | grep ':$' | tr -d ':' | cut -d' ' -f2 | sort)"
 echo "$tests"
 echo '::endgroup::'
 echo
