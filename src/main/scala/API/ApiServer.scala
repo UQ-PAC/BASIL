@@ -17,7 +17,6 @@ import com.comcast.ip4s._
 
 import cats.implicits._
 import cats.effect._
-import cats.effect.std.Console
 import cats.effect.std.Semaphore
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -79,35 +78,28 @@ object ApiServer extends IOApp {
         .withHttpApp(httpApp)
         .build
         .use { server =>
-          Console[IO].println(s"Server started at ${server.baseUri}") *>
-            IO.never
+          logger.info(s"Server started at http://localhost:8080/") *>
+          IO.never 
         }
     } yield exitCode
   }
-  
+
   private def generateIRAsync(
                                epochStore: IREpochStore,
                                irProcessingSemaphore: Semaphore[IO],
                                isReady: Ref[IO, Boolean]
                              )(adt: String, relf: Option[String]): IO[Unit] = {
-    
+
     irProcessingSemaphore.permit.use { _ =>
       val analysis: IO[Unit] = for {
-        _ <- logger.info("Starting BASIL analysis...")
         startTime <- IO.monotonic
-
         _ <- logger.info("Clearing previous epochs from store...")
         _ <- epochStore.epochsRef.set(List.empty)
         _ <- isReady.set(false)
+        _ <- logger.info("Starting BASIL analysis (inside locked section)...")
         collectedEpochs <- IO.blocking {
           val buffer = ArrayBuffer.empty[IREpoch]
-
-          val ilConfig = ILLoadingConfig(
-            inputFile = adt,
-            relfFile  = relf,
-            dumpIL = None
-          )
-
+          val ilConfig = ILLoadingConfig(inputFile = adt, relfFile = relf, dumpIL = None)
           val basilConfig = BASILConfig(
             context = None,
             loading = ilConfig,
@@ -118,25 +110,16 @@ object ApiServer extends IOApp {
             staticAnalysis = None,
             outputPrefix = "out/test_output"
           )
-
-          logger.info("Starting BASIL analysis (inside locked section)...")
           val finalBasilResult = RunUtils.run(basilConfig, Some(buffer))
-          logger.info("BASIL analysis completed.")
-
           RunUtils.writeOutput(finalBasilResult)
-
           buffer.toList
         }
         endTime <- IO.monotonic
-        _ <- logger.info(s"BASIL analysis (inside locked section) completed in ${(endTime - startTime).toMillis}ms.")
-        
+        _ <- logger.info(s"BASIL analysis completed in ${(endTime - startTime).toMillis}ms.")
         _ <- collectedEpochs.traverse_(epochStore.addEpoch)
         _ <- logger.info(s"All ${collectedEpochs.size} epochs stored.")
-
         _ <- isReady.set(true)
-
       } yield ()
-
       analysis.handleErrorWith { e =>
         logger.error(e)(s"BASIL analysis failed for ADT=$adt, RELF=${relf.getOrElse("none")}") *>
           isReady.set(true)
