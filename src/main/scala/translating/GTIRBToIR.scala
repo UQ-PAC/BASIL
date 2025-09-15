@@ -14,8 +14,7 @@ import java.util.Base64
 import scala.collection.mutable.{ArrayBuffer, Map, Set}
 import scala.collection.{immutable, mutable}
 
-def b64encode(x: com.google.protobuf.ByteString) =
-  Base64.getEncoder().encodeToString(x.toByteArray)
+def b64encode(x: com.google.protobuf.ByteString) = Base64.getEncoder.encodeToString(x.toByteArray)
 
 private def assigned(x: Statement): immutable.Set[Variable] = x match {
   case x: Assign => x.assignees
@@ -51,9 +50,6 @@ class TempIf(
   *
   * @param mods:
   *   Modules of the Gtirb file.
-  * @param parserMap:
-  *   A Map from UUIDs to basic block statements, used for instruction semantics.
-  *   If None is provided then the offline lifter is used to generate instruction semantics.
   * @param cfg:
   *   The cfg provided by gtirb
   * @param mainAddress:
@@ -67,9 +63,9 @@ class GTIRBToIR(
   mainName: Option[String]
 ) {
 
-  val functionNames = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionNames)(_)).foldLeft0(_ ++ _)
-  val functionEntries = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionEntries)(_)).foldLeft0(_ ++ _)
-  val functionBlocks = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionBlocks)(_)).foldLeft0(_ ++ _)
+  private val functionNames = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionNames)(_)).foldLeft0(_ ++ _)
+  private val functionEntries = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionEntries)(_)).foldLeft0(_ ++ _)
+  private val functionBlocks = mods.map(AuxDecoder.decodeAux(AuxKind.FunctionBlocks)(_)).foldLeft0(_ ++ _)
 
   import scala.language.implicitConversions
   given scala.Conversion[com.google.protobuf.ByteString, String] = b64encode
@@ -190,7 +186,7 @@ class GTIRBToIR(
           Logger.debug(s"removing block ${block.label}")
           procedure.removeBlocks(block)
         } else {
-          val outgoingEdges = blockOutgoingEdges.getOrElse(blockUUID, Set())
+          val outgoingEdges = blockOutgoingEdges.getOrElse(blockUUID, mutable.Set())
           if (outgoingEdges.nonEmpty) {
             val (calls, jump) = if (outgoingEdges.size == 1) {
               val edge = outgoingEdges.head
@@ -264,17 +260,15 @@ class GTIRBToIR(
         // this allows for differing branch behaviours within trailing TempIf
         // statements, as happens in conditional jumps for example.
         initial :+ TempIf(x.cond, insertPCIncrement(x.thenStmts), insertPCIncrement(x.elseStmts))
-      case _ => {
+      case _ =>
         val increment = LocalAssign(
           Register("_PC", 64),
           BinaryExpr(BVADD, Register("_PC", 64), BitVecLiteral(4, 64)),
           Some("pc-tracking")
         )
-
         val branchTaken = findUniqueBranchBehaviour(isnStmts)
         val incrementIfNotBranched = if branchTaken then None else Some(increment)
         incrementIfNotBranched ++: isnStmts
-      }
     }
   }
 
@@ -341,7 +335,7 @@ class GTIRBToIR(
     procedure.addBlock(block)
     if (uuidToBlock.contains(blockUUID)) {
       // TODO this is a case that requires special consideration
-      throw Exception(s"block ${(blockUUID)} is in multiple functions")
+      throw Exception(s"block $blockUUID is in multiple functions")
     }
     uuidToBlock += (blockUUID -> block)
 
@@ -350,7 +344,7 @@ class GTIRBToIR(
       procedure.entryBlock = block
     }
 
-    block.address.foreach { case addr =>
+    block.address.foreach { addr =>
       val pcCorrectExpr = BinaryExpr(EQ, Register("_PC", 64), BitVecLiteral(addr, 64))
       val assertPC = Assert(pcCorrectExpr, Some("pc-tracking"), Some("pc-tracking"))
       block.statements.append(assertPC)
@@ -360,7 +354,7 @@ class GTIRBToIR(
 
   // makes label boogie friendly
   private def convertLabel(procedure: Procedure, label: String, blockCount: Int): String = {
-    procedure.name + "__" + blockCount + "__" + (label)
+    procedure.name + "__" + blockCount + "__" + label
       .replace("=", "")
       .replace("-", "~")
       .replace("/", "\'")
@@ -536,8 +530,7 @@ class GTIRBToIR(
   ): (Option[Call], Jump) = {
     edge.getLabel match {
       case EdgeLabel(false, false, Type_Branch, _) =>
-        // indirect jump, possibly to external subroutine, possibly to another block in procedure
-        // perhaps other possibilities not yet encountered
+        // indirect jump to external subroutine, another block in procedure, or non-returning call to another procedure
         if (proxies.contains(edge.targetUuid)) {
           val proxySymbols = nodeUUIDToSymbols.getOrElse(edge.targetUuid, mutable.Set())
           if (proxySymbols.isEmpty) {
@@ -552,7 +545,7 @@ class GTIRBToIR(
           } else if (proxySymbols.size > 1) {
             // TODO requires further consideration once encountered
             throw Exception(
-              s"multiple uuidToSymbol ${proxySymbols.map(_.name).mkString(", ")} associated with proxy block ${(edge.targetUuid)}, target of indirect call from block ${block.label}"
+              s"multiple uuidToSymbol ${proxySymbols.map(_.name).mkString(", ")} associated with proxy block ${edge.targetUuid}, target of indirect call from block ${block.label}"
             )
           } else {
             // indirect call to external procedure with name
@@ -570,13 +563,23 @@ class GTIRBToIR(
           }
         } else if (uuidToBlock.contains(edge.targetUuid)) {
           // resolved indirect jump
-          // TODO consider possibility this can go to another procedure?
           val target = uuidToBlock(edge.targetUuid)
           val label = handlePCAssign(block)
-          (None, GoTo(mutable.Set(target), label))
+          if (procedure.blocks.contains(target)) {
+            // jump is within the procedure
+            (None, GoTo(mutable.Set(target), label))
+          } else if (target.isEntry) {
+            // jump is to a different procedure
+            (Some(DirectCall(target.parent, label)), Unreachable())
+          } else {
+            // TODO - jump is to a block in the middle of another procedure - need to either split or merge procedures
+            throw Exception(
+              s"indirect jump from ${block.label} to ${edge.targetUuid} points to a block in the middle of another procedure"
+            )
+          }
         } else {
           throw Exception(
-            s"edge from ${block.label} to ${(edge.targetUuid)} does not point to a known block or proxy block"
+            s"edge from ${block.label} to ${edge.targetUuid} does not point to a known block or proxy block"
           )
         }
       case EdgeLabel(false, true, Type_Branch, _) =>
@@ -598,7 +601,7 @@ class GTIRBToIR(
           val label = handlePCAssign(block)
           (None, GoTo(mutable.Set(target), label))
         } else {
-          throw Exception(s"edge from ${block.label} to ${(edge.targetUuid)} does not point to a known block")
+          throw Exception(s"edge from ${block.label} to ${edge.targetUuid} does not point to a known block")
         }
       case EdgeLabel(false, _, Type_Return, _) =>
         // return statement, value of 'direct' is just whether DDisasm has resolved the return target
@@ -616,7 +619,7 @@ class GTIRBToIR(
           val target = uuidToBlock(edge.targetUuid)
           (None, GoTo(mutable.Set(target)))
         } else {
-          throw Exception(s"edge from ${block.label} to ${(edge.targetUuid)} does not point to a known block")
+          throw Exception(s"edge from ${block.label} to ${edge.targetUuid} does not point to a known block")
         }
       case EdgeLabel(false, true, Type_Call, _) =>
         // call that will not return according to DDisasm even though R30 may be set
@@ -627,7 +630,7 @@ class GTIRBToIR(
           (Some(DirectCall(target, label)), Unreachable())
         } else {
           throw Exception(
-            s"edge from ${block.label} to ${(edge.targetUuid)} does not point to a known procedure entrance"
+            s"edge from ${block.label} to ${edge.targetUuid} does not point to a known procedure entrance"
           )
         }
 
@@ -637,7 +640,7 @@ class GTIRBToIR(
     }
   }
 
-  def handleMultipleEdges(
+  private def handleMultipleEdges(
     block: Block,
     outgoingEdges: mutable.Set[Edge],
     procedure: Procedure
@@ -650,24 +653,19 @@ class GTIRBToIR(
       (None, Return(label))
 
     } else if (edgeLabels.forall { (e: EdgeLabel) => !e.conditional && !e.direct && e.`type` == Type_Branch }) {
-      // resolved indirect call with multiple blocks as targets
-      val targets = mutable.Set[Block]()
+      // resolved indirect jump with multiple blocks as targets
+      val targets = ArrayBuffer[Block]()
       for (edge <- outgoingEdges) {
         if (uuidToBlock.contains(edge.targetUuid)) {
-          // TODO consider possibility edge goes to another procedure?
           val target = uuidToBlock(edge.targetUuid)
-          targets += target
+          targets.append(target)
         } else {
           throw Exception(
             s"cannot handle ${edge.getLabel} from block ${block.label} as it is an unresolved indirect edge among many resolved indirect edges"
           )
         }
       }
-      // TODO add assertion that target register is low
-      val label = handlePCAssign(block)
-      (None, GoTo(targets, label))
-      // TODO possibility not yet encountered: resolved indirect call that goes to multiple procedures?
-
+      handleResolvedIndirectBranching(targets, block, procedure)
     } else if (outgoingEdges.size == 2) {
       // pair of edges, either direct call with return or conditional branch
 
@@ -718,6 +716,61 @@ class GTIRBToIR(
     }
   }
 
+  private def handleResolvedIndirectBranching(
+    targets: ArrayBuffer[Block],
+    block: Block,
+    procedure: Procedure
+  ): (Option[Call], Jump) = {
+    // TODO add assertion that target register is low
+    val label = handlePCAssign(block)
+
+    val withinProcedureTargets = targets.collect { case t: Block if procedure.blocks.contains(t) => t }
+
+    if (withinProcedureTargets.size == targets.size) {
+      // all target blocks are within the calling procedure
+      (None, GoTo(targets, label))
+    } else if (withinProcedureTargets.nonEmpty) {
+      // TODO - only some target blocks are within the calling procedure - unclear how to handle
+      throw Exception(
+        s"Indirect call from ${block.label} has ${withinProcedureTargets.size} targets out of ${targets.size} within the procedure"
+      )
+    } else if (targets.size == 1) {
+      // single indirect non-returning jump with target block outside this procedure
+      val target = targets.head
+      if (target.isEntry) {
+        val call = DirectCall(target.parent, label)
+        // unreachable because R30 is not set and any returns will need to be manually resolved through later analysis
+        (Some(call), Unreachable())
+      } else {
+        // TODO - jumps to block that isn't entrance - would need to split other procedure, or merge procedures
+        throw Exception(s"Indirect call from ${block.label} resolved to jump to mid-procedure block ${target.label}")
+      }
+    } else {
+      // indirect jump targeting multiple blocks outside this procedure
+      val newBlocks = ArrayBuffer[Block]()
+      val targetRegister = getPCTarget(block)
+
+      for (targetBlock <- targets) {
+        if (!targetBlock.isEntry) {
+          // TODO - jumps to block that isn't entrance - would need to split other procedure, or merge procedures
+          throw Exception(
+            s"Indirect call from ${block.label} resolved to jump to mid-procedure block ${targetBlock.label}"
+          )
+        }
+        val target = targetBlock.parent
+        val resolvedCall = DirectCall(target)
+
+        val assume = Assume(BinaryExpr(EQ, targetRegister, BitVecLiteral(target.address.get, 64)))
+        val label = block.label + "_" + target.name
+        // unreachable because R30 is not set and any returns will need to be manually resolved through later analysis
+        newBlocks.append(Block(label, None, ArrayBuffer(assume, resolvedCall), Unreachable()))
+      }
+      handlePCAssign(block)
+      procedure.addBlocks(newBlocks)
+      (None, GoTo(newBlocks))
+    }
+  }
+
   private def handleIndirectCallMultipleResolvedTargets(
     fallthrough: Edge,
     indirectCallTargets: ArrayBuffer[Edge],
@@ -726,7 +779,7 @@ class GTIRBToIR(
   ): GoTo = {
     if (!uuidToBlock.contains(fallthrough.targetUuid)) {
       throw Exception(
-        s"block ${block.label} has fallthrough edge to ${(fallthrough.targetUuid)} that does not point to a known block"
+        s"block ${block.label} has fallthrough edge to ${fallthrough.targetUuid} that does not point to a known block"
       )
     }
     val returnTarget = uuidToBlock(fallthrough.targetUuid)
@@ -738,7 +791,7 @@ class GTIRBToIR(
       // it's odd if an indirect call is only partially resolved, so throw an exception for now because this case will require further investigation
       if (!entranceUUIDtoProcedure.contains(call.targetUuid)) {
         throw Exception(
-          s"block ${block.label} has resolved indirect call edge to ${(call.targetUuid)} that does not point to a known procedure"
+          s"block ${block.label} has resolved indirect call edge to ${call.targetUuid} that does not point to a known procedure"
         )
       }
 
@@ -757,7 +810,7 @@ class GTIRBToIR(
   private def handleIndirectCallWithReturn(fallthrough: Edge, call: Edge, block: Block): (Option[Call], GoTo) = {
     if (!uuidToBlock.contains(fallthrough.targetUuid)) {
       throw Exception(
-        s"block ${block.label} has fallthrough edge to ${(fallthrough.targetUuid)} that does not point to a known block"
+        s"block ${block.label} has fallthrough edge to ${fallthrough.targetUuid} that does not point to a known block"
       )
     }
     val returnTarget = uuidToBlock(fallthrough.targetUuid)
@@ -779,13 +832,13 @@ class GTIRBToIR(
   private def handleDirectCallWithReturn(fallthrough: Edge, call: Edge, block: Block): (Option[Call], GoTo) = {
     if (!entranceUUIDtoProcedure.contains(call.targetUuid)) {
       throw Exception(
-        s"block ${block.label} has direct call edge to ${(call.targetUuid)} that does not point to a known procedure"
+        s"block ${block.label} has direct call edge to ${call.targetUuid} that does not point to a known procedure"
       )
     }
 
     if (!uuidToBlock.contains(fallthrough.targetUuid)) {
       throw Exception(
-        s"block ${block.label} has fallthrough edge to ${(fallthrough.targetUuid)} that does not point to a known block"
+        s"block ${block.label} has fallthrough edge to ${fallthrough.targetUuid} that does not point to a known block"
       )
     }
 
@@ -798,13 +851,13 @@ class GTIRBToIR(
   private def handleConditionalBranch(fallthrough: Edge, branch: Edge, block: Block, procedure: Procedure): GoTo = {
     if (!uuidToBlock.contains(fallthrough.targetUuid)) {
       throw Exception(
-        s"block ${block.label} has fallthrough edge to ${(fallthrough.targetUuid)} that does not point to a known block"
+        s"block ${block.label} has fallthrough edge to ${fallthrough.targetUuid} that does not point to a known block"
       )
     }
 
     if (!uuidToBlock.contains(branch.targetUuid)) {
       throw Exception(
-        s"block ${block.label} has branch edge to ${(fallthrough.targetUuid)} that does not point to a known block"
+        s"block ${block.label} has branch edge to ${fallthrough.targetUuid} that does not point to a known block"
       )
     }
 
