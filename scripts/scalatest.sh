@@ -29,5 +29,5 @@ if ! [[ -d "$classes" ]]; then
   exit 1
 fi
 
-exec ./mill --ticker false test.runMain org.scalatest.tools.Runner -R "$classes" "$@"
+exec ./mill -i --ticker false test.runMain org.scalatest.tools.Runner -R "$classes" "$@"
 
