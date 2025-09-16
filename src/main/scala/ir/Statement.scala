@@ -294,7 +294,7 @@ class GoTo private (_targets: mutable.LinkedHashSet[Block], var label: Option[St
 
   def this(target: Block) = this(mutable.Set(target), None)
 
-  def targets: Set[Block] = _targets.toSet
+  def targets: Set[Block] = _targets.toList.sorted(Ordering.by(_.label)).to(collection.immutable.ListSet)
 
   override def deepEquals(o: Object): Boolean = o match {
     case GoTo(tgts, lbl) => tgts.map(_.label).toSet == targets.map(_.label).toSet && lbl == label

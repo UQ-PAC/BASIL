@@ -1427,7 +1427,7 @@ object TranslationValidator {
     {
       println("writing!!!" + transformName)
       val before = ir.dsl.IRToDSL.convertProgram(p).resolve
-      before.procedures.foreach(stripBody(_))
+      // before.procedures.foreach(stripBody(_))
       util.writeToFile(before.pprint, "before.il")
 
       val beforeprocs = before.nameToProcedure
@@ -1438,15 +1438,15 @@ object TranslationValidator {
       val r = transform(p)
       val inv = invariant(r)
       val after = ir.dsl.IRToDSL.convertProgram(p).resolve
-      after.procedures.foreach(stripBody(_))
+      // after.procedures.foreach(stripBody(_))
       util.writeToFile(after.pprint, "after.il")
       if (transformName == "AssumeCallPreserved") {
         val b = analysis.LoopDetector.identify_loops(before)
         val a = analysis.LoopDetector.identify_loops(after)
+        println(a)
         println(b.loops_o.map(_.header.label).toSet -- a.loops_o.map(_.header.label).toSet)
         println(a.loops_o.map(_.header.label).toSet -- b.loops_o.map(_.header.label).toSet)
         assert(a.loops_o.size == b.loops_o.size, "before and after have differing loop counts?!")
-        throw Exception("boop")
       }
       getValidationSMT(p, tvconf, transformName, before, after, inv)
     }
