@@ -5,7 +5,6 @@ import Parsers.ASLpParser.*
 import org.antlr.v4.runtime.{BailErrorStrategy, CharStreams, CommonTokenStream}
 import translating.InsnSemantics
 import upickle.default.*
-import util.Logger
 
 private def parse_asl_stmt(line: String): Option[StmtContext] = {
   val lexer = ASLpLexer(CharStreams.fromString(line))
@@ -14,26 +13,7 @@ private def parse_asl_stmt(line: String): Option[StmtContext] = {
   parser.setErrorHandler(BailErrorStrategy())
   parser.setBuildParseTree(true)
 
-  try {
-    Some(parser.stmteof().stmt)
-  } catch {
-    case e: org.antlr.v4.runtime.misc.ParseCancellationException =>
-      val extra = e.getCause match {
-        case mismatch: org.antlr.v4.runtime.InputMismatchException =>
-          val token = mismatch.getOffendingToken
-          s"""
-            exn: $mismatch
-            offending token: $token
-
-          ${line.replace('\n', ' ')}
-          ${" " * token.getStartIndex}^ here!
-          """.strip
-        case o => o.toString
-      }
-      Logger.error(s"""Semantics parse error:\n  line: $line\n$extra""")
-      Logger.error(e.getStackTrace.mkString("\n"))
-      None
-  }
+  Some(util.catchAntlrParseErrors(parser.stmteof().stmt))
 }
 
 implicit val insnSemanticsJsonReader: Reader[InsnSemantics] =
