@@ -6,7 +6,6 @@ import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
 import test_util.{BASILTest, CaptureOutput}
-import translating.PrettyPrinter.*
 import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, StaticAnalysisConfig}
 
 /** This is the test suite for testing DSA functionality The tests follow a general pattern of running BASIL analyses on

@@ -512,7 +512,7 @@ enum Flags {
 /** case CF // Carry Flag case ZF // Zero Flag case SF // Sign Flag case PF // Parity Flag case AF // Auxiliary Flag
   * case OF // Overflow Flag
   */
-trait Flag
+sealed trait Flag
 
 case object BOTTOM_Flag extends Flag {
   override def toString = "BOTTOM_FLAG"
@@ -575,7 +575,7 @@ class SingleElementLattice[T] extends Lattice[Option[T]] {
   }
 }
 
-trait LiftedElement[+T]
+sealed trait LiftedElement[+T]
 case class Lift[T](el: T) extends LiftedElement[T] {
   override def toString = s"Lift($el)"
 }
@@ -626,7 +626,7 @@ class TwoElementLattice extends Lattice[TwoElement]:
     case _ => TwoElementTop
   }
 
-trait FlatElement[+T]
+sealed trait FlatElement[+T]
 case class FlatEl[T](el: T) extends FlatElement[T]
 case object Top extends FlatElement[Nothing]
 case object Bottom extends FlatElement[Nothing]

@@ -3,8 +3,6 @@ package analysis
 import analysis.solvers.*
 import ir.*
 
-import scala.collection.immutable
-
 /** Calculates the set of variables that are not read after being written up to that point in the program. Useful for
   * detecting dead stores, constants and which variables are passed as parameters in a function call.
   */

@@ -3,8 +3,6 @@ package analysis
 import analysis.solvers.*
 import ir.*
 
-import scala.collection.immutable
-
 /** Calculates the set of variables that are read but not written in a given program. This helps to identify the set of
   * variables that are read from memory before they have been initialised. This could be used on callee side to identify
   * what parameters where passed to the function.

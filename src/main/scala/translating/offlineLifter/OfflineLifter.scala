@@ -1,7 +1,6 @@
 package translating.offlineLifter
 
 import ir.*
-import ir.eval.BitVectorEval.*
 import lifter.*
 import translating.TempIf
 import util.Logger

@@ -13,7 +13,6 @@ import translating.*
 import util.{ILLoadingConfig, Logger}
 
 import java.io.FileInputStream
-import scala.jdk.CollectionConverters.*
 
 enum FrontendMode {
   case Bap

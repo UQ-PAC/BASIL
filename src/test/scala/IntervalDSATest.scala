@@ -1,5 +1,5 @@
-import analysis.data_structure_analysis.{DSInterval, Heap, IntervalDSA, Par, Ret, SymBase}
-import analysis.{AnalysisPipelineMRA, StaticAnalysisContext, data_structure_analysis}
+import analysis.data_structure_analysis.{DSInterval, Heap, IntervalDSA, Par, Ret}
+import analysis.{AnalysisPipelineMRA, StaticAnalysisContext}
 import boogie.SpecGlobal
 import ir.Endian.LittleEndian
 import ir.dsl.{block, directCall, goto, proc, prog, ret}

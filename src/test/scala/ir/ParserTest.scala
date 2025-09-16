@@ -1,7 +1,6 @@
 package ir
 
 import ir.parsing.ParseBasilIL
-import org.scalactic.*
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.CaptureOutput
 

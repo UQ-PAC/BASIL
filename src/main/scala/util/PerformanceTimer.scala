@@ -1,6 +1,5 @@
 package util
 import java.util.concurrent.atomic.AtomicLong
-import scala.collection
 import scala.collection.mutable
 
 case class RegionTimer(name: String) {
