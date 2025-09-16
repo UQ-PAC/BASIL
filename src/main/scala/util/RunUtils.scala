@@ -761,7 +761,9 @@ object RunUtils {
   }
 
   def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]): Unit = {
-    // writeToFile(dotBlockGraph(program, program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
+    writeToFile(dotBlockGraph(ctx.program, ctx.program.collect {
+      case b: Block => b -> b.label
+    }.toMap), s"blockgraph-before-simp.dot")
     Logger.info("[!] Running Simplify")
     val timer = PerformanceTimer("Simplify")
     val program = ctx.program

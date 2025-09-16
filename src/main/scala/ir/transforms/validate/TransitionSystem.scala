@@ -168,6 +168,7 @@ object TransitionSystem {
   def toTransitionSystemInPlace(p: Procedure): CutPointMap = {
     require(p.entryBlock.isDefined)
 
+    println(p.name)
     val loops = analysis.LoopDetector.identify_loops(p.entryBlock.get)
     val floops = loops.loops_o
     val cutPoints = procToTransition(p, floops)

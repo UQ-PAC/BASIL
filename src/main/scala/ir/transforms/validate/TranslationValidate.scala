@@ -144,7 +144,7 @@ enum FormalParam {
 }
 
 /**
- * Describe renaming for a function call parameter list, map from variable to the (formal, actual) pair, 
+ * Describe renaming for a function call parameter list, map from variable to the (formal, actual) pair,
  * if actual is Some() it is invariant at any call site.
  */
 type ParameterRenamingFun = (Variable | Memory) => (Variable, Option[Expr])
@@ -334,7 +334,7 @@ object TranslationValidator {
   /**
    * Convert an invariant to a guarded invariant for a specific cut point as described by the invariant.
    *
-   * renaming functions provide the expression rewriting for 
+   * renaming functions provide the expression rewriting for
    *  - the ssa index of varibales at exit block
    *  - variable renaming for source/target program
    *
@@ -434,7 +434,7 @@ object TranslationValidator {
    *
    * f1 : a <-> Option[b]
    * f2 : b <-> Option[a]
-   *  
+   *
    *  => F : a <-> b
    *
    *
@@ -489,7 +489,7 @@ object TranslationValidator {
 
   /**
   * We re-infer the function signature of all target program procedures based on the transform
-  * described by [[renaming]], and the [[Frame]] of the source. 
+  * described by [[renaming]], and the [[Frame]] of the source.
   *
   *   **this describes all the observable effects of a procedure and forms invariant we validate**
   *
@@ -497,17 +497,17 @@ object TranslationValidator {
   * to the signature we infer here.
   *
   * We use this to describe the entry and exit invariant for every procedure, so if it is too weak
-  * then the verification of the procedure will fail. 
+  * then the verification of the procedure will fail.
   *
   * If it is too strong the ackermann instantiation of the call will fail; and verification should
-  * fail at the call-site. 
+  * fail at the call-site.
   *
   * This means it is possible to drop parameters (read-global-variables or actual parameters)
   * as long as they aren't needed in the verification of the procedure.
   *
   * Because we at minimum make the global trace variable part of the function signature, a malicious
   * transform should only be able to verify by deleting all functionality if it was origionally a
-  * pure function. Assuming we ensure invariants are not valid or false. 
+  * pure function. Assuming we ensure invariants are not valid or false.
   *
   */
   def getFunctionSigsRenaming(
@@ -563,14 +563,14 @@ object TranslationValidator {
   }
 
   /**
-   * Set invariant defining a correspondence between variables in the source and target programs. 
+   * Set invariant defining a correspondence between variables in the source and target programs.
    *
    * @param renamingTgtSrc provides an optional corresponding source-program expression for a target porgam
    *    variable. E.g. representing a substitution performed by a transform at a given block label.
    *
    *
-   *  In this case if there is no v such that renamingTgtSrc(tv) -> v \in s and 
-   *    renamingSrcTgt(v) = tv \in t then it means there is no correspondence. 
+   *  In this case if there is no v such that renamingTgtSrc(tv) -> v \in s and
+   *    renamingSrcTgt(v) = tv \in t then it means there is no correspondence.
    *  In isolation None means there is no information.
    *
    *
@@ -624,8 +624,13 @@ object TranslationValidator {
     val invs = (cuts.map {
       case (label) => {
         if (!(targetInfo.cutBlockLabels.contains(label) && sourceInfo.cutBlockLabels.contains(label))) {
+          import ir.dsl.given
+          util.writeToFile(targetInfo.transition.pprint, "target.il")
+          util.writeToFile(sourceInfo.transition.pprint, "source.il")
+          val s = sourceInfo.cutBlockLabels.values.toSet
+          val t = targetInfo.cutBlockLabels.values.toSet
           throw Exception(
-            s"Mismatched cut labels (missing $label)\nsource: ${sourceInfo.cutBlockLabels}\ntarget: ${targetInfo.cutBlockLabels}"
+            s"Mismatched cut labels (missing $label)\nsource: ${sourceInfo.cutBlockLabels}\ntarget: ${targetInfo.cutBlockLabels}\n\n${s -- t}\n\n${t--s}"
           )
         }
         val tgtCut = targetInfo.cutBlockLabels(label)
@@ -1205,10 +1210,10 @@ object TranslationValidator {
   }
 
   /**
-   * Generate an SMT query for the product program, 
+   * Generate an SMT query for the product program,
    *
-   * @param invariant.renamingSrcTgt 
-   *  function describing the transform as mapping from variable -> expression at a given block in the resulting program, 
+   * @param invariant.renamingSrcTgt
+   *  function describing the transform as mapping from variable -> expression at a given block in the resulting program,
    *  using a lambda Option[BlockId] => Variable | Memory => Option[Expr]
    *
    * @param filePrefix
@@ -1225,6 +1230,7 @@ object TranslationValidator {
     sourceProgClone: Program,
     invariant: InvariantDescription
   ): TVJob = {
+    println(s"getValidationSMT $runName")
 
     val framesTarget = inferProcFrames(targetProgClone).map((k, v) => (k.name, v)).toMap
     val framesSource = inferProcFrames(sourceProgClone).map((k, v) => (k.name, v)).toMap
@@ -1413,7 +1419,9 @@ object TranslationValidator {
     invariant: T => InvariantDescription = (_: T) => InvariantDescription()
   ): ((Program, TVJob) => TVJob) = { (p: Program, tvconf: TVJob) =>
     {
+      println("writing!!!" + transformName)
       val before = ir.dsl.IRToDSL.convertProgram(p).resolve
+      util.writeToFile(before.pprint, "before.il")
 
       val beforeprocs = before.nameToProcedure
       for (p <- p.procedures) {
@@ -1423,6 +1431,13 @@ object TranslationValidator {
       val r = transform(p)
       val inv = invariant(r)
       val after = ir.dsl.IRToDSL.convertProgram(p).resolve
+      util.writeToFile(after.pprint, "after.il")
+      if (transformName == "AssumeCallPreserved") {
+        val b = analysis.LoopDetector.identify_loops(before)
+        val a = analysis.LoopDetector.identify_loops(after)
+        println(b.loops_o.map(_.header.label).toSet -- a.loops_o.map(_.header.label).toSet)
+        assert(a.loops_o.size == b.loops_o.size, "before and after have differing loop counts?!")
+      }
       getValidationSMT(p, tvconf, transformName, before, after, inv)
     }
   }

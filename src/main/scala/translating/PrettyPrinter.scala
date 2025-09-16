@@ -552,7 +552,7 @@ class BasilIRPrettyPrinter(
   }
   override def vnop(): PPProg[NOP] = BST("nop")
 
-  override def vgoto(t: List[String]): PPProg[GoTo] = BST[GoTo](s"goto(${t.map(Sigil.BASIR.block + _).mkString(", ")})")
+  override def vgoto(t: List[String]): PPProg[GoTo] = BST[GoTo](s"goto(${t.map(Sigil.BASIR.block + _).toList.sorted.mkString(", ")})")
   override def vunreachable(): PPProg[Unreachable] = BST[Unreachable]("unreachable")
   override def vreturn(outs: List[(PPProg[Variable], PPProg[Expr])]) = BST(
     s"return (${outs.map((l, r) => r).mkString(", ")})"
