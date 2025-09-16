@@ -11,7 +11,11 @@ enum PCTrackingOption {
 enum SimplifyMode {
   case Disabled
   case Simplify
-  case ValidatedSimplify(verify: Option[util.SMT.Solver] = Some(util.SMT.Solver.Z3), dumpSMT: Option[String] = None)
+  case ValidatedSimplify(
+    verify: Option[util.SMT.Solver] = Some(util.SMT.Solver.Z3),
+    dumpSMT: Option[String] = None,
+    dryRun: Boolean = false
+  )
 }
 
 case class BoogieGeneratorConfig(

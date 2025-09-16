@@ -57,7 +57,8 @@ case class TVJob(
   results: List[TVResult] = List(),
   debugDumpAlways: Boolean = false,
   /* minimum number of statements in source and target combined to trigger case analysis */
-  splitLargeProceduresThreshold: Option[Int] = Some(60)
+  splitLargeProceduresThreshold: Option[Int] = Some(60),
+  dryRun: Boolean = false
 ) {
 
   lazy val noneFailed = {
@@ -1289,25 +1290,44 @@ object TranslationValidator {
 
       val concreteInvariant = inferInvariant(interproc, invariant, source, target)
 
-      if (
-        config.splitLargeProceduresThreshold
-          .exists(_ <= (procComplexity(source.transition) + procComplexity(target.transition)))
-      ) {
+      if (!config.dryRun) {
+        if (
+          config.splitLargeProceduresThreshold
+            .exists(_ <= (procComplexity(source.transition) + procComplexity(target.transition)))
+        ) {
 
-        var splits = 0
-        val splitProcs = chooseCuts(source, target)
-        tvLogger.info(s"Splitting ${proc.name} into ${splitProcs.size} elements")
-        for ((sourceSplit, targetSplit) <- splitProcs) {
-          splits += 1
+          var splits = 0
+          val splitProcs = chooseCuts(source, target)
+          tvLogger.info(s"Splitting ${proc.name} into ${splitProcs.size} elements")
+          for ((sourceSplit, targetSplit) <- splitProcs) {
+            splits += 1
 
-          val sourceSSA = ssaProcInfo(sourceSplit, sourceParams)
-          val targetSSA = ssaProcInfo(targetSplit, targetParams)
+            val sourceSSA = ssaProcInfo(sourceSplit, sourceParams)
+            val targetSSA = ssaProcInfo(targetSplit, targetParams)
+
+            val res = validateSMTSingleProc(
+              result,
+              interproc,
+              runName,
+              "split-" + splits,
+              proc,
+              invariant,
+              concreteInvariant,
+              sourceSSA,
+              targetSSA
+            )
+            result = result.copy(results = res :: result.results)
+          }
+
+        } else {
+          val sourceSSA = ssaProcInfo(source, sourceParams)
+          val targetSSA = ssaProcInfo(target, targetParams)
 
           val res = validateSMTSingleProc(
             result,
             interproc,
             runName,
-            "split-" + splits,
+            "thesplit",
             proc,
             invariant,
             concreteInvariant,
@@ -1316,23 +1336,6 @@ object TranslationValidator {
           )
           result = result.copy(results = res :: result.results)
         }
-
-      } else {
-        val sourceSSA = ssaProcInfo(source, sourceParams)
-        val targetSSA = ssaProcInfo(target, targetParams)
-
-        val res = validateSMTSingleProc(
-          result,
-          interproc,
-          runName,
-          "thesplit",
-          proc,
-          invariant,
-          concreteInvariant,
-          sourceSSA,
-          targetSSA
-        )
-        result = result.copy(results = res :: result.results)
       }
     })
 

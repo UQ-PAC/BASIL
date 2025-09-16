@@ -250,8 +250,8 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   // maybe it should; in ackermann phase and observable variables...
   val p = ctx.program
   var config = mode match {
-    case SimplifyMode.ValidatedSimplify(verifyMode, filePrefix) =>
-      TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = false)
+    case SimplifyMode.ValidatedSimplify(verifyMode, filePrefix, dryRun) =>
+      TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = false, dryRun = dryRun)
     case _ => TVJob(None, None)
   }
   transforms.applyRPO(p)

@@ -213,6 +213,8 @@ object Main {
     tvSimp: Option[String],
     @arg(name = "simplify-tv-verify", doc = "Simplify with translation validation immediately call z3")
     tvSimpVerify: Flag,
+    @arg(name = "simplify-tv-dryrun", doc = "Skip all tv work after invariant generation")
+    tvDryRun: Flag,
     @arg(
       name = "pc",
       doc = "Program counter mode, supports GTIRB only. (options: none | keep | assert) (default: none)"
@@ -458,8 +460,8 @@ object Main {
     }
 
     val simplifyMode = (conf.simplify.value, conf.tvSimp, conf.tvSimpVerify.value) match {
-      case (_, d, true) => SimplifyMode.ValidatedSimplify(Some(util.SMT.Solver.Z3), d)
-      case (_, Some(d), _) => SimplifyMode.ValidatedSimplify(None, Some(d))
+      case (_, d, true) => SimplifyMode.ValidatedSimplify(Some(util.SMT.Solver.Z3), d, dryRun = conf.tvDryRun.value)
+      case (_, Some(d), _) => SimplifyMode.ValidatedSimplify(None, Some(d), dryRun = conf.tvDryRun.value)
       case (true, None, _) => SimplifyMode.Simplify
       case _ => SimplifyMode.Disabled
     }
