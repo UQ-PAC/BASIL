@@ -1,7 +1,8 @@
 import ir.dsl.*
 import ir.{CallSCCWalker, updateWithCallSCC}
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.programToContext
+import test_util.BASILTest.programToContext
+import util.IRContext
 
 object CallSCCTestData {
   /*
@@ -12,7 +13,7 @@ object CallSCCTestData {
    ^ |
    \/
    */
-  def scc = {
+  def scc: IRContext = {
     val program = prog(
       proc("a", block("a0", directCall("b"), ret)),
       proc("b", block("b0", directCall("c"), ret)),

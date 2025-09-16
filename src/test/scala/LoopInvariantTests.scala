@@ -3,7 +3,8 @@ import boogie.SpecGlobal
 import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.{CaptureOutput, programToContext}
+import test_util.BASILTest.programToContext
+import test_util.CaptureOutput
 import util.SMT.{SMTSolver, SatResult}
 import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils}
 
