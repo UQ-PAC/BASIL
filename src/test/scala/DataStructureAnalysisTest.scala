@@ -1,20 +1,12 @@
 import analysis.data_structure_analysis.*
+import analysis.{AnalysisPipelineMRA, StaticAnalysisContext}
 import boogie.SpecGlobal
 import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
 import specification.Specification
 import test_util.{BASILTest, CaptureOutput}
-import util.{
-  BASILConfig,
-  BASILResult,
-  BoogieGeneratorConfig,
-  ILLoadingConfig,
-  IRContext,
-  RunUtils,
-  StaticAnalysisConfig,
-  StaticAnalysisContext
-}
+import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, StaticAnalysisConfig}
 
 /** This is the test suite for testing DSA functionality The tests follow a general pattern of running BASIL analyses on
   * a test program and then asserting properties about the Data Structure Graph (DSG) of the function produced at
@@ -34,7 +26,7 @@ class DataStructureAnalysisTest extends AnyFunSuite with CaptureOutput {
 
     val emptySpec = Specification(Set(), Set(), Map(), List(), List(), List(), Set())
     val emptyContext = IRContext(List(), Set(), Set(), Set(), Map(), emptySpec, program)
-    RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
+    AnalysisPipelineMRA.runToFixpoint(StaticAnalysisConfig(), emptyContext)
   }
 
   def runTest(relativePath: String): BASILResult = {
@@ -761,7 +753,7 @@ class DataStructureAnalysisTest extends AnyFunSuite with CaptureOutput {
 
     val spec = Specification(Set(), globals, Map(), List(), List(), List(), Set())
     val context = IRContext(List(), Set(), globals, Set(), globalOffsets, spec, program)
-    val staticAnalysisResult = RunUtils.staticAnalysis(StaticAnalysisConfig(), context)
+    val staticAnalysisResult = AnalysisPipelineMRA.runToFixpoint(StaticAnalysisConfig(), context)
 
     val dsg = staticAnalysisResult.topDownDSA(program.mainProcedure)
 

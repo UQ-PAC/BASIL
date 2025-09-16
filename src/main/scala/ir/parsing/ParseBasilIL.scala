@@ -7,17 +7,17 @@ import java.io.{FileReader, Reader, StringReader}
 object ParseBasilIL {
 
   /**
-   * Combines the parsed declarations and the parsed DSL program into a [[util.IRContext]],
+   * Combines the parsed declarations and the parsed DSL program into a [[ir.IRContext]],
    * including resolving the DSL program into a Basil IR program.
    */
   def makeBasilIRContext(decls: Declarations, prog: ir.dsl.EventuallyProgram) = {
-    util.IRContext(
+    ir.IRContext(
       List(),
       decls.symtab.externalFunctions,
       decls.symtab.globals,
       decls.symtab.funcEntries,
       decls.symtab.globalOffsets,
-      util.IRLoading.emptySpecification(decls.symtab.globals),
+      ir.IRLoading.emptySpecification(decls.symtab.globals),
       prog.resolve
     )
   }
@@ -46,12 +46,12 @@ object ParseBasilIL {
     result
   }
 
-  def loadILFile(filePath: String): util.IRContext = {
+  def loadILFile(filePath: String): ir.IRContext = {
     val reader = new FileReader(filePath)
     loadILReader(reader)
   }
 
-  def loadILString(text: String): util.IRContext = {
+  def loadILString(text: String): ir.IRContext = {
     val reader = new StringReader(text)
     loadILReader(reader)
   }

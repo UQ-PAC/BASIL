@@ -1,8 +1,7 @@
 package ir.eval
 
 import boogie.Scope
-import ir.*
-import util.IRContext
+import ir.{IRContext, *}
 import util.functional.*
 
 enum ExecEffect:

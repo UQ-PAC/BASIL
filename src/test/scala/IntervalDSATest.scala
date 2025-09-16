@@ -1,4 +1,5 @@
 import analysis.data_structure_analysis.{DSInterval, Heap, IntervalDSA, Par, Ret}
+import analysis.{AnalysisPipelineMRA, StaticAnalysisContext}
 import boogie.SpecGlobal
 import ir.Endian.LittleEndian
 import ir.dsl.{block, directCall, goto, proc, prog, ret}
@@ -223,7 +224,7 @@ def runAnalysis(program: Program): StaticAnalysisContext = {
 
   val emptySpec = Specification(Set(), Set(), Map(), List(), List(), List(), Set())
   val emptyContext = IRContext(List(), Set(), Set(), Set(), Map(), emptySpec, program)
-  RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
+  AnalysisPipelineMRA.runToFixpoint(StaticAnalysisConfig(), emptyContext)
 }
 
 def programToContext(
@@ -246,7 +247,6 @@ def globalsToLiteral(ctx: IRContext) = {
 
 @test_util.tags.AnalysisSystemTest3
 class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
-
   def runTest(relativePath: String, main: Option[String] = None, config: DSConfig = DSConfig()): BASILResult = {
     val path = s"${BASILTest.rootDirectory}/$relativePath"
     RunUtils.loadAndTranslate(

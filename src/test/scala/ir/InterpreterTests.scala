@@ -1,5 +1,6 @@
 package ir
 
+import analysis.AnalysisManager
 import boogie.{Scope, SpecGlobal}
 import ir.dsl.*
 import ir.dsl.given
@@ -8,7 +9,7 @@ import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
 import util.functional.*
-import util.{ILLoadingConfig, IRContext, IRLoading, IRTransform, LogLevel, Logger, PerformanceTimer}
+import util.{ILLoadingConfig, LogLevel, Logger, PerformanceTimer}
 
 import scala.language.implicitConversions
 
@@ -43,8 +44,9 @@ class InterpreterTests extends AnyFunSuite with CaptureOutput with BeforeAndAfte
       dumpIL = None
     )
 
-    val p = IRLoading.load(loading)
-    val ctx = IRTransform.doCleanup(p)
+    val ctx = IRLoading.load(loading)
+    ir.transforms.doCleanupWithoutSimplify(ctx, AnalysisManager(ctx.program))
+
     ir.transforms.clearParams(ctx.program)
     // val bapProgram = loadBAP(loading.inputFile)
     // val (symbols, externalFunctions, globals, _, mainAddress) = loadReadELF(loading.relfFile, loading)

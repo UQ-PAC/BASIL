@@ -1,9 +1,9 @@
 package ir.eval
 import boogie.Scope
 import ir.*
+import util.Logger
 import util.functional.*
 import util.functional.State.*
-import util.{IRContext, Logger}
 
 /** Abstraction for memload and variable lookup used by the expression evaluator.
   */

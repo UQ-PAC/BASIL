@@ -1,8 +1,8 @@
 package ir.eval
 
 import ir.*
+import util.Logger
 import util.functional.*
-import util.{IRContext, Logger}
 
 enum BreakPointLoc:
   case CMD(c: Command)
