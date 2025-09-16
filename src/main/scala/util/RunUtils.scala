@@ -1,7 +1,6 @@
 package util
 
 import analysis.data_structure_analysis.*
-import analysis.given
 import analysis.{AnalysisManager, Interval as _, *}
 import boogie.*
 import ir.*
