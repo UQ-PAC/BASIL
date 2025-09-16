@@ -262,8 +262,8 @@ class IRTest extends AnyFunSuite with CaptureOutput {
 
     assert(
       prev.size == 1 && prev
-        .collect {
-          case c: GoTo => c.parent == p.labelToBlock("l_main")
+        .collect { case c: GoTo =>
+          c.parent == p.labelToBlock("l_main")
         }
         .contains(true)
     )

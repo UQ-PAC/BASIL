@@ -142,3 +142,12 @@ def establishProcedureDiamondForm(program: Program, doSimplify: Boolean = false)
   cilvisitor.visit_prog(ConvertSingleReturn(), program)
   debugAssert(ir.invariant.programDiamondForm(program))
 }
+
+def getEstablishProcedureDiamondFormTransform(doSimplify: Boolean): Transform =
+  Transform(
+    "EstablishProcedureDiamondForm",
+    (ctx, man) => {
+      establishProcedureDiamondForm(ctx.program, doSimplify)
+      man.ClobberAll
+    }
+  )

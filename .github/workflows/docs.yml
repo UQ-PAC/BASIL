@@ -40,7 +40,7 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt-get -y install latexmk texlive-latex-recommended texlive-lang-japanese texlive-latex-extra texlive-extra-utils poppler-utils
       - run: |
-          ./mill --no-server allDocs
+          ./mill -i allDocs
           echo "dir=$(realpath out/allDocs.dest/BASIL)" >> "$GITHUB_OUTPUT"
         id: allDocs
 

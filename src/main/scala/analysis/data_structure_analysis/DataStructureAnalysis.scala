@@ -8,6 +8,15 @@ import util.assertion.*
 
 import scala.collection.mutable
 
+case class DSAContext(
+  sva: Map[Procedure, SymValues[OSet]],
+  constraints: Map[Procedure, Set[Constraint]],
+  local: Map[Procedure, IntervalGraph],
+  bottomUp: Map[Procedure, IntervalGraph],
+  topDown: Map[Procedure, IntervalGraph],
+  globals: Map[IntervalNode, IntervalNode]
+)
+
 /** Data Structure Analysis Performs all phases of DSA and stores the results in member variables local, bottom-up,
   * top-down results in member variables locals, bu and td respectively.
   * @param program

@@ -11,7 +11,7 @@ private val localSigils = false
 
 object PrettyPrinter {
 
-  type PrettyPrintable = Program | Procedure | Statement | Jump | Command | Block | Expr | util.IRContext
+  type PrettyPrintable = Program | Procedure | Statement | Jump | Command | Block | Expr | IRContext
 
   extension (b: BigInt) {
     def pprint: String = "0x%x".format(b)
@@ -24,10 +24,10 @@ object PrettyPrinter {
       case e: Block => pp_block(e)
       case e: Procedure => pp_proc(e)
       case e: Program => pp_prog(e)
-      case e: util.IRContext => pp_irctx(e)
+      case e: IRContext => pp_irctx(e)
     }
 
-  def pp_irctx(e: util.IRContext) = BasilIRPrettyPrinter().vcontext(e).toString
+  def pp_irctx(e: IRContext) = BasilIRPrettyPrinter().vcontext(e).toString
   def pp_expr(e: Expr) = BasilIRPrettyPrinter()(e)
   def pp_stmt(s: Statement) = BasilIRPrettyPrinter()(s)
   def pp_cmd(c: Command) = c match {
@@ -230,7 +230,7 @@ class BasilIRPrettyPrinter(
     }.toSet
   }
 
-  def vcontext(i: util.IRContext) = {
+  def vcontext(i: IRContext) = {
     val prog = vprog(i.program)
     import ir.parsing.Attrib
     import ir.parsing.MemoryAttribData

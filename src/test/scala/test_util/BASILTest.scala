@@ -1,7 +1,7 @@
 package test_util
 
 import boogie.SpecGlobal
-import ir.{Program, cilvisitor, transforms}
+import ir.{IRContext, Program, cilvisitor, transforms}
 import org.scalatest.concurrent.ScaledTimeSpans
 import org.scalatest.time.{Seconds, Span}
 import specification.Specification
@@ -12,7 +12,6 @@ import util.{
   BoogieGeneratorConfig,
   DSConfig,
   ILLoadingConfig,
-  IRContext,
   Logger,
   RunUtils,
   StaticAnalysisConfig
