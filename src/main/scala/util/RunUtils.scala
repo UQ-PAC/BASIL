@@ -67,6 +67,7 @@ object RunUtils {
     else doCleanupWithoutSimplify(ctx, analysisManager)
 
     assert(ir.invariant.programDiamondForm(ctx.program))
+    assert(ir.invariant.readUninitialised(ctx.program))
 
     transforms.inlinePLTLaunchpad(ctx, analysisManager)
 
@@ -84,6 +85,7 @@ object RunUtils {
     if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
+    assert(ir.invariant.readUninitialised(ctx.program))
       if (conf.assertCalleeSaved) {
         transforms.CalleePreservedParam.transform(ctx.program)
       }
@@ -106,17 +108,21 @@ object RunUtils {
     }
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
 
+
     assert(ir.invariant.programDiamondForm(ctx.program))
     ir.eval.SimplifyValidation.validate = conf.validateSimp
     if (conf.simplify) {
 
       ir.transforms.clearParams(ctx.program)
 
+      assert(ir.invariant.readUninitialised(ctx.program))
       ir.transforms.liftIndirectCall(ctx.program)
       transforms.liftSVCompNonDetEarlyIR(ctx.program)
+      assert(ir.invariant.readUninitialised(ctx.program))
 
       DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
+      assert(ir.invariant.readUninitialised(ctx.program))
       DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
 
       if (conf.assertCalleeSaved) {

@@ -92,6 +92,7 @@ def addReturnBlocks(p: Program, toAll: Boolean = false): Unit = {
     val returningBlocks = p.blocks.filter(_.jump.isInstanceOf[Return]).toList
     val containsReturn = returningBlocks.nonEmpty
 
+
     if (
       returningBlocks.size == 1 && !p.entryBlock.contains(returningBlocks.head)
       && returningBlocks.forall(_.statements.isEmpty)

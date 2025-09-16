@@ -74,12 +74,8 @@ def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]): Unit = {
       )
     }
   }
-  config.foreach {
-    _.dumpILToPath.foreach { s =>
-      DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-dsa.il"), pp_prog(program))
-    }
-  }
 
+  DebugDumpIRLogger.writeToFile(File(s"il-after-dsa.il"), pp_prog(program))
   if (ir.eval.SimplifyValidation.validate) {
     Logger.info("DSA no uninitialised")
     assert(invariant.allVariablesAssignedIndex(program))

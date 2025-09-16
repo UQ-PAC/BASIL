@@ -28,11 +28,11 @@ def renameBlock(s: String): String = {
 class VarRenamer(proc: Procedure) extends CILVisitor {
 
   def doRename(v: Variable): Variable = v match {
-    case l: LocalVar if l.name.endsWith("_in") => {
-      val name = l.name.stripSuffix("_in")
-      proc.getFreshSSAVar(name, l.getType)
-    }
-    case l: LocalVar if l.index != 0 =>
+    //case l: LocalVar if l.name.endsWith("_in") => {
+    //  val name = l.name.stripSuffix("_in")
+    //  proc.getFreshSSAVar(name, l.getType)
+    //}
+    case l: LocalVar =>
       proc.getFreshSSAVar(l.varName, l.getType)
     case _ => v
   }
