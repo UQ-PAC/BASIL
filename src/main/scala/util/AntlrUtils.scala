@@ -29,7 +29,6 @@ def catchAntlrParseErrors[T](body: => T) = {
 
             val vocabulary = mismatch.getRecognizer().getVocabulary()
             val expected = mismatch.getExpectedTokens().toString(vocabulary)
-            println(expected)
 
             val tokenName = vocabulary.getDisplayName(token.getType())
             val sourceName = token.getTokenSource().getSourceName()
@@ -40,10 +39,10 @@ def catchAntlrParseErrors[T](body: => T) = {
             encountered token: $tokenName%s ${token.getText()}%s
             expected token(s): $expected%s
 
-            $sourceName%s:$line%d:$col%d
+            $sourceName%s:$line%d:${col + 1}%d (truncated)
             $line%4d | $lineText
-                   ${" " * col}^ offending token start
-          """.stripIndent.stripLeading
+                   ${" " * col}^ unexpected token
+            """.stripIndent.stripLeading
           }
         case o => Failure(new Exception())
       }
