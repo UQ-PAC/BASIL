@@ -56,22 +56,23 @@ object RunUtils {
     var ctx = q.context.getOrElse(IRLoading.load(q.loading))
     postLoad(ctx) // allows extracting information from the original loaded program
 
-    assert(ir.invariant.checkTypeCorrect(ctx.program))
+    assert(invariant.checkTypeCorrect(ctx.program))
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
+    assert(invariant.readUninitialised(ctx.program))
 
     val analysisManager = AnalysisManager(ctx.program)
 
     if conf.simplify then doCleanupWithSimplify(ctx, analysisManager)
     else doCleanupWithoutSimplify(ctx, analysisManager)
 
-    assert(ir.invariant.programDiamondForm(ctx.program))
-    assert(ir.invariant.readUninitialised(ctx.program))
+    assert(invariant.programDiamondForm(ctx.program))
+    assert(invariant.readUninitialised(ctx.program))
 
     transforms.inlinePLTLaunchpad(ctx, analysisManager)
 
-    assert(ir.invariant.programDiamondForm(ctx.program))
+    assert(invariant.programDiamondForm(ctx.program))
 
     if q.loading.trimEarly then
       getStripUnreachableFunctionsTransform(q.loading.procedureTrimDepth)(ctx, analysisManager)

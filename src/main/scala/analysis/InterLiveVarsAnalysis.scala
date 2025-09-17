@@ -147,15 +147,6 @@ def interLiveVarsAnalysis(program: Program, ignoreExternals: Boolean = false) = 
     p.incomingCalls().size == 0 && p.entryBlock.isDefined && p.returnBlock.isDefined && p.blocks.nonEmpty
   )
 
-  var procedures = program.procedures.toSet
-  var segments = List[Procedure]()
-
-  val reachableEntry = program.mainProcedure.preOrderIterator.collect { case p: Procedure =>
-    p
-  }
-
-  procedures = procedures -- reachableEntry
-
   var r = Map[CFGPosition, Map[Variable, TwoElement]]()
   for (p <- entries) {
     r = r ++ InterLiveVarsAnalysis(program, ignoreExternals, Some(p)).analyze()

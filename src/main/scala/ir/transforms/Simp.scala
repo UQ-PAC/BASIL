@@ -1299,9 +1299,7 @@ object OffsetProp {
         case None => v
         case Some((None, None)) => ret(v)
         case Some((None, Some(c))) => ret(c)
-        // case Some((Some(c), None)) if c == v => ret(c)
         case Some((Some(v), None)) => find(v, ret, fuel - 1)
-        // case Some((Some(v2), Some(c))) if v2 == v => eval(c)(v2)
         case Some((Some(v), Some(c))) => find(v, eval(c), fuel - 1)
       }
     }
