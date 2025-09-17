@@ -122,6 +122,7 @@ object RunUtils {
 
       DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
+      DebugDumpIRLogger.writeToFile(File("il-after-param.il"), pp_prog(ctx.program))
       assert(ir.invariant.readUninitialised(ctx.program))
       DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
 
