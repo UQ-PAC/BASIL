@@ -142,13 +142,13 @@ jobs:
           set -x
           if ! "$autoformat"; then
             : Scalafmt check outcome:
-            ${{ steps.diff.outcome != 'failed' }}
+            ${{ steps.diff.outcome != 'failure' }}
 
             : Scalafmt comment outcome:
-            ${{ steps.prepare.outcome != 'failed' }}
+            ${{ steps.prepare.outcome != 'failure' }}
           else
             : Scalafmt auto-format outcome:
-            ${{ steps.prepare.outcome != 'failed' }}
+            ${{ steps.prepare.outcome != 'failure' }}
           fi
 
 
