@@ -351,15 +351,28 @@ object LoopDetector {
   }
 }
 
-case class BlockState(val b: Block, var iloop_header: Option[Block], var dfsp_pos: Int, var is_traversed: Boolean)
+trait LoopInfo {
+  def b: Block
+  def iloop_header: Option[Block]
+  def headers: Set[Block]
+}
+
+case class BlockLoopInfo(
+  val b: Block,
+  var iloop_header: Option[Block],
+  var dfsp_pos: Int,
+  var is_traversed: Boolean,
+  var headers: Set[Block]
+) extends LoopInfo
 
 class NewLoopDetector(procedure: Procedure) {
 
-  val loopBlocks: Map[Block, BlockState] = procedure.blocks.map(b => b -> BlockState(b, None, 0, false)).toMap
+  val loopBlocks: Map[Block, BlockLoopInfo] =
+    procedure.blocks.map(b => b -> BlockLoopInfo(b, None, 0, false, Set())).toMap
 
   import scala.language.implicitConversions
 
-  given Conversion[Block, BlockState] with
+  given Conversion[Block, BlockLoopInfo] with
     def apply(b: Block) = loopBlocks(b)
 
   def compute_forest() = {
@@ -368,7 +381,7 @@ class NewLoopDetector(procedure: Procedure) {
     // XXX: do toposort properly. or get order from dfs traversal
     (0 to 10).foreach { _ =>
       loopBlocks.values.foreach {
-        case BlockState(b, Some(h), _, _) =>
+        case BlockLoopInfo(b, Some(h), _, _, _) =>
           forest.updateWith(h) {
             case None => Some(forest.getOrElse(b, Set()) + b + h)
             case Some(xs) => Some(xs + b + h ++ forest.getOrElse(b, Set()))
@@ -376,6 +389,7 @@ class NewLoopDetector(procedure: Procedure) {
         case _ => ()
       }
     }
+    loopBlocks.values.foreach(println(_))
     forest
   }
 
@@ -383,13 +397,13 @@ class NewLoopDetector(procedure: Procedure) {
     procedure.entryBlock.map(loopBlocks(_)).map(entry => trav_loops_tailrec(Left((entry, 1)), Nil))
     this
 
-  case class LoopContext(b0: BlockState, dfsp_pos: Int, locals: Option[(BlockState, Iterator[BlockState])])
+  case class LoopContext(b0: BlockLoopInfo, dfsp_pos: Int, locals: Option[(BlockLoopInfo, Iterator[BlockLoopInfo])])
 
   @tailrec
   final def trav_loops_tailrec(
-    input: Either[(BlockState, Int), Option[BlockState]],
-    inputContinuations: List[(BlockState, Int, Iterator[BlockState])]
-  ): Option[BlockState] = {
+    input: Either[(BlockLoopInfo, Int), Option[BlockLoopInfo]],
+    inputContinuations: List[(BlockLoopInfo, Int, Iterator[BlockLoopInfo])]
+  ): Option[BlockLoopInfo] = {
     println("a")
 
     val (b0, dfsp_pos, it, nh, continuations) = (input, inputContinuations) match {
@@ -421,7 +435,8 @@ class NewLoopDetector(procedure: Procedure) {
          */
       } else {
         if (b.dfsp_pos > 0) {
-          println("mark as loop header: " + b)
+          println("mark as loop header: " + b + " from " + b0)
+          b.headers = b.headers + b.b
           tag_lhead(b0, Some(b))
         } else if (b.iloop_header.isEmpty) {
           // intentionally empty
@@ -430,7 +445,7 @@ class NewLoopDetector(procedure: Procedure) {
           if (h.dfsp_pos > 0) {
             tag_lhead(b0, Some(h))
           } else {
-            println("mark " + b + " as re-entry. irreducible.")
+            println(s"IRRED: mark $b0 as re-entry into $b. irreducible.")
 
             boundary {
               while (h.iloop_header.isDefined) {
@@ -441,6 +456,8 @@ class NewLoopDetector(procedure: Procedure) {
                 }
               }
             }
+            println("irred h: " + h)
+            h.headers = h.headers + b.b
           }
         }
       }
@@ -453,7 +470,7 @@ class NewLoopDetector(procedure: Procedure) {
     }
   }
 
-  def tag_lhead(b: BlockState, h: Option[BlockState]): Unit = h match {
+  def tag_lhead(b: BlockLoopInfo, h: Option[BlockLoopInfo]): Unit = h match {
     case Some(h) if b.b ne h.b =>
       var cur1 = b
       var cur2 = h
