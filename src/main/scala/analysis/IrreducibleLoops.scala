@@ -364,7 +364,10 @@ class NewLoopDetector(procedure: Procedure) {
     procedure.entryBlock.map(loopBlocks(_)).map(trav_loops_dfs(_, 1))
     this
 
-  def trav_loops_dfs(b0: BlockState, dfsp_pos: Int): Option[BlockState] = {
+  case class LoopContext(b0: BlockState, dfsp_pos: Int, locals: Option[(BlockState, Iterator[BlockState])])
+
+  @tailrec
+  def trav_loops_tailrec(b0: BlockState, dfsp_pos: Int): Option[BlockState] = {
     println("a")
     b0.dfsp_pos = dfsp_pos
     b0.is_traversed = true
