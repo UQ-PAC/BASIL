@@ -4,6 +4,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
 import translating.{BAPToIR, ReadELFData}
 import util.{ILLoadingConfig, LogLevel, Logger}
+ import translating.PrettyPrinter.pprint
 
 import scala.sys.process.*
 
@@ -100,6 +101,25 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     val boogieResult = Seq("boogie", "/useArrayAxioms", "/timeLimit:10", outPath).!!
     Logger.debug("Boogie result: " + boogieResult)
     assert(boogieResult.contains("Irreducible flow graphs are unsupported."))
+  }
+
+  test("plist_free") {
+    val p = ir.parsing.ParseBasilIL.loadILFile("/home/rina/progs/basil/plist-free.il").program
+    p.procedures.foreach { p =>
+      p.blocks.foreach(_.statements.clear())
+      while (ir.transforms.coalesceBlocks(p)) {}
+    }
+
+    util.writeToFile(p.pprint, "/home/rina/progs/basil/plist-before.il")
+
+    analysis.AnalysisPipelineMRA.reducibleLoops(p)
+
+    util.writeToFile(p.pprint, "/home/rina/progs/basil/plist-after.il")
+
+    p.procedures.foreach { p =>
+      val blocksWithoutPrev = p.blocks.filter(b => Some(b) != p.entryBlock && b.prevBlocks.isEmpty).toList
+      assertResult(Nil, "after loop transform, all blocks should still be reachable")(blocksWithoutPrev)
+    }
   }
 
 }
