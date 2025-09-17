@@ -2,6 +2,8 @@ package ir
 import util.assertion.*
 import util.intrusive_list.IntrusiveListElement
 
+import scala.util.Random
+
 import collection.immutable.SortedMap
 import collection.immutable.ListSet
 import collection.mutable
@@ -290,6 +292,12 @@ class GoTo private (_targets: mutable.LinkedHashSet[Block], var label: Option[St
   def this(targets: Iterable[Block], label: Option[String] = None) = this(mutable.LinkedHashSet.from(targets), label)
 
   def this(target: Block) = this(mutable.Set(target), None)
+
+  def internalShuffleTargets(): Unit = {
+    val shuffled = Random.shuffle(_targets.toList)
+    _targets.clear()
+    _targets ++= shuffled
+  }
 
   def targets: Set[Block] = _targets.to(ListSet)
 

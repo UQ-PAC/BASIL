@@ -9,6 +9,7 @@ import util.intrusive_list.*
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{immutable, mutable}
+import scala.util.Random
 
 import eval.BitVectorEval
 
@@ -666,6 +667,16 @@ class Block private (
     }
     jump = j
     this
+  }
+
+  def internalShuffleJumps(): Unit = {
+    jump match {
+      case g: GoTo => g.internalShuffleTargets()
+      case _ => ()
+    }
+    val shuffled = Random.shuffle(_incomingJumps.toList)
+    _incomingJumps.clear()
+    _incomingJumps ++= shuffled
   }
 
   def incomingJumps: immutable.Set[GoTo] = _incomingJumps.to(immutable.ListSet)
