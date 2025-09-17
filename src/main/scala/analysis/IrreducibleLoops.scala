@@ -387,31 +387,38 @@ class NewLoopDetector(procedure: Procedure) {
 
   @tailrec
   final def trav_loops_tailrec(
-    input: Either[(BlockState, Int), (BlockState, Option[BlockState])],
+    input: Either[(BlockState, Int), Option[BlockState]],
     inputContinuations: List[(BlockState, Int, Iterator[BlockState])]
   ): Option[BlockState] = {
     println("a")
 
-    var (b0, dfsp_pos, it, nh, continuations) = (input, inputContinuations) match {
+    val (b0, dfsp_pos, it, nh, continuations) = (input, inputContinuations) match {
       case (Left((b0, dfsp_pos)), conts) => {
         b0.dfsp_pos = dfsp_pos
         b0.is_traversed = true
         val it = b0.b.nextBlocks.map(loopBlocks(_)).iterator
         (b0, dfsp_pos, it, None, conts)
       }
-      case (Right((b, nh)), (b0, dfsp_pos, it) :: rest) =>
-        (b0, dfsp_pos, Iterator(b) ++ it, Some(nh), rest)
+      case (Right(nh), (b0, dfsp_pos, it) :: rest) =>
+        (b0, dfsp_pos, it, Some(nh), rest)
       case (Right(_), Nil) =>
         throw new Exception("trav_loops_tailrec: stack underflow")
     }
 
+    nh match {
+      case Some(nh) => tag_lhead(b0, nh)
+      case None => ()
+    }
+
     while (it.hasNext) {
       val b = it.next()
-      if (nh.isDefined) {
-        tag_lhead(b0, nh.get)
-        nh = None
-      } else if (!b.is_traversed) {
+      if (!b.is_traversed) {
         return trav_loops_tailrec(Left((b, dfsp_pos + 1)), (b0, dfsp_pos, it) :: continuations)
+        /* before tailrec transformation:
+         *
+         * val nh = trav_loops_dfs(b, dfsp_pos + 1)
+         * tag_lhead(b0, nh)
+         */
       } else {
         if (b.dfsp_pos > 0) {
           println("mark as loop header: " + b)
@@ -442,7 +449,7 @@ class NewLoopDetector(procedure: Procedure) {
     val result = b0.iloop_header.map(loopBlocks(_))
     continuations match {
       case Nil => result
-      case _ :: _ => trav_loops_tailrec(Right((b0, result)), continuations)
+      case _ :: _ => trav_loops_tailrec(Right(result), continuations)
     }
   }
 
