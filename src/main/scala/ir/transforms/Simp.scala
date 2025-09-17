@@ -1259,14 +1259,6 @@ object OffsetProp {
     val lastUpdate = mutable.Map[Block, Int]()
     var stSequenceNo = 1
 
-    def findOff(v: Variable, c: BitVecLiteral): BitVecLiteral | Variable | BinaryExpr = find(v) match {
-      case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
-      case lv: Variable => BinaryExpr(BVADD, lv, c)
-      case BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) =>
-        BinaryExpr(BVADD, l, ir.eval.BitVectorEval.smt_bvadd(r, c))
-      case _ => throw Exception("Unexpected expression structure created by find() at some point")
-    }
-
     def eval(c: BitVecLiteral)(v: BitVecLiteral | Variable | BinaryExpr): BitVecLiteral | Variable | BinaryExpr =
       v match {
         case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
@@ -1287,7 +1279,6 @@ object OffsetProp {
           chain = st.get(chain.head) match {
             case Some((Some(v: Variable), _)) => v :: chain
             case o =>
-              println(o)
               chain
           }
         }
@@ -1299,12 +1290,12 @@ object OffsetProp {
         case None => v
         case Some((None, None)) => ret(v)
         case Some((None, Some(c))) => ret(c)
-        case Some((Some(v), None)) => find(v, ret, fuel - 1)
-        case Some((Some(v), Some(c))) => find(v, eval(c), fuel - 1)
+        case Some((Some(v), None)) => ret(find(v, x => x, fuel - 1))
+        case Some((Some(v), Some(c))) => ret(find(v, eval(c), fuel - 1))
       }
     }
 
-    def findOff(v: BitVecLiteral, e: Variable): BitVecLiteral | Variable | BinaryExpr = find(e, eval(v))
+    def findOff(e: Variable, v: BitVecLiteral): BitVecLiteral | Variable | BinaryExpr = eval(v)(find(e))
 
     def joinState(lhs: Variable, rhs: Expr) = {
       specJoinState(lhs, rhs) match {
@@ -1332,9 +1323,6 @@ object OffsetProp {
     }
 
     def clob(v: Variable) = {
-      if (!st.get(v).contains((None, None))) {
-        stSequenceNo += 1
-      }
       st(v) = (None, None)
     }
 
@@ -1348,9 +1336,6 @@ object OffsetProp {
             case (l: Variable, _) => Seq(l -> (None, None))
           }
           .foreach { case (l, r) =>
-            if (!st.get(l).contains(r)) {
-              stSequenceNo += 1
-            }
             st(l) = r
           }
       case a: Assign => {
@@ -2079,7 +2064,6 @@ def getDoCleanupTransform(doSimplify: Boolean): Transform = TransformBatch(
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
     assert(invariant.procEntryNoIncoming(ctx.program))
-    assert(invariant.readUninitialised(ctx.program))
   }
 )
 

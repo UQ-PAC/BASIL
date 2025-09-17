@@ -224,7 +224,6 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
     )
 
     val context = programToContext(program, globals)
-    translating.PrettyPrinter.pp_prog(context.program)
     val results = runTest(context)
 
     val loads = results.ir.program.collect { case la: MemoryLoad => la }
