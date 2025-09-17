@@ -2,7 +2,10 @@ package ir
 import util.assertion.*
 import util.intrusive_list.IntrusiveListElement
 
+import scala.util.Random
+
 import collection.immutable.SortedMap
+import collection.immutable.ListSet
 import collection.mutable
 
 /*
@@ -290,7 +293,13 @@ class GoTo private (_targets: mutable.LinkedHashSet[Block], var label: Option[St
 
   def this(target: Block) = this(mutable.Set(target), None)
 
-  def targets: Set[Block] = _targets.toSet
+  def internalShuffleTargets(): Unit = {
+    val shuffled = Random.shuffle(_targets.toList)
+    _targets.clear()
+    _targets ++= shuffled
+  }
+
+  def targets: Set[Block] = _targets.to(ListSet)
 
   override def deepEquals(o: Object): Boolean = o match {
     case GoTo(tgts, lbl) => tgts.map(_.label).toSet == targets.map(_.label).toSet && lbl == label
