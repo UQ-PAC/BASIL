@@ -146,6 +146,8 @@ def interLiveVarsAnalysis(program: Program, ignoreExternals: Boolean = false) = 
     p.incomingCalls().size == 0 && p.entryBlock.isDefined && p.returnBlock.isDefined && p.blocks.nonEmpty
   )
 
+  assert(entries.toSet.flatMap(_.reachableFrom).contains(program.mainProcedure))
+
   var r = Map[CFGPosition, Map[Variable, TwoElement]]()
   for (p <- entries) {
     r = r ++ InterLiveVarsAnalysis(program, ignoreExternals, Some(p)).analyze()
