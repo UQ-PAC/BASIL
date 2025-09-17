@@ -2,7 +2,6 @@ package analysis
 
 import analysis.solvers.BackwardIDESolver
 import ir.{
-  LocalVar,
   Assert,
   Assume,
   CFGPosition,
@@ -11,6 +10,7 @@ import ir.{
   GlobalVar,
   IndirectCall,
   LocalAssign,
+  LocalVar,
   MemoryLoad,
   MemoryStore,
   Procedure,
@@ -137,31 +137,29 @@ trait LiveVarsAnalysisFunctions(inline: Boolean, addExternals: Boolean = true)
   }
 }
 
-
-
 class InterLiveVarsAnalysis(program: Program, ignoreExternals: Boolean = false, entry: Option[Procedure] = None)
     extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program, entry),
       LiveVarsAnalysisFunctions(true, !ignoreExternals)
 
 def interLiveVarsAnalysis(program: Program, ignoreExternals: Boolean = false) = {
 
-    val entries = program.procedures.filter(p => p.incomingCalls().size == 0 && p.entryBlock.isDefined && p.returnBlock.isDefined && p.blocks.nonEmpty)
+  val entries = program.procedures.filter(p =>
+    p.incomingCalls().size == 0 && p.entryBlock.isDefined && p.returnBlock.isDefined && p.blocks.nonEmpty
+  )
 
-    var procedures = program.procedures.toSet
-    var segments = List[Procedure]()
+  var procedures = program.procedures.toSet
+  var segments = List[Procedure]()
 
-    val reachableEntry = program.mainProcedure.preOrderIterator.collect {
-        case p: Procedure => p
-      }
+  val reachableEntry = program.mainProcedure.preOrderIterator.collect { case p: Procedure =>
+    p
+  }
 
-    procedures = procedures -- reachableEntry
+  procedures = procedures -- reachableEntry
 
-    var r = Map[CFGPosition, Map[Variable, TwoElement]]()
-    for (p <- entries) {
-      r = r ++ InterLiveVarsAnalysis(program, ignoreExternals, Some(p)).analyze()
-    }
-    r
-
+  var r = Map[CFGPosition, Map[Variable, TwoElement]]()
+  for (p <- entries) {
+    r = r ++ InterLiveVarsAnalysis(program, ignoreExternals, Some(p)).analyze()
+  }
+  r
 
 }
-

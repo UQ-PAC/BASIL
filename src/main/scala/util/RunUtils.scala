@@ -85,7 +85,7 @@ object RunUtils {
     if (q.loading.parameterForm && !q.simplify) {
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
-    assert(ir.invariant.readUninitialised(ctx.program))
+      assert(ir.invariant.readUninitialised(ctx.program))
       if (conf.assertCalleeSaved) {
         transforms.CalleePreservedParam.transform(ctx.program)
       }
@@ -107,7 +107,6 @@ object RunUtils {
       AnalysisPipelineMRA.runToFixpoint(conf, ctx)
     }
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
-
 
     assert(ir.invariant.programDiamondForm(ctx.program))
     ir.eval.SimplifyValidation.validate = conf.validateSimp

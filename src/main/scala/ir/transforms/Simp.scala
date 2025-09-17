@@ -1267,39 +1267,46 @@ object OffsetProp {
       case _ => throw Exception("Unexpected expression structure created by find() at some point")
     }
 
-    def eval(c: BitVecLiteral)(v: BitVecLiteral | Variable | BinaryExpr): BitVecLiteral | Variable | BinaryExpr = v match {
-      case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
-      case lv: Variable => BinaryExpr(BVADD, lv, c)
-      case BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) =>
-        BinaryExpr(BVADD, l, ir.eval.BitVectorEval.smt_bvadd(r, c))
-      case _ => throw Exception("Unexpected expression structure created by find() at some point")
-    }
+    def eval(c: BitVecLiteral)(v: BitVecLiteral | Variable | BinaryExpr): BitVecLiteral | Variable | BinaryExpr =
+      v match {
+        case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
+        case lv: Variable => BinaryExpr(BVADD, lv, c)
+        case BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) =>
+          BinaryExpr(BVADD, l, ir.eval.BitVectorEval.smt_bvadd(r, c))
+        case _ => throw Exception("Unexpected expression structure created by find() at some point")
+      }
 
-    final def find(v: Variable, ret: BitVecLiteral | Variable | BinaryExpr =>  BitVecLiteral | Variable | BinaryExpr = x => x, fuel: Int = 5000): BitVecLiteral | Variable | BinaryExpr = {
+    final def find(
+      v: Variable,
+      ret: BitVecLiteral | Variable | BinaryExpr => BitVecLiteral | Variable | BinaryExpr = x => x,
+      fuel: Int = 5000
+    ): BitVecLiteral | Variable | BinaryExpr = {
       if (fuel == 0) {
         var chain = List(v)
         for (i <- 0 to 10) {
           chain = st.get(chain.head) match {
             case Some((Some(v: Variable), _)) => v :: chain
-            case o => 
+            case o =>
               println(o)
               chain
           }
         }
-        throw Exception(s"Ran out of fuel recursively resolving copyprop (at $v): probable cycle. Next lookups are: $chain")
+        throw Exception(
+          s"Ran out of fuel recursively resolving copyprop (at $v): probable cycle. Next lookups are: $chain"
+        )
       }
       st.get(v) match {
         case None => v
         case Some((None, None)) => ret(v)
         case Some((None, Some(c))) => ret(c)
-        //case Some((Some(c), None)) if c == v => ret(c)
+        // case Some((Some(c), None)) if c == v => ret(c)
         case Some((Some(v), None)) => find(v, ret, fuel - 1)
-        //case Some((Some(v2), Some(c))) if v2 == v => eval(c)(v2)
+        // case Some((Some(v2), Some(c))) if v2 == v => eval(c)(v2)
         case Some((Some(v), Some(c))) => find(v, eval(c), fuel - 1)
       }
     }
 
-    def findOff(v: BitVecLiteral, e: Variable) : BitVecLiteral | Variable | BinaryExpr = find(e, eval(v))
+    def findOff(v: BitVecLiteral, e: Variable): BitVecLiteral | Variable | BinaryExpr = find(e, eval(v))
 
     def joinState(lhs: Variable, rhs: Expr) = {
       specJoinState(lhs, rhs) match {
@@ -1343,7 +1350,7 @@ object OffsetProp {
             case (l: Variable, _) => Seq(l -> (None, None))
           }
           .foreach { case (l, r) =>
-            if (!st.get(l).contains(r))  {
+            if (!st.get(l).contains(r)) {
               stSequenceNo += 1
             }
             st(l) = r

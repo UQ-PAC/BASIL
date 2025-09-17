@@ -245,9 +245,9 @@ abstract class IDESolver[
   }
 
   def analyze(): Map[CFGPosition, Map[D, T]] = {
-      val phase1 = Phase1()
-      val phase2 = Phase2(phase1)
-      phase2.restructure(phase2.analyze())
+    val phase1 = Phase1()
+    val phase2 = Phase2(phase1)
+    phase2.restructure(phase2.analyze())
   }
 }
 
@@ -297,9 +297,8 @@ abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program, entry: 
 
 abstract class BackwardIDESolver[D, T, L <: Lattice[T]](program: Program, entry: Option[Procedure] = None)
     extends IDESolver[Return, Procedure, Command, DirectCall, D, T, L](
-      program,
-      {
-        val e = entry.getOrElse(program.mainProcedure) 
+      program, {
+        val e = entry.getOrElse(program.mainProcedure)
         IRWalk.lastInProc(e).getOrElse(e)
       }
     ),
