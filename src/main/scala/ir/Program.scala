@@ -604,7 +604,7 @@ class Block private (
   var label: String,
   val statements: IntrusiveList[Statement],
   private var _jump: Jump,
-  private val _incomingJumps: mutable.HashSet[GoTo],
+  private val _incomingJumps: mutable.LinkedHashSet[GoTo],
   var meta: Metadata
 ) extends HasParent[Procedure]
     with DeepEquality {
@@ -621,7 +621,7 @@ class Block private (
     statements: IterableOnce[Statement] = Set.empty,
     jump: Jump = Unreachable()
   ) = {
-    this(label, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty, Metadata(None, address))
+    this(label, IntrusiveList().addAll(statements), jump, mutable.LinkedHashSet.empty, Metadata(None, address))
   }
 
   def address = meta.address
@@ -668,7 +668,7 @@ class Block private (
     this
   }
 
-  def incomingJumps: immutable.Set[GoTo] = _incomingJumps.toSet
+  def incomingJumps: immutable.Set[GoTo] = _incomingJumps.to(immutable.ListSet)
 
   def addIncomingJump(g: GoTo): Boolean = _incomingJumps.add(g)
 
