@@ -1,8 +1,9 @@
 package analysis
 
-import ir.{Assume, BinaryExpr, Block, BoolOR, EQ, GoTo, IRWalk, IntLiteral, IntType, LocalAssign, LocalVar, Program}
+import ir.{Assume, BinaryExpr, Block, BoolOR, EQ, GoTo, IRWalk, IntLiteral, IntType, LocalAssign, LocalVar, Program, Procedure}
 
 import scala.collection.mutable
+import scala.util.boundary, boundary.break
 
 private def label(p: Block) = "block." + p.label
 
@@ -55,10 +56,10 @@ object LoopDetector {
     headers: Set[Block] = Set(),
 
     // Algorithm helpers
-    private[LoopDetector] val visitedNodes: Set[Block] = Set(),
-    private[LoopDetector] val nodeDFSPpos: Map[Block, Int] = Map(),
-    private[LoopDetector] val iloopHeaders: Map[Block, Block] = Map(),
-    private[LoopDetector] val edgeStack: List[LoopEdge] = List()
+    val visitedNodes: Set[Block] = Set(),
+    val nodeDFSPpos: Map[Block, Int] = Map(),
+    val iloopHeaders: Map[Block, Block] = Map(),
+    val edgeStack: List[LoopEdge] = List()
   ) {
     def irreducibleLoops: Set[Loop] = loops.values.filter(l => !l.reducible).toSet
 
@@ -79,12 +80,13 @@ object LoopDetector {
 
     /** Discards private variables used during the computation but not part of the result. */
     def canonicalise() = {
-      this.copy(
-        visitedNodes = Set(),
-        nodeDFSPpos = Map(),
-        iloopHeaders = Map(),
-        edgeStack = List()
-      )
+      this
+      // this.copy(
+      //   visitedNodes = Set(),
+      //   nodeDFSPpos = Map(),
+      //   iloopHeaders = Map(),
+      //   edgeStack = List()
+      // )
     }
   }
 
@@ -329,6 +331,98 @@ object LoopDetector {
     st = st.copy(iloopHeaders = st.iloopHeaders.updated(cur1, cur2))
     st
   }
+}
+
+case class BlockState(val b: Block, var iloop_header: Option[Block], var dfsp_pos: Int, var is_traversed: Boolean)
+
+class NewLoopDetector(procedure: Procedure) {
+
+  val loopBlocks: Map[Block, BlockState] = procedure.blocks.map(b => b -> BlockState(b, None, 0, false)).toMap
+
+  import scala.language.implicitConversions
+
+  given Conversion[Block, BlockState] with
+    def apply(b: Block) = loopBlocks(b)
+
+  def compute_forest() = {
+    // Header -> Cycle with that header
+    val forest = mutable.Map[Block, Set[Block]]()
+    (0 to 10).foreach { _ =>
+
+    loopBlocks.values.foreach {
+      case BlockState(b, Some(h), _, _) => forest.updateWith(h) {
+        case None => Some(forest.getOrElse(b, Set()) + b + h)
+        case Some(xs) => Some(xs + b + h ++ forest.getOrElse(b, Set()))
+      }
+      case _ => ()
+    }
+    }
+    forest
+  }
+
+  def identify_loops(): this.type =
+    procedure.entryBlock.map(loopBlocks(_)).map(trav_loops_dfs(_, 1))
+    this
+
+  def trav_loops_dfs(b0: BlockState, dfsp_pos: Int): Option[BlockState] = {
+    println("a")
+    b0.dfsp_pos = dfsp_pos
+    b0.is_traversed = true
+    for (b <- b0.b.nextBlocks.map(loopBlocks(_))) {
+      println(b)
+      if (!b.is_traversed) {
+        val nh = trav_loops_dfs(b, dfsp_pos + 1)
+        tag_lhead(b0, nh)
+      } else {
+        if (b.dfsp_pos > 0) {
+          println("mark as loop header: " + b)
+          tag_lhead(b0, Some(b))
+        } else if (b.iloop_header.isEmpty) {
+
+        } else {
+          var h = b.iloop_header.get
+          if (h.dfsp_pos > 0) {
+            tag_lhead(b0, Some(h))
+          } else {
+            println("mark " + b + " as re-entry. irreducible.")
+
+            boundary {
+              while (h.iloop_header.isDefined) {
+                h = h.iloop_header.get
+                if (h.dfsp_pos > 0) {
+                  tag_lhead(b0, Some(h))
+                  break()
+                }
+              }
+            }
+          }
+        }
+      }
+
+    }
+    b0.dfsp_pos = 0
+    b0.iloop_header.map(loopBlocks(_))
+  }
+
+  def tag_lhead(b: BlockState, h: Option[BlockState]): Unit = h match {
+    case Some(h) if b.b ne h.b =>
+      var cur1 = b
+      var cur2 = h
+      while (cur1.iloop_header.isDefined) {
+        val ih = cur1.iloop_header.get
+        if (ih eq cur2.b) return
+        if (ih.dfsp_pos < cur2.dfsp_pos) {
+          cur1.iloop_header = Some(cur2.b)
+          cur1 = cur2
+          cur2 = ih
+        } else {
+          cur1 = ih
+        }
+      }
+      cur1.iloop_header = Some(cur2.b)
+    case _ => ()
+  }
+
 }
 
 object LoopTransform {

@@ -1,10 +1,11 @@
 import analysis.LoopDetector
+import analysis.NewLoopDetector
 import ir.{Block, IRLoading, Program, dotBlockGraph}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
 import translating.{BAPToIR, ReadELFData}
 import util.{ILLoadingConfig, LogLevel, Logger}
- import translating.PrettyPrinter.pprint
+import translating.PrettyPrinter.pprint
 
 import scala.sys.process.*
 
@@ -103,11 +104,11 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     assert(boogieResult.contains("Irreducible flow graphs are unsupported."))
   }
 
-  test("paper 1") {
+  test("paper fig2") {
     import ir.dsl.*
     val p = prog(
       proc("main")(
-        block("s", goto("a", "e")),
+        block("S", goto("a", "e")),
         block("a", goto("b")),
         block("b", goto("c")),
         block("c", goto("d", "b")),
@@ -126,7 +127,34 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println("" + loop.header + ": " + loop.nodes.map(_.label))
     }
 
+    println(NewLoopDetector(p.mainProcedure).identify_loops().compute_forest())
+
   }
+
+  test("paper fig3") {
+    import ir.dsl.*
+    val p = prog(
+      proc("main")(
+        block("S", goto("a", "d")),
+        block("a", goto("b")),
+        block("b", goto("a", "c", "E")),
+        block("c", goto("b", "d", "E")),
+        block("d", goto("c")),
+        block("E", ret)
+      )
+    )
+
+    val result = LoopDetector.identify_loops(p)
+    println(result.iloopHeaders.groupMap(_._2)(_._1))
+    result.loops.values.foreach { loop =>
+      println("" + loop.header + ": " + loop.nodes.map(_.label))
+      println(loop)
+    }
+
+    println(NewLoopDetector(p.mainProcedure).identify_loops().compute_forest())
+
+  }
+
 
   test("plist_free") {
     val p = ir.parsing.ParseBasilIL.loadILFile("/home/rina/progs/basil/plist-free.il").program
