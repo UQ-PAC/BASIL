@@ -23,17 +23,23 @@ class TaintAnalysisTests extends AnyFunSuite, CaptureOutput {
     ProcVariableDependencyAnalysis(program, variables, Map(), procedure).analyze()
   }
 
+  def convertReturns(program: Program): Unit = {
+    val replaceReturns = transforms.ReplaceReturns()
+    cilvisitor.visit_prog(replaceReturns, program)
+    replaceReturns.addR30Begins()
+    transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+  }
+
   private val registers = 0.to(31).map { n => Register(s"R$n", 64): Variable }.toSet
-  private val baseRegisterMap = registers.map { r => (r -> FiniteSet(Set(r))) }.toMap
+  private val baseRegisterMap = registers.map { r => r -> FiniteSet(Set(r)) }.toMap
 
   test("constantLiteral") {
     val program = prog(
       proc("main", block("main", directCall("f"), goto("mainRet")), block("mainRet", ret)),
       proc("f", block("assign", LocalAssign(R0, bv64(2), None), goto("returnBlock")), block("returnBlock", ret))
     )
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+    convertReturns(program)
 
     val f = program.nameToProcedure("f")
     val taint: Map[CFGPosition, Set[Variable]] = Map(f -> Set(R0))
@@ -55,10 +61,7 @@ class TaintAnalysisTests extends AnyFunSuite, CaptureOutput {
         block("returnBlock", ret)
       )
     )
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
+    convertReturns(program)
     val f = program.nameToProcedure("f")
     val taint: Map[CFGPosition, Set[Variable]] = Map(f -> Set(R0))
     val taintAnalysisResults = getTaintAnalysisResults(program, taint)
@@ -81,9 +84,7 @@ class TaintAnalysisTests extends AnyFunSuite, CaptureOutput {
         block("returnBlock", ret)
       )
     )
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+    convertReturns(program)
 
     val f = program.nameToProcedure("f")
     val taint: Map[CFGPosition, Set[Variable]] = Map(f -> Set(R1))
@@ -108,9 +109,7 @@ class TaintAnalysisTests extends AnyFunSuite, CaptureOutput {
       ),
       proc("g", block("body", LocalAssign(R0, R1, None), goto("gReturnBlock")), block("gReturnBlock", ret))
     )
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+    convertReturns(program)
 
     val f = program.nameToProcedure("f")
     val taint: Map[CFGPosition, Set[Variable]] = Map(f -> Set(R1))
@@ -135,9 +134,7 @@ class TaintAnalysisTests extends AnyFunSuite, CaptureOutput {
         block("returnBlock", ret)
       )
     )
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+    convertReturns(program)
 
     val f = program.nameToProcedure("f")
     val taint: Map[CFGPosition, Set[Variable]] = Map(f -> Set(R1))
