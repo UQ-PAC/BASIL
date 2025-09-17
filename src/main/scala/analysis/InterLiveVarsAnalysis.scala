@@ -10,7 +10,6 @@ import ir.{
   GlobalVar,
   IndirectCall,
   LocalAssign,
-  LocalVar,
   MemoryLoad,
   MemoryStore,
   Procedure,

@@ -2079,6 +2079,7 @@ def getDoCleanupTransform(doSimplify: Boolean): Transform = TransformBatch(
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
     assert(invariant.procEntryNoIncoming(ctx.program))
+    assert(invariant.readUninitialised(ctx.program))
   }
 )
 
