@@ -154,6 +154,52 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
   }
 
+  test("multiple entries into same header") {
+    import ir.dsl.*
+    val p = prog(
+      proc("main")(
+        block("S", goto("a", "b")),
+        block("a", goto("loop")),
+        block("b", goto("loop")),
+        block("loop", goto("loopexit")),
+        block("loopexit", goto("loop", "end")),
+        block("end", ret)
+      )
+    )
+
+    val result = LoopDetector.identify_loops(p)
+    println(result.iloopHeaders.groupMap(_._2)(_._1))
+    result.loops.values.foreach { loop =>
+      println("" + loop.header + ": " + loop.nodes.map(_.label))
+      println(loop)
+    }
+
+    println(NewLoopDetector(p.mainProcedure).identify_loops().compute_forest())
+
+  }
+
+  test("one long loop") {
+    import ir.dsl.*
+    val p = prog(
+      proc("main")(
+        block("S", goto("loop")),
+        block("loop", goto("loop2")),
+        block("loop2", goto("loop3")),
+        block("loop3", goto("loop", "end")),
+        block("end", ret)
+      )
+    )
+
+    val result = LoopDetector.identify_loops(p)
+    println(result.iloopHeaders.groupMap(_._2)(_._1))
+    result.loops.values.foreach { loop =>
+      println("" + loop.header + ": " + loop.nodes.map(_.label))
+      println(loop)
+    }
+
+    println(NewLoopDetector(p.mainProcedure).identify_loops().compute_forest())
+  }
+
   test("plist_free") {
     val p = ir.parsing.ParseBasilIL.loadILFile("/home/rina/progs/basil/plist-free.il").program
     p.procedures.foreach { p =>
