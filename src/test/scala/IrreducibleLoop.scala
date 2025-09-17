@@ -103,6 +103,31 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     assert(boogieResult.contains("Irreducible flow graphs are unsupported."))
   }
 
+  test("paper 1") {
+    import ir.dsl.*
+    val p = prog(
+      proc("main")(
+        block("s", goto("a", "e")),
+        block("a", goto("b")),
+        block("b", goto("c")),
+        block("c", goto("d", "b")),
+        block("d", goto("E", "a")),
+        block("e", goto("f")),
+        block("f", goto("g")),
+        block("g", goto("f", "h")),
+        block("h", goto("i")),
+        block("i", goto("h", "e", "E")),
+        block("E", ret)
+      )
+    )
+
+    val result = LoopDetector.identify_loops(p)
+    result.loops.values.foreach { loop =>
+      println("" + loop.header + ": " + loop.nodes.map(_.label))
+    }
+
+  }
+
   test("plist_free") {
     val p = ir.parsing.ParseBasilIL.loadILFile("/home/rina/progs/basil/plist-free.il").program
     p.procedures.foreach { p =>
@@ -111,6 +136,8 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     }
 
     util.writeToFile(p.pprint, "/home/rina/progs/basil/plist-before.il")
+
+    println(LoopDetector.identify_loops(p))
 
     analysis.AnalysisPipelineMRA.reducibleLoops(p)
 

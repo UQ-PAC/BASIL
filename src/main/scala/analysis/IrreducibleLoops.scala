@@ -76,15 +76,20 @@ object LoopDetector {
         }
       }
     }
+
+    /** Discards private variables used during the computation but not part of the result. */
+    def canonicalise() = {
+      this.copy(
+        visitedNodes = Set(),
+        nodeDFSPpos = Map(),
+        iloopHeaders = Map(),
+        edgeStack = List()
+      )
+    }
   }
 
   def identify_loops(entryBlock: Block): State = {
-    traverse_loops_dfs(State(), entryBlock, 1).copy(
-      visitedNodes = Set(),
-      nodeDFSPpos = Map(),
-      iloopHeaders = Map(),
-      edgeStack = List()
-    )
+    traverse_loops_dfs(State(), entryBlock, 1).canonicalise()
   }
 
   /*
@@ -93,7 +98,7 @@ object LoopDetector {
   def identify_loops(cfg: Program): State = {
     cfg.procedures.toSet
       .flatMap(_.entryBlock)
-      .foldLeft(State())((st, eb) => traverse_loops_dfs(st, eb, 1))
+      .foldLeft(State())((st, eb) => traverse_loops_dfs(st, eb, 1)).canonicalise()
   }
 
   private def processVisitedNodeOutgoingEdge(istate: State, edge: LoopEdge): State = {
@@ -336,6 +341,8 @@ object LoopTransform {
    */
   def llvm_transform(loops: Iterable[Loop]): Iterable[Loop] = {
     loops.map { l =>
+      println("transforming loop with header: " + l.header)
+      println("nodes: " + l.nodes.map(_.label))
       if (!l.reducible) {
         llvm_transform_loop(l)
       } else {
@@ -355,7 +362,8 @@ object LoopTransform {
    * Returns: A new reducible loop which is semantically equivalent to the input irreducible loop
    */
   private def llvm_transform_loop(loop: Loop): Loop = {
-    val entryEdges: Set[LoopEdge] = loop.entryEdges.union(loop.reentries).union(loop.backEdges).toSet
+    val otherHeaders = loop.reentries.toSet.map(_.to)
+    val entryEdges: Set[LoopEdge] = loop.entryEdges.toSet ++ loop.reentries ++ loop.backEdges ++ loop.edges.filter(e => otherHeaders.contains(e.to))
 
     val P_e: Set[LoopEdge] = entryEdges // N entry edges
     val P_b: Set[LoopEdge] = entryEdges.flatMap { e =>
