@@ -262,7 +262,6 @@ enum GammaTerm {
    * Determines whether the term contains only variables in vars
    */
   def containsOnly(vars: Set[Variable]): Boolean = {
-    import GammaTerm.*
     this match {
       case Lit(x) => true
       case Var(v) => vars.contains(v)
@@ -275,7 +274,6 @@ enum GammaTerm {
 }
 
 object GammaTerm {
-  import GammaTerm.*
 
   val Low = Lit(TrueLiteral)
   val High = Lit(FalseLiteral)
@@ -824,7 +822,7 @@ def exprToGammaTerm(e: Expr): Option[GammaTerm] = e match {
 def exprToPredicate(e: Expr): Option[Predicate] = e match {
   case b: BoolLit => Some(Predicate.Lit(b))
   case UnaryExpr(BoolNOT, arg) => exprToPredicate(arg).map(p => Predicate.not(p))
-  case BinaryExpr(op: (PolyCmp | BVCmpOp | BoolCmpOp), arg1, arg2) =>
+  case BinaryExpr(op: (PolyCmp | BVCmpOp | BoolBinOp), arg1, arg2) =>
     (
       List(arg1, arg2).map(e =>
         e.getType match {
@@ -835,7 +833,7 @@ def exprToPredicate(e: Expr): Option[Predicate] = e match {
       ),
       op
     ) match {
-      case (Some(l: Predicate) :: Some(r: Predicate) :: Nil, op: (BoolCmpOp | PolyCmp)) => Some(Predicate.bop(op, l, r))
+      case (Some(l: Predicate) :: Some(r: Predicate) :: Nil, op: (BoolBinOp | PolyCmp)) => Some(Predicate.bop(op, l, r))
       case (Some(l: BVTerm) :: Some(r: BVTerm) :: Nil, op: (BVCmpOp | PolyCmp)) => Some(Predicate.BVCmp(op, l, r))
       case _ => None
     }

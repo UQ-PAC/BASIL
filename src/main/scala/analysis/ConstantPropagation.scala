@@ -107,6 +107,8 @@ class IntraProcConstantPropagation(prog: Program)
             (k, v)
           }
         }
+      case havoc: Havoc =>
+        s ++ havoc.vars.map(v => v -> valuelattice.top)
       case _ => s
     }
   }
@@ -132,6 +134,8 @@ class InterProcConstantPropagation(val program: Program)
         s + (la.lhs -> eval(la.rhs, s))
       case load: MemoryLoad =>
         s + (load.lhs -> valuelattice.top)
+      case havoc: Havoc =>
+        s ++ havoc.vars.map(v => v -> valuelattice.top)
       // all others: like no-ops
       case _ => s
     }

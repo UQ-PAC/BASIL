@@ -166,7 +166,7 @@ Some additional constants are defined for convenience, Eg. `R0 = Register(R0, 64
 
 ### Pretty printing
 
-The ir can be printed with the overloaded function below, which can take a procedure, block, or statement and returns a string.
+The IR can be printed with the overloaded function below, which can take a procedure, block, or statement and returns a string.
 
 ```scala
 translating.BasilIRPrettyPrinter()(b)

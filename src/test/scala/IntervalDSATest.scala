@@ -1,5 +1,4 @@
-import analysis.data_structure_analysis
-import analysis.data_structure_analysis.{DSInterval, Heap, IntervalDSA, Par, Ret, SymBase}
+import analysis.data_structure_analysis.{DSInterval, Heap, IntervalDSA, Par, Ret}
 import boogie.SpecGlobal
 import ir.Endian.LittleEndian
 import ir.dsl.{block, directCall, goto, proc, prog, ret}
@@ -667,6 +666,12 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(dsg.glIntervals.size == 1)
     assert(!IntervalDSA.checksStackMaintained(dsg))
     assert(!IntervalDSA.checksGlobalsMaintained(dsg))
+  }
+
+  test("recursion with callee") {
+    val path = "src/test/dsa/recursion/gcc/recursion"
+    val config = DSConfig(DSAPhase.TD, true, false, false, true)
+    val results = runTest(path, None, config)
   }
 
 }

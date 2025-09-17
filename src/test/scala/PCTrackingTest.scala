@@ -1,4 +1,4 @@
-import ir.{IRContext, *}
+import ir.*
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
 import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, PCTrackingOption, SimplifyMode, StaticAnalysisConfig}
@@ -16,7 +16,7 @@ class PCTrackingTest extends AnyFunSuite with CaptureOutput {
           dumpIL = None,
           pcTracking = pcTracking
         ),
-        staticAnalysis = Some(StaticAnalysisConfig(None)),
+        staticAnalysis = Some(StaticAnalysisConfig()),
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
         simplify = if simplify then SimplifyMode.Simplify else SimplifyMode.Disabled

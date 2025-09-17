@@ -14,10 +14,10 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
       case a: LocalAssign => vassign(vlvar(a.lhs), vexpr(a.rhs))
       case m: MemoryAssign => vmemassign(vlvar(m.lhs), vexpr(m.rhs))
       case a: SimulAssign =>
-        vsimulassign(a.assignments.toList.map { case (lhs, rhs) =>
+        vsimulassign(a.assignments.toList.map { (lhs, rhs) =>
           vlvar(lhs) -> vexpr(rhs)
         })
-
+      case h: Havoc => vhavoc(h.vars.toList.map(vlvar))
       case m: MemoryLoad => vload(vlvar(m.lhs), m.mem.name, vexpr(m.index), m.endian, m.size)
       case m: MemoryStore => vstore(m.mem, vexpr(m.index), vexpr(m.value), m.endian, m.size)
       case c: DirectCall =>
@@ -94,6 +94,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
   def vassign(lhs: Repr[Variable], rhs: Repr[Expr]): Repr[LocalAssign]
   def vmemassign(lhs: Repr[Variable], rhs: Repr[Expr]): Repr[LocalAssign]
   def vsimulassign(assignments: List[(Repr[Variable], Repr[Expr])]): Repr[SimulAssign]
+  def vhavoc(variables: List[Repr[Variable]]): Repr[Havoc]
   def vload(lhs: Repr[Variable], mem: String, index: Repr[Expr], endian: Endian, size: Int): Repr[MemoryLoad]
   def vstore(mem: Memory, index: Repr[Expr], value: Repr[Expr], endian: Endian, size: Int): Repr[MemoryStore]
   def vcall(
@@ -211,7 +212,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
 
   def vload(lhs: Sexp[Variable], mem: String, index: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryLoad] = ???
   def vstore(mem: Memory, index: Sexp[Expr], value: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryStore] = ???
-
+  def vhavoc(variables: List[Sexp[Variable]]) = ???
   def vold(e: Expr) = ???
   def vquantifier(e: QuantifierExpr) = ???
   def vlambda(e: LambdaExpr) = ???

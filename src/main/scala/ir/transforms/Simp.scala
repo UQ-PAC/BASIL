@@ -3,7 +3,6 @@ package ir.transforms
 import ir.*
 import ir.cilvisitor.*
 import ir.eval.{AlgebraicSimplifications, AssumeConditionSimplifications, simplifyExprFixpoint}
-import translating.PrettyPrinter.*
 import util.assertion.*
 import util.{SimplifyLogger, condPropDebugLogger}
 
@@ -105,11 +104,12 @@ enum Def {
 // map v -> definitions reached here
 class DefUseEntryDomain() extends AbstractDomain[Map[Variable, Set[Def]]] {
 
-  override def transfer(s: Map[Variable, Set[Def]], b: Command) = {
+  override def transfer(s: Map[Variable, Set[Def]], b: Command): Map[Variable, Set[Def]] = {
     b match {
       case a: LocalAssign => s.updated(a.lhs, Set(Def.Def(a)))
       case a: MemoryLoad => s.updated(a.lhs, Set(Def.Def(a)))
-      case d: DirectCall => d.outParams.map(_._2).foldLeft(s)((s, r) => s.updated(r, Set(Def.Def(d))))
+      case h: Havoc => h.vars.foldLeft(s) { (s, r) => s.updated(r, Set(Def.Def(h))) }
+      case d: DirectCall => d.outParams.values.foldLeft(s)((s, r) => s.updated(r, Set(Def.Def(d))))
       case _ => s
     }
   }
@@ -117,12 +117,12 @@ class DefUseEntryDomain() extends AbstractDomain[Map[Variable, Set[Def]]] {
   def bot = Map[Variable, Set[Def]]()
   def init = Map[Variable, Set[Def]]().withDefaultValue(Def.Entry)
 
-  def join(l: Map[Variable, Set[Def]], r: Map[Variable, Set[Def]], pos: Block) = {
+  def join(l: Map[Variable, Set[Def]], r: Map[Variable, Set[Def]], pos: Block): Map[Variable, Set[Def]] = {
     l.keySet
       .union(r.keySet)
-      .map(k => {
-        k -> (l.get(k).getOrElse(Set(Def.Entry)) ++ r.get(k).getOrElse(Set(Def.Entry)))
-      })
+      .map { k =>
+        k -> (l.getOrElse(k, Set(Def.Entry)) ++ r.getOrElse(k, Set(Def.Entry)))
+      }
       .toMap
   }
 }
@@ -139,12 +139,11 @@ class IntraLiveVarsDomain extends PowerSetDomain[Variable] {
       case m: MemoryStore => s ++ m.index.variables ++ m.value.variables
       case a: Assume => s ++ a.body.variables
       case a: Assert => s ++ a.body.variables
+      case h: Havoc => s -- h.vars
       case i: IndirectCall => s + i.target
-      case c: DirectCall => {
-        s -- c.outParams.map(_._2) ++ c.actualParams.flatMap(_._2.variables)
-      }
+      case c: DirectCall => (s -- c.outParams.values) ++ c.actualParams.values.flatMap(_.variables)
       case g: GoTo => s
-      case r: Return => s ++ r.outParams.flatMap(_._2.variables)
+      case r: Return => s ++ r.outParams.values.flatMap(_.variables)
       case r: Unreachable => s
       case n: NOP => s
     }
@@ -337,70 +336,63 @@ def getRedundantAssignments(procedure: Procedure): Set[Variable] = {
 
   for (c <- procedure) {
     c match {
-
-      case a: LocalAssign => {
+      case a: LocalAssign =>
         assignedNotRead(a.lhs) = joinVS(assignedNotRead(a.lhs), VS.Assigned(Set(a)))
-        a.rhs.variables.foreach(v => {
+        a.rhs.variables.foreach { v =>
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(a)))
-        })
-      }
-      case a: MemoryAssign => {
+        }
+      case a: MemoryAssign =>
         assignedNotRead(a.lhs) = joinVS(assignedNotRead(a.lhs), VS.Assigned(Set(a)))
-        a.rhs.variables.foreach(v => {
+        a.rhs.variables.foreach { v =>
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(a)))
-        })
-      }
-      case m: SimulAssign => {
-        m.assignments.foreach { case (lhs, r) =>
+        }
+      case m: SimulAssign =>
+        m.assignments.foreach { (lhs, r) =>
           assignedNotRead(lhs) = joinVS(assignedNotRead(lhs), VS.Assigned(Set(m)))
         }
         m.assignments.toSeq
           .flatMap(_._2.variables)
-          .foreach(v => {
+          .foreach { v =>
             assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(m)))
-          })
-      }
-      case a: MemoryLoad => {
+          }
+      case a: MemoryLoad =>
         assignedNotRead(a.lhs) = joinVS(assignedNotRead(a.lhs), VS.Assigned(Set(a)))
-        a.index.variables.foreach(v => {
+        a.index.variables.foreach { v =>
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(a)))
-        })
-      }
-      case m: MemoryStore => {
-        m.index.variables.foreach(v => {
+        }
+      case m: MemoryStore =>
+        m.index.variables.foreach { v =>
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(m)))
-        })
-        m.value.variables.foreach(v => {
+        }
+        m.value.variables.foreach { v =>
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(m)))
-        })
-      }
-      case m: IndirectCall => {
+        }
+      case m: IndirectCall =>
         assignedNotRead(m.target) = joinVS(assignedNotRead(m.target), VS.Read(Set(), Set(m)))
-      }
-      case m: Assert => {
-        m.body.variables.foreach(v => {
+      case m: Assert =>
+        m.body.variables.foreach { v =>
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(m)))
-        })
-      }
-      case m: Assume => {
+        }
+      case m: Assume =>
         for (v <- m.body.variables) {
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(m)))
         }
-      }
-      case c: DirectCall => {
-        c.actualParams
-          .flatMap(_._2.variables)
-          .foreach(v => {
+      case h: Havoc =>
+        h.vars.foreach { v =>
+          assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Assigned(Set(h)))
+        }
+      case c: DirectCall =>
+        c.actualParams.values
+          .flatMap(_.variables)
+          .foreach { v =>
             assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(c)))
-          })
-      }
-      case p: Return => {
-        p.outParams
-          .flatMap(_._2.variables)
-          .foreach(v => {
+          }
+      case p: Return =>
+        p.outParams.values
+          .flatMap(_.variables)
+          .foreach { v =>
             assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(p)))
-          })
-      }
+          }
       case p: GoTo => ()
       case p: NOP => ()
       case p: Unreachable => ()
@@ -409,8 +401,7 @@ def getRedundantAssignments(procedure: Procedure): Set[Variable] = {
     }
   }
 
-  var toRemove = assignedNotRead.filter(_._2.isInstanceOf[VS.Assigned])
-  var removeOld = toRemove
+  val toRemove = assignedNotRead.filter(_._2.isInstanceOf[VS.Assigned])
 
   toRemove.map(_._1).toSet
 }
@@ -508,16 +499,15 @@ def inlineCond(a: Assume): Option[Expr] = boundary {
 
     for (s <- Vector.from(bs).flatMap(_.statements).reverseIterator) {
       s match {
-        case assign: LocalAssign => {
-          st = st.filterNot(_._2.variables.contains(assign.lhs)).updated(assign.lhs, assign.rhs)
-        }
-        case assign: MemoryLoad => {
-          st = st.filterNot(_._2.variables.contains(assign.lhs))
-        }
+        case assign: LocalAssign =>
+          st = st.filterNot { (k, v) => v.variables.contains(assign.lhs) }.updated(assign.lhs, assign.rhs)
+        case assign: MemoryLoad =>
+          st = st.filterNot { (k, v) => v.variables.contains(assign.lhs) }
         case n: MemoryStore => ()
         case n: Assume => ()
-        case n: Assume => ()
         case n: Assert => ()
+        case h: Havoc =>
+          st = st.filterNot { (k, v) => v.variables.intersect(h.vars).nonEmpty }
         case n: NOP => ()
         case _ => break((st, false))
       }
@@ -1295,15 +1285,28 @@ object OffsetProp {
       }
     }
 
+    def joinState(lhs: Variable, rhs: Expr) = {
+      specJoinState(lhs, rhs) match {
+        case Some((l, r)) => {
+          if (st.contains(l) && st(l) != r) {
+            stSequenceNo += 1
+          }
+          st(l) = r
+        }
+        case _ => ()
+      }
+    }
+
     def specJoinState(lhs: Variable, rhs: Expr): Option[(Variable, Value)] = {
       rhs match {
-        case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if (!st.contains(lhs)) =>
+        case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if !st.contains(lhs) =>
           Some(lhs -> (Some(l), Some(r)))
         case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if findOff(l, r) == find(lhs) => None
-        case v: Variable if (!st.contains(lhs)) => Some(lhs -> (Some(v), None))
-        case v: BitVecLiteral if (!st.contains(lhs)) => Some(lhs -> (None, Some(v)))
-        case v: Variable if (find(lhs) == find(v)) => None
-        case c: BitVecLiteral if (find(lhs) != c) => Some(lhs -> (None, None))
+        case v: Variable if !st.contains(lhs) => Some(lhs -> (Some(v), None))
+        case v: BitVecLiteral if !st.contains(lhs) => Some(lhs -> (None, Some(v)))
+        case v: Variable if find(lhs) == find(v) => None
+        case c: BitVecLiteral if find(lhs) != c => Some(lhs -> (None, None))
+        case c: BitVecLiteral if find(lhs) == c => Some(lhs -> (None, Some(c)))
         case _ => Some(lhs -> (None, None))
       }
     }
@@ -1341,16 +1344,24 @@ object OffsetProp {
     def analyse(p: Procedure): Map[Variable, Expr] = {
       reversePostOrder(p)
       val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
+      val worklistSet = mutable.HashSet[Block]()
       worklist.addAll(p.entryBlock)
+      worklistSet.addAll(p.entryBlock)
       while (worklist.nonEmpty && !giveUp) {
         val b = worklist.dequeue()
-        val seq = lastUpdate.get(b).getOrElse(0)
+        worklistSet.remove(b)
+        val seq = lastUpdate.getOrElse(b, 0)
 
         b.statements.foreach(transfer)
 
         if (stSequenceNo != seq || seq == 0) {
           lastUpdate(b) = stSequenceNo
-          worklist.addAll(b.nextBlocks)
+          for (block <- b.nextBlocks) {
+            if (!worklistSet.contains(block)) {
+              worklist.enqueue(block)
+              worklistSet.add(block)
+            }
+          }
         }
       }
 
@@ -1464,16 +1475,24 @@ object MinCopyProp {
     def analyse(p: Procedure): Map[Variable, Variable | Literal] = {
       reversePostOrder(p)
       val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
+      val worklistSet = mutable.HashSet[Block]()
       worklist.addAll(p.entryBlock)
+      worklistSet.addAll(p.entryBlock)
       while (worklist.nonEmpty && !giveUp) {
         val b = worklist.dequeue()
-        val seq = lastUpdate.get(b).getOrElse(0)
+        worklistSet.remove(b)
+        val seq = lastUpdate.getOrElse(b, 0)
 
         b.statements.foreach(transfer)
 
         if (stSequenceNo != seq || seq == 0) {
           lastUpdate(b) = stSequenceNo
-          worklist.addAll(b.nextBlocks)
+          for (block <- b.nextBlocks) {
+            if (!worklistSet.contains(block)) {
+              worklist.enqueue(block)
+              worklistSet.add(block)
+            }
+          }
         }
       }
 
@@ -1567,9 +1586,12 @@ object CopyProp {
           if transform then x.body = subst(x.body)
           SkipChildren()
         }
+        case h: Havoc =>
+          h.vars.foreach(replaceVar(_, None))
+          SkipChildren()
         case x: DirectCall => {
           if transform then x.actualParams = x.actualParams.map((l, r) => (l, subst(r)))
-          val lhs = x.outParams.map(_._2)
+          val lhs = x.outParams.values
           lhs.foreach(replaceVar(_, None))
           SkipChildren()
         }
@@ -1690,6 +1712,10 @@ object CopyProp {
         case l: MemoryAssign => {
           clobberFull(c, l.lhs)
         }
+        case h: Havoc =>
+          h.vars.foreach { v =>
+            clobberFull(c, v)
+          }
         case s: SimulAssign =>
           s.assignments.foreach {
             case (l, r) => {
@@ -2012,13 +2038,13 @@ val removeExternalFunctionReferences = Transform(
 def getDoCleanupTransform(doSimplify: Boolean): Transform = TransformBatch(
   "DoCleanup",
   List(
-    makeProcEntriesNonLoops,
     // useful for ReplaceReturns
     // (pushes single block with `Unreachable` into its predecessor)
     coalesceBlocksFixpoint,
     applyRpoTransform,
     replaceJumpsInNonReturningProcs,
     getEstablishProcedureDiamondFormTransform(doSimplify),
+    makeProcEntriesNonLoops,
     removeExternalFunctionReferences
   ),
   notice = "Removing external function calls", // fixme: is this all the cleanup is doing?
@@ -2027,6 +2053,7 @@ def getDoCleanupTransform(doSimplify: Boolean): Transform = TransformBatch(
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
     assert(invariant.procEntryNoIncoming(ctx.program))
+    assert(invariant.programDiamondForm(ctx.program))
   }
 )
 

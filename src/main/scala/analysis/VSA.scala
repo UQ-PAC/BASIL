@@ -4,8 +4,6 @@ import analysis.solvers.*
 import ir.*
 import util.VSALogger
 
-import scala.collection.immutable
-
 /** ValueSets are PowerSet of possible values */
 trait Value
 

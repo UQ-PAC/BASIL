@@ -1,11 +1,10 @@
 package translating
-import analysis.{MergedRegion, RegionInjector}
+import analysis.RegionInjector
 import boogie.*
 import ir.*
 import specification.*
 import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
 
-import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 def memoryToConditionCoalesced(memorySections: Iterable[MemorySection]): List[BExpr] = {
@@ -907,6 +906,9 @@ class IRToBoogie(
         }
         .unzip
       List(AssignCmd(lhs.flatten, rhs.flatten))
+    case h: Havoc =>
+      val havoced = h.vars.map(_.toBoogie) ++ h.vars.map(_.toGamma)
+      List(BHavoc(havoced, h.comment))
     case m: MemoryAssign =>
       val lhs = m.lhs.toBoogie
       val rhs = m.rhs.toBoogie

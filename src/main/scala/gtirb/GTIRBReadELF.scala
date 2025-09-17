@@ -2,7 +2,6 @@ package gtirb
 
 import boogie.SpecGlobal
 import com.google.protobuf.ByteString
-import com.grammatech.gtirb.proto.CFG.EdgeType.*
 import specification.{ExternalFunction, FuncEntry}
 import translating.{ELFBind, ELFNDX, ELFSymType, ELFSymbol, ELFVis, ReadELFData}
 import util.Logger

@@ -3,8 +3,6 @@ package analysis
 import analysis.solvers.*
 import ir.*
 
-import scala.collection.immutable
-
 /** Calculates the set of variables that are read but not written in a given program. This helps to identify the set of
   * variables that are read from memory before they have been initialised. This could be used on callee side to identify
   * what parameters where passed to the function.
@@ -33,8 +31,8 @@ trait RNAAnalysis(program: Program, ignoreStack: Boolean = true) {
       case memoryStore: MemoryStore =>
         s ++ ((memoryStore.index.variables ++ memoryStore.value.variables) -- ignoreRegions)
       case call: DirectCall =>
-        (s ++ call.actualParams.flatMap(_._2.variables).toSet.filterNot(ignoreRegions.contains(_)))
-          .diff(call.outParams.map(_._2).toSet)
+        (s ++ call.actualParams.values.flatMap(_.variables).toSet.diff(ignoreRegions))
+          .diff(call.outParams.values.toSet)
       case indirectCall: IndirectCall =>
         if (ignoreRegions.contains(indirectCall.target)) {
           s
@@ -47,6 +45,8 @@ trait RNAAnalysis(program: Program, ignoreStack: Boolean = true) {
       case memoryLoad: MemoryLoad =>
         val m = s - memoryLoad.lhs
         m ++ (memoryLoad.index.variables -- ignoreRegions)
+      case havoc: Havoc =>
+        s -- havoc.vars
       case _ =>
         s
     }

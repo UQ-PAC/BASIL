@@ -2,7 +2,6 @@ import analysis.{LatticeMap, LatticeSet}
 import org.scalacheck.{Arbitrary, Gen, Shrink}
 import org.scalatest.*
 import org.scalatest.funsuite.*
-import translating.PrettyPrinter.*
 
 @test_util.tags.UnitTest
 class LatticeCollectionTests extends AnyFunSuite with org.scalatestplus.scalacheck.ScalaCheckPropertyChecks {

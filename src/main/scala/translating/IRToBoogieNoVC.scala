@@ -55,6 +55,9 @@ object BoogieTranslator {
       val lhs: BVar = translateVar(l.lhs)
       val rhs = translateExpr(l.rhs)
       Seq(AssignCmd(List(lhs), List(rhs)))
+    case h: Havoc =>
+      val havoced = h.vars.map(translateVar)
+      Seq(BHavoc(havoced))
     case a: Assert =>
       val body = translateExpr(a.body)
       Seq(BAssert(body, a.comment))
