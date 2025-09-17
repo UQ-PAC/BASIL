@@ -1,11 +1,10 @@
-import analysis.LoopDetector
-import analysis.NewLoopDetector
+import analysis.{LoopDetector, NewLoopDetector}
 import ir.{Block, IRLoading, Program, dotBlockGraph}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
+import translating.PrettyPrinter.pprint
 import translating.{BAPToIR, ReadELFData}
 import util.{ILLoadingConfig, LogLevel, Logger}
-import translating.PrettyPrinter.pprint
 
 import scala.sys.process.*
 
@@ -154,7 +153,6 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     println(NewLoopDetector(p.mainProcedure).identify_loops().compute_forest())
 
   }
-
 
   test("plist_free") {
     val p = ir.parsing.ParseBasilIL.loadILFile("/home/rina/progs/basil/plist-free.il").program

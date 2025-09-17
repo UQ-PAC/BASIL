@@ -1,9 +1,26 @@
 package analysis
 
-import ir.{Assume, BinaryExpr, Block, BoolOR, EQ, GoTo, IRWalk, IntLiteral, IntType, LocalAssign, LocalVar, Program, Procedure}
+import ir.{
+  Assume,
+  BinaryExpr,
+  Block,
+  BoolOR,
+  EQ,
+  GoTo,
+  IRWalk,
+  IntLiteral,
+  IntType,
+  LocalAssign,
+  LocalVar,
+  Procedure,
+  Program
+}
 
+import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.util.boundary, boundary.break
+import scala.util.boundary
+
+import boundary.break
 
 private def label(p: Block) = "block." + p.label
 
@@ -100,7 +117,8 @@ object LoopDetector {
   def identify_loops(cfg: Program): State = {
     cfg.procedures.toSet
       .flatMap(_.entryBlock)
-      .foldLeft(State())((st, eb) => traverse_loops_dfs(st, eb, 1)).canonicalise()
+      .foldLeft(State())((st, eb) => traverse_loops_dfs(st, eb, 1))
+      .canonicalise()
   }
 
   private def processVisitedNodeOutgoingEdge(istate: State, edge: LoopEdge): State = {
@@ -347,41 +365,59 @@ class NewLoopDetector(procedure: Procedure) {
   def compute_forest() = {
     // Header -> Cycle with that header
     val forest = mutable.Map[Block, Set[Block]]()
+    // XXX: do toposort properly. or get order from dfs traversal
     (0 to 10).foreach { _ =>
-
-    loopBlocks.values.foreach {
-      case BlockState(b, Some(h), _, _) => forest.updateWith(h) {
-        case None => Some(forest.getOrElse(b, Set()) + b + h)
-        case Some(xs) => Some(xs + b + h ++ forest.getOrElse(b, Set()))
+      loopBlocks.values.foreach {
+        case BlockState(b, Some(h), _, _) =>
+          forest.updateWith(h) {
+            case None => Some(forest.getOrElse(b, Set()) + b + h)
+            case Some(xs) => Some(xs + b + h ++ forest.getOrElse(b, Set()))
+          }
+        case _ => ()
       }
-      case _ => ()
-    }
     }
     forest
   }
 
   def identify_loops(): this.type =
-    procedure.entryBlock.map(loopBlocks(_)).map(trav_loops_dfs(_, 1))
+    procedure.entryBlock.map(loopBlocks(_)).map(entry => trav_loops_tailrec(Left((entry, 1)), Nil))
     this
 
   case class LoopContext(b0: BlockState, dfsp_pos: Int, locals: Option[(BlockState, Iterator[BlockState])])
 
   @tailrec
-  def trav_loops_tailrec(b0: BlockState, dfsp_pos: Int): Option[BlockState] = {
+  final def trav_loops_tailrec(
+    input: Either[(BlockState, Int), (BlockState, Option[BlockState])],
+    inputContinuations: List[(BlockState, Int, Iterator[BlockState])]
+  ): Option[BlockState] = {
     println("a")
-    b0.dfsp_pos = dfsp_pos
-    b0.is_traversed = true
-    for (b <- b0.b.nextBlocks.map(loopBlocks(_))) {
-      println(b)
-      if (!b.is_traversed) {
-        val nh = trav_loops_dfs(b, dfsp_pos + 1)
-        tag_lhead(b0, nh)
+
+    var (b0, dfsp_pos, it, nh, continuations) = (input, inputContinuations) match {
+      case (Left((b0, dfsp_pos)), conts) => {
+        b0.dfsp_pos = dfsp_pos
+        b0.is_traversed = true
+        val it = b0.b.nextBlocks.map(loopBlocks(_)).iterator
+        (b0, dfsp_pos, it, None, conts)
+      }
+      case (Right((b, nh)), (b0, dfsp_pos, it) :: rest) =>
+        (b0, dfsp_pos, Iterator(b) ++ it, Some(nh), rest)
+      case (Right(_), Nil) =>
+        throw new Exception("trav_loops_tailrec: stack underflow")
+    }
+
+    while (it.hasNext) {
+      val b = it.next()
+      if (nh.isDefined) {
+        tag_lhead(b0, nh.get)
+        nh = None
+      } else if (!b.is_traversed) {
+        return trav_loops_tailrec(Left((b, dfsp_pos + 1)), (b0, dfsp_pos, it) :: continuations)
       } else {
         if (b.dfsp_pos > 0) {
           println("mark as loop header: " + b)
           tag_lhead(b0, Some(b))
         } else if (b.iloop_header.isEmpty) {
-
+          // intentionally empty
         } else {
           var h = b.iloop_header.get
           if (h.dfsp_pos > 0) {
@@ -401,10 +437,13 @@ class NewLoopDetector(procedure: Procedure) {
           }
         }
       }
-
     }
     b0.dfsp_pos = 0
-    b0.iloop_header.map(loopBlocks(_))
+    val result = b0.iloop_header.map(loopBlocks(_))
+    continuations match {
+      case Nil => result
+      case _ :: _ => trav_loops_tailrec(Right((b0, result)), continuations)
+    }
   }
 
   def tag_lhead(b: BlockState, h: Option[BlockState]): Unit = h match {
@@ -460,7 +499,8 @@ object LoopTransform {
    */
   private def llvm_transform_loop(loop: Loop): Loop = {
     val otherHeaders = loop.reentries.toSet.map(_.to)
-    val entryEdges: Set[LoopEdge] = loop.entryEdges.toSet ++ loop.reentries ++ loop.backEdges ++ loop.edges.filter(e => otherHeaders.contains(e.to))
+    val entryEdges: Set[LoopEdge] =
+      loop.entryEdges.toSet ++ loop.reentries ++ loop.backEdges ++ loop.edges.filter(e => otherHeaders.contains(e.to))
 
     val P_e: Set[LoopEdge] = entryEdges // N entry edges
     val P_b: Set[LoopEdge] = entryEdges.flatMap { e =>
