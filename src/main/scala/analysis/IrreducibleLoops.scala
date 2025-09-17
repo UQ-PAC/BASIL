@@ -31,6 +31,16 @@ class Loop(val header: Block) {
   val edges: mutable.Set[LoopEdge] = mutable.Set() // G_e
   var reducible: Boolean = true // Assume reducible by default
 
+  def this(header: Block, reentries: Iterable[LoopEdge], backEdges: Iterable[LoopEdge], entryEdges: Iterable[LoopEdge], nodes: Iterable[Block], edges: Iterable[LoopEdge], reducible: Boolean) = {
+    this(header)
+    this.reentries ++= reentries
+    this.backEdges ++= backEdges
+    this.entryEdges ++= entryEdges
+    this.nodes ++= nodes
+    this.edges ++= edges
+    this.reducible = reducible
+  }
+
   def addEdge(edge: LoopEdge): Unit = {
     nodes += edge.from
     nodes += edge.to
@@ -39,8 +49,29 @@ class Loop(val header: Block) {
 
   def name: String = label(header)
 
+  def canonicalise(): Loop = {
+    val possibleHeaders = header :: reentries.map(_.to).toList
+    val leastHeader = possibleHeaders.minBy(b => (b.address, b.meta.originalLabel, b.label))
+
+    if (header eq leastHeader) return this
+
+    val allEntries = entryEdges.toSet ++ reentries
+
+    val (entryEdgesNew, reentriesNew) = allEntries.partition(_.to eq leastHeader)
+
+    new Loop(
+      header = leastHeader,
+      entryEdges = entryEdgesNew,
+      reentries = reentriesNew,
+      backEdges = edges.filter(_.to eq leastHeader),
+      nodes = nodes,
+      edges = edges,
+      reducible = reducible
+    )
+  }
+
   override def toString: String = {
-    s"Header: ${label(header)}, Body: $edges"
+    s"Header: ${label(header)}, Body: $edges, Reentries: $reentries"
   }
 }
 
@@ -76,24 +107,48 @@ object LoopDetector {
         }
       }
     }
+
+    def canonicalise() = {
+      val newLoops = loops.values.map(_.canonicalise())
+      val loopMap = newLoops.map(x => x.header -> x).toMap
+      State(
+        loops = loopMap,
+        headers = loopMap.keys.toSet
+      )
+    }
   }
 
   def identify_loops(entryBlock: Block): State = {
-    traverse_loops_dfs(State(), entryBlock, 1).copy(
+    var x = traverse_loops_dfs(State(), entryBlock, 1)
+    x = x.copy(
       visitedNodes = Set(),
       nodeDFSPpos = Map(),
       iloopHeaders = Map(),
       edgeStack = List()
     )
+    println(x)
+    println(x.canonicalise())
+    println("X")
+    x.canonicalise()
   }
 
   /*
    * Returns the set of loops for each procedure in the program.
    */
   def identify_loops(cfg: Program): State = {
-    cfg.procedures.toSet
+    var x = cfg.procedures.toSet
       .flatMap(_.entryBlock)
       .foldLeft(State())((st, eb) => traverse_loops_dfs(st, eb, 1))
+    x = x.copy(
+      visitedNodes = Set(),
+      nodeDFSPpos = Map(),
+      iloopHeaders = Map(),
+      edgeStack = List()
+    )
+    println(x)
+    println(x.canonicalise())
+    println()
+    x.canonicalise()
   }
 
   private def processVisitedNodeOutgoingEdge(istate: State, edge: LoopEdge): State = {

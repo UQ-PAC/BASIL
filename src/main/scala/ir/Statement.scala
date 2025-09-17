@@ -299,7 +299,7 @@ class GoTo private (_targets: mutable.LinkedHashSet[Block], var label: Option[St
     _targets ++= shuffled
   }
 
-  def targets: Set[Block] = _targets.to(ListSet)
+  def targets: Set[Block] = _targets.toSet
 
   override def deepEquals(o: Object): Boolean = o match {
     case GoTo(tgts, lbl) => tgts.map(_.label).toSet == targets.map(_.label).toSet && lbl == label

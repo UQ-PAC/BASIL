@@ -66,6 +66,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
         || foundLoops.loops.values.exists { otherLoop => otherLoop.reentries.map(_.to.label).contains(header) }
       }
     }
+    assert(cloneFoundLoops.headers.map(_.label).toSet == foundLoops.headers.map(_.label).toSet)
 
     val newLoops = foundLoops.reducibleTransformIR()
     newLoops.identifiedLoops.foreach(l => Logger.debug(s"newloops${System.lineSeparator()}$l"))
