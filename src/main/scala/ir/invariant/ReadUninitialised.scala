@@ -50,9 +50,6 @@ def readUninitialised(p: Procedure): Boolean = {
 }
 
 def readUninitialised(p: Program): Boolean = {
-  var reach = p.mainProcedure.collect { case p: Procedure =>
-    p
-  }
-  val r = reach.map(readUninitialised)
+  val r = p.procedures.map(readUninitialised)
   r.forall(x => !x)
 }

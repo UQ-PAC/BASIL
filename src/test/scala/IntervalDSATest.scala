@@ -630,6 +630,9 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val locals = res.dsa.get.local
     assert(locals.values.forall(_.glIntervals.size == 1))
 
+
+    println(locals.values.filter(g => stackCollapsed.contains(g.proc.procName)).map(_.proc.procName).toSet)
+
     assert(
       locals.values.filterNot(g => stackCollapsed.contains(g.proc.procName)).forall(IntervalDSA.checksStackMaintained)
     )

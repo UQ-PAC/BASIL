@@ -1,6 +1,7 @@
 package analysis
 
 import analysis.solvers.BackwardIDESolver
+import scala.collection.immutable.ListSet
 import ir.{
   Assert,
   Assume,
@@ -140,16 +141,20 @@ class InterLiveVarsAnalysis(program: Program, ignoreExternals: Boolean = false, 
     extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program, entry),
       LiveVarsAnalysisFunctions(true, !ignoreExternals)
 
-def interLiveVarsAnalysis(program: Program, ignoreExternals: Boolean = false) = {
+def interLiveVarsAnalysis(program: Program, ignoreExternals: Boolean = false) : Map[CFGPosition, Map[Variable, TwoElement]] = {
 
-  val entries = program.procedures.filter(p =>
-    p.incomingCalls().size == 0 && p.entryBlock.isDefined && p.returnBlock.isDefined && p.blocks.nonEmpty
-  )
+  var procs = ListSet.from(program.procedures)
+  var starts = List[Procedure]()
 
-  assert(entries.toSet.flatMap(_.reachableFrom).contains(program.mainProcedure))
+  while (procs.nonEmpty) {
+    val entries = procs.toList.filter(p => p.incomingCalls().size == 0 && p.entryBlock.isDefined && p.returnBlock.isDefined && p.blocks.nonEmpty)
+    starts = entries.head :: starts
+    val done = entries.head.reachableFrom
+    procs = procs -- done
+  }
 
   var r = Map[CFGPosition, Map[Variable, TwoElement]]()
-  for (p <- entries) {
+  for (p <- starts) {
     r = r ++ InterLiveVarsAnalysis(program, ignoreExternals, Some(p)).analyze()
   }
   r
