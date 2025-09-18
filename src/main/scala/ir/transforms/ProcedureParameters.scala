@@ -4,7 +4,7 @@ import ir.cilvisitor.*
 import ir.{CallGraph, *}
 import specification.Specification
 import translating.PrettyPrinter
-import util.{DebugDumpIRLogger, Logger}
+import util.DebugDumpIRLogger
 
 import java.io.File
 import scala.collection.{immutable, mutable}
@@ -119,12 +119,7 @@ def liftProcedureCallAbstraction(ctx: ir.IRContext): ir.IRContext = {
   val mainHasReturn = ctx.program.mainProcedure.returnBlock.isDefined
   val mainHasEntry = ctx.program.mainProcedure.entryBlock.isDefined
 
-  val liveVars = if (mainNonEmpty && mainHasEntry && mainHasReturn) {
-    analysis.interLiveVarsAnalysis(ctx.program)
-  } else {
-    Logger.error(s"Empty live vars $mainNonEmpty $mainHasReturn $mainHasEntry")
-    Map.empty
-  }
+  val liveVars = analysis.interLiveVarsAnalysis(ctx.program)
   transforms.applyRPO(ctx.program)
 
   val liveLab = () =>
