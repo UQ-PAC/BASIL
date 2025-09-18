@@ -6,7 +6,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest.programToContext
 import test_util.CaptureOutput
 import util.SMT.{SMTSolver, SatResult}
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils, SimplifyMode}
+import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, SimplifyMode}
 
 @test_util.tags.UnitTest
 class LoopInvariantTests extends AnyFunSuite, CaptureOutput {

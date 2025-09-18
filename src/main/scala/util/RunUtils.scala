@@ -169,7 +169,10 @@ object RunUtils {
     }
 
     if q.summariseProcedures then
-      getGenerateProcedureSummariesTransform(q.loading.parameterForm || conf.simplify != SimplifyMode.Disabled)(ctx, analysisManager)
+      getGenerateProcedureSummariesTransform(q.loading.parameterForm || conf.simplify != SimplifyMode.Disabled)(
+        ctx,
+        analysisManager
+      )
 
     if (!conf.staticAnalysis.exists(!_.irreducibleLoops) && conf.generateLoopInvariants) {
       if (!conf.staticAnalysis.exists(_.irreducibleLoops)) {

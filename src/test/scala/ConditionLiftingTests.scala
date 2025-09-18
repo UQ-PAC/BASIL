@@ -818,8 +818,8 @@ class ConditionLiftingRegressionTest extends AnyFunSuite with test_util.CaptureO
 
   test("conds inline test tvsimp") {
 
-    var ctx = util.IRLoading.load(testProgram)
-    util.IRTransform.doCleanup(ctx, true)
+    var ctx = ir.IRLoading.load(testProgram)
+    ir.transforms.doCleanupWithSimplify(ctx, analysis.AnalysisManager(ctx.program))
     ir.transforms.clearParams(ctx.program)
 
     ir.transforms.validate.validatedSimplifyPipeline(ctx, SimplifyMode.Simplify)

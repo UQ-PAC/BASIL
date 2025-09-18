@@ -1,15 +1,7 @@
 import ir.{IRContext, *}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
-import util.{
-  BASILConfig,
-  BoogieGeneratorConfig,
-  ILLoadingConfig,
-  IRContext,
-  PCTrackingOption,
-  SimplifyMode,
-  StaticAnalysisConfig
-}
+import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, PCTrackingOption, SimplifyMode, StaticAnalysisConfig}
 
 @test_util.tags.UnitTest
 class PCTrackingTest extends AnyFunSuite with CaptureOutput {
