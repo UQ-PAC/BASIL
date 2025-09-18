@@ -34,9 +34,10 @@ function App() {
     const [epochError, setEpochError] = useState<string | null>(null);
     const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-    const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(
-        (localStorage.getItem(LOCAL_STORAGE_THEME_KEY) as 'light' | 'dark' | 'system') || 'system'
-    );
+    const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
+        const savedTheme = localStorage.getItem(LOCAL_STORAGE_THEME_KEY);
+        return (savedTheme as  'light' | 'dark' | 'system') || 'system';
+    });
 
     const [datasets, setDatasets] = useState<DatasetConfig[]>([]);
     const [selectedDataset, setSelectedDataset] = useState<string>(() => {
@@ -237,6 +238,7 @@ function App() {
             setLoadingProcedures(true);
             setProcedureError(null);
             try {
+                // Assume that after procedures always have the same name as before procedures
                 const response = await fetch(`${API_BASE_URL}/procedures/${singleSelectedEndEpoch}`);
                 if (!response.ok) {
                     const errorMessage = `HTTP error! status: ${response.status} fetching procedures for ${singleSelectedEndEpoch}`;
