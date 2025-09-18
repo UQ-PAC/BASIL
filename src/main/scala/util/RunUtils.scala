@@ -63,7 +63,7 @@ object RunUtils {
 
     val analysisManager = AnalysisManager(ctx.program)
 
-    if conf.simplify then doCleanupWithSimplify(ctx, analysisManager)
+    if conf.simplify != SimplifyMode.Disabled then doCleanupWithSimplify(ctx, analysisManager)
     else doCleanupWithoutSimplify(ctx, analysisManager)
 
     assert(ir.invariant.programDiamondForm(ctx.program))
@@ -81,7 +81,7 @@ object RunUtils {
     ctx.program.procedures.foreach(transforms.RemoveUnreachableBlocks.apply)
     Logger.info(s"[!] Removed unreachable blocks")
 
-    if (q.loading.parameterForm && !q.simplify) {
+    if (q.loading.parameterForm && !(q.simplify != SimplifyMode.Disabled)) {
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
       if (conf.assertCalleeSaved) {
@@ -108,23 +108,42 @@ object RunUtils {
 
     assert(ir.invariant.programDiamondForm(ctx.program))
     ir.eval.SimplifyValidation.validate = conf.validateSimp
-    if (conf.simplify) {
 
-      ir.transforms.clearParams(ctx.program)
-
-      ir.transforms.liftIndirectCall(ctx.program)
-      transforms.liftSVCompNonDetEarlyIR(ctx.program)
-
-      DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
-      ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
-      DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
-
-      if (conf.assertCalleeSaved) {
-        transforms.CalleePreservedParam.transform(ctx.program)
+    conf.simplify match {
+      case SimplifyMode.Disabled => ()
+      case _ => {
+        for (p <- ctx.program.procedures) {
+          p.normaliseBlockNames()
+        }
       }
+    }
 
-      assert(ir.invariant.programDiamondForm(ctx.program))
-      doSimplify(ctx, conf.staticAnalysis)
+    conf.simplify match {
+      case c: SimplifyMode.ValidatedSimplify => {
+        ir.transforms.clearParams(ctx.program)
+        ir.transforms.liftIndirectCall(ctx.program)
+        DebugDumpIRLogger.writeToFile(File("il-beforetvsimp.il"), pp_prog(ctx.program))
+        val (tvres, nctx) = transforms.validate.validatedSimplifyPipeline(ctx, conf.simplify)
+        ctx = nctx
+      }
+      case SimplifyMode.Simplify => {
+        ir.transforms.clearParams(ctx.program)
+
+        ir.transforms.liftIndirectCall(ctx.program)
+        transforms.liftSVCompNonDetEarlyIR(ctx.program)
+
+        DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
+        ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
+        DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
+
+        if (conf.assertCalleeSaved) {
+          transforms.CalleePreservedParam.transform(ctx.program)
+        }
+
+        assert(ir.invariant.programDiamondForm(ctx.program))
+        doSimplify(ctx, conf.staticAnalysis)
+      }
+      case SimplifyMode.Disabled => ()
     }
 
     assert(ir.invariant.programDiamondForm(ctx.program))
@@ -150,7 +169,10 @@ object RunUtils {
     }
 
     if q.summariseProcedures then
-      getGenerateProcedureSummariesTransform(q.loading.parameterForm || q.simplify)(ctx, analysisManager)
+      getGenerateProcedureSummariesTransform(q.loading.parameterForm || conf.simplify != SimplifyMode.Disabled)(
+        ctx,
+        analysisManager
+      )
 
     if (!conf.staticAnalysis.exists(!_.irreducibleLoops) && conf.generateLoopInvariants) {
       if (!conf.staticAnalysis.exists(_.irreducibleLoops)) {

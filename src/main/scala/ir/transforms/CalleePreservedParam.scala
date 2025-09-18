@@ -6,6 +6,8 @@ import cilvisitor.*
 
 object CalleePreservedParam {
 
+  var counter = util.Counter()
+
   /**
    * Asusming single-return and parameter form 
    */
@@ -24,13 +26,17 @@ object CalleePreservedParam {
     }
   }
 
-  def transform(p: Program) = {
+  // returns labels of injected assertions
+  def transform(p: Program): List[String] = {
     val v = MakePreserved()
     visit_prog(v, p)
     debugAssert(invariant.correctCalls(p))
+    v.addedAsserts
   }
 
   class MakePreserved extends CILVisitor {
+
+    var addedAsserts = List[String]()
 
     override def vproc(p: Procedure) = {
 
@@ -57,9 +63,11 @@ object CalleePreservedParam {
             }
             case o => ???
           }
-          b.statements.append(
-            Assert(BinaryExpr(EQ, input, out), Some(s"${param.name.stripSuffix("_out")} preserved across calls"))
-          )
+          var l = Some(s"callerpreserved${counter.next()}")
+          val assert =
+            Assert(BinaryExpr(EQ, input, out), Some(s"${param.name.stripSuffix("_out")} preserved across calls"), l)
+          b.statements.append(assert)
+          addedAsserts = l.get :: addedAsserts
         })
       }
       SkipChildren()

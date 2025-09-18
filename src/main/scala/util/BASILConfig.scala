@@ -10,6 +10,16 @@ enum PCTrackingOption {
   case None, Keep, Assert
 }
 
+enum SimplifyMode {
+  case Disabled
+  case Simplify
+  case ValidatedSimplify(
+    verify: Option[util.SMT.Solver] = Some(util.SMT.Solver.Z3),
+    dumpSMT: Option[String] = None,
+    dryRun: Boolean = false
+  )
+}
+
 case class BoogieGeneratorConfig(
   memoryFunctionType: BoogieMemoryAccessMode = BoogieMemoryAccessMode.SuccessiveStoreSelect,
   coalesceConstantMemory: Boolean = true,
@@ -77,7 +87,7 @@ case class BASILConfig(
   context: Option[IRContext] = None,
   loading: ILLoadingConfig,
   runInterpret: Boolean = false,
-  simplify: Boolean = false,
+  simplify: SimplifyMode = SimplifyMode.Disabled,
   validateSimp: Boolean = false,
   tvSimp: Boolean = false,
   dsaConfig: Option[DSConfig] = None,

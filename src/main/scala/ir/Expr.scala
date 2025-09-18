@@ -381,6 +381,7 @@ sealed trait Variable extends Expr {
 
 object Variable {
   implicit def ordering[V <: Variable]: Ordering[V] = Ordering.by(_.name)
+  implicit def catsOrdering[V <: Variable]: cats.kernel.Order[V] = cats.kernel.Order.by(_.name)
 }
 
 object Register {
@@ -409,7 +410,7 @@ case class LocalVar(varName: String, override val irType: IRType, val index: Int
 }
 
 object LocalVar {
-  def unapply(l: LocalVar): Some[(String, IRType, Int)] = Some((l.name, l.irType, l.index))
+  def unapply(l: LocalVar): Some[(String, IRType, Int)] = Some((l.varName, l.irType, l.index))
 
   /**
    * Construct a LocalVar by infering its index from the provided name corresponding to [[LocalVar.name]].

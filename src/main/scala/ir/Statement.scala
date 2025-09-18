@@ -198,12 +198,16 @@ object MemoryLoad {
  * class's field in all methods of the subclass.
  */
 class NOP(var label: Option[String] = None) extends Statement with Command {
+  def cloneStatement(): NOP = {
+    NOP(label)
+  }
   override def toString: String = s"NOP $labelStr"
   override def deepEquals(o: Object) = o match {
     case NOP(x) => x == label
     case _ => false
   }
 }
+
 object NOP {
   def unapply(x: NOP) = Some(x.label)
 }

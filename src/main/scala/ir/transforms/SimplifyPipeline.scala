@@ -113,7 +113,7 @@ def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]): Unit = {
     }
   }
   Logger.info("Copyprop Start")
-  transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
+  transforms.copyPropParamFixedPoint(program)
 
   transforms.fixupGuards(program)
   transforms.removeDuplicateGuard(program)
