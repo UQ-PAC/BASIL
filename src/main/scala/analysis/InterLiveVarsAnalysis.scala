@@ -1,7 +1,6 @@
 package analysis
 
 import analysis.solvers.BackwardIDESolver
-import scala.collection.immutable.ListSet
 import ir.{
   Assert,
   Assume,
@@ -18,6 +17,8 @@ import ir.{
   Return,
   Variable
 }
+
+import scala.collection.immutable.ListSet
 
 /** Micro-transfer-functions for LiveVar analysis
  *  This analysis works by inlining function calls - instead of just mapping parameters and returns, all live variables
@@ -141,13 +142,18 @@ class InterLiveVarsAnalysis(program: Program, ignoreExternals: Boolean = false, 
     extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program, entry),
       LiveVarsAnalysisFunctions(true, !ignoreExternals)
 
-def interLiveVarsAnalysis(program: Program, ignoreExternals: Boolean = false) : Map[CFGPosition, Map[Variable, TwoElement]] = {
+def interLiveVarsAnalysis(
+  program: Program,
+  ignoreExternals: Boolean = false
+): Map[CFGPosition, Map[Variable, TwoElement]] = {
 
   var procs = ListSet.from(program.procedures)
   var starts = List[Procedure]()
 
   while (procs.nonEmpty) {
-    val entries = procs.toList.filter(p => p.incomingCalls().size == 0 && p.entryBlock.isDefined && p.returnBlock.isDefined && p.blocks.nonEmpty)
+    val entries = procs.toList.filter(p =>
+      p.incomingCalls().size == 0 && p.entryBlock.isDefined && p.returnBlock.isDefined && p.blocks.nonEmpty
+    )
     starts = entries.head :: starts
     val done = entries.head.reachableFrom
     procs = procs -- done

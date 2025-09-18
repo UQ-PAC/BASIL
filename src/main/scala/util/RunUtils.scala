@@ -154,6 +154,7 @@ object RunUtils {
         val memTransferTimer = PerformanceTimer("Mem Transfer Timer", INFO)
         visit_prog(MemoryTransform(dsaResults.topDown, dsaResults.globals), ctx.program)
         memTransferTimer.checkPoint("Performed Memory Transform")
+        invariant.readUninitialised(ctx.program)
     }
 
     if q.summariseProcedures then
