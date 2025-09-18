@@ -7,6 +7,7 @@ import ir.{
   CFGPosition,
   Command,
   DirectCall,
+  GlobalVar,
   IndirectCall,
   LocalAssign,
   MemoryLoad,
@@ -17,13 +18,14 @@ import ir.{
   Variable
 }
 
-/** Micro-transfer-functions for LiveVar analysis this analysis works by inlining function calls (instead of just
-  * mapping parameters and returns all live variables (registers) are propagated to and from callee functions) The
-  * result of what variables are alive at each point in the program should still be correct However, the functions that
-  * are callees of other functions will have an over approximation of their parameters alive at the top of the function
-  * Tip SPA IDE Slides include a short and clear explanation of microfunctions
-  * https://cs.au.dk/~amoeller/spa/8-distributive.pdf
-  */
+/** Micro-transfer-functions for LiveVar analysis
+ *  This analysis works by inlining function calls - instead of just mapping parameters and returns, all live variables
+ *  (registers) are propagated to and from callee functions. The result of which variables are alive at each point in
+ *  the program should still be correct. However, the functions that are callees of other functions will have an
+ *  over-approximation of their parameters alive at the top of the function.
+ *  Tip SPA IDE Slides include a short and clear explanation of microfunctions:
+ *  https://cs.au.dk/~amoeller/spa/8-distributive.pdf
+ */
 trait LiveVarsAnalysisFunctions(inline: Boolean, addExternals: Boolean = true)
     extends BackwardIDEAnalysis[Variable, TwoElement, TwoElementLattice] {
   val valuelattice: TwoElementLattice = TwoElementLattice()
@@ -32,12 +34,10 @@ trait LiveVarsAnalysisFunctions(inline: Boolean, addExternals: Boolean = true)
 
   def edgesCallToEntry(call: Command, entry: Return)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     d match {
-      case Left(l) if inline => {
-        Map(d -> IdEdge())
-      }
+      case Left(l: GlobalVar) if inline => Map(d -> IdEdge())
       case Left(l) => Map()
       case Right(_) =>
-        entry.outParams.flatMap(_._2.variables).foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
+        entry.outParams.values.flatMap(_.variables).foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
           (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
         }
     }
@@ -119,8 +119,8 @@ trait LiveVarsAnalysisFunctions(inline: Boolean, addExternals: Boolean = true)
         }
       }
       case c: DirectCall => {
-        val writes = c.outParams.map(_._2).toSet
-        val reads = c.actualParams.flatMap(_._2.variables).toSet
+        val writes = c.outParams.values.toSet
+        val reads = c.actualParams.values.flatMap(_.variables).toSet
         d match {
           case Left(value) =>
             if writes.contains(value) then Map()

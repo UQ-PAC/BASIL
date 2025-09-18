@@ -1,9 +1,9 @@
 import analysis.LoopDetector
-import ir.{Block, Program, dotBlockGraph}
+import ir.{Block, IRLoading, Program, dotBlockGraph}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
 import translating.{BAPToIR, ReadELFData}
-import util.{ILLoadingConfig, IRLoading, LogLevel, Logger}
+import util.{ILLoadingConfig, LogLevel, Logger}
 
 import scala.sys.process.*
 
@@ -33,6 +33,8 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     assert(!boogieResult.contains("found unreachable code"))
   }
 
+  def shuffleNextPrevBlocks(p: ir.Procedure) = p.blocks.foreach { b => b.internalShuffleJumps() }
+
   def runTest(path: String, name: String): Unit = {
     val variationPath = path + "/" + name
     val ADTPath = variationPath + ".adt"
@@ -40,6 +42,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     Logger.debug(variationPath)
 
     val program: Program = load(ILLoadingConfig(ADTPath, Some(RELFPath)))
+    ir.transforms.clearParams(program)
 
     val foundLoops = LoopDetector.identify_loops(program)
 
@@ -49,6 +52,20 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     )
 
     foundLoops.identifiedLoops.foreach(l => Logger.debug(s"found loops${System.lineSeparator()}$l"))
+
+    // loop headers for irreducible loops can be arbitrarily-chosen. shuffling the
+    // order of nextBlocks/prevBlocks affects this choice.
+    val clone = ir.dsl.IRToDSL.convertProgram(program).resolve
+    clone.procedures.foreach(shuffleNextPrevBlocks(_))
+    val cloneFoundLoops = LoopDetector.identify_loops(clone)
+    assert {
+      // in the reordered clone, every header should be either a header of the original analysis,
+      // OR it should be a re-entry point.
+      cloneFoundLoops.headers.map(_.label).forall { header =>
+        foundLoops.headers.map(_.label).contains(header)
+        || foundLoops.loops.values.exists { otherLoop => otherLoop.reentries.map(_.to.label).contains(header) }
+      }
+    }
 
     val newLoops = foundLoops.reducibleTransformIR()
     newLoops.identifiedLoops.foreach(l => Logger.debug(s"newloops${System.lineSeparator()}$l"))

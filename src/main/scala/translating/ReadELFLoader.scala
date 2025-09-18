@@ -26,8 +26,21 @@ enum ELFBind derives ir.dsl.ToScala:
   case WEAK /* multiple versions of symbol may be exposed to the linker, and the last definition is used. */
 
 enum ELFVis derives ir.dsl.ToScala:
-  case HIDDEN
+
+  /** Symbols which are visible from outside and are _pre-emptible_. That is, a definition from
+   *  outside this module *may* override this module's definition. Something like `extern` in C.
+   */
   case DEFAULT
+
+  /** Symbols like [[ELFVis.HIDDEN]] but whose address are never taken. */
+  case INTERNAL
+
+  /** Symbols not visible from outside the current component, but may be exported by address. */
+  case HIDDEN
+
+  /** Symbols which are visible from outside but not _pre-emptible_. That is, a definition from
+   *  outside this module will not override this module's definition.
+   */
   case PROTECTED
 
 enum ELFNDX derives ir.dsl.ToScala:
@@ -162,7 +175,10 @@ object ReadELFLoader {
   def getSymbolTableRow(ctx: SymbolTableRowContext): ELFSymbol = {
     val bind = ELFBind.valueOf(ctx.bind.getText)
     val etype = ELFSymType.valueOf(ctx.entrytype.getText)
-    val size = ctx.size.getText.toInt
+    val size = ctx.size.getText match {
+      case hex if hex.startsWith("0x") => Integer.parseInt(hex.stripPrefix("0x"), 16)
+      case s => s.toInt
+    }
     val name = ctx.name match {
       case null => ""
       case x => x.getText

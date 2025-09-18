@@ -1,7 +1,10 @@
 package test_util
 
+import boogie.SpecGlobal
+import ir.{IRContext, Program, cilvisitor, transforms}
 import org.scalatest.concurrent.ScaledTimeSpans
 import org.scalatest.time.{Seconds, Span}
+import specification.Specification
 import util.boogie_interaction.*
 import util.{
   BASILConfig,
@@ -9,7 +12,6 @@ import util.{
   BoogieGeneratorConfig,
   DSConfig,
   ILLoadingConfig,
-  IRContext,
   Logger,
   RunUtils,
   SimplifyMode,
@@ -35,10 +37,10 @@ case class TestConfig(
   useOfflineLifterForGtirbFrontend: Boolean = false
 ) {
   private val scaledtimespans = new ScaledTimeSpans {}
-  def timeoutFlag =
+  def timeoutFlag: String =
     val seconds = scaledtimespans.scaled(Span(timeout, Seconds)).millisPart / 1000
-    s"/timeLimit:${seconds}"
-  def boogieFlags = timeoutFlag +: baseBoogieFlags
+    s"/timeLimit:$seconds"
+  def boogieFlags: Seq[String] = timeoutFlag +: baseBoogieFlags
 }
 
 trait BASILTest {
@@ -180,4 +182,21 @@ object BASILTest {
   def median(xs: Iterable[Double]): Double = xs.toArray.sorted.apply(xs.size / 2)
 
   def stdDev(xs: Iterable[Double]): Double = math.sqrt(variance(xs))
+
+  // only for use for DSL test cases, not for lifted binaries
+  def programToContext(
+    program: Program,
+    globals: Set[SpecGlobal] = Set.empty,
+    globalOffsets: Map[BigInt, BigInt] = Map.empty
+  ): IRContext = {
+    val replaceReturns = transforms.ReplaceReturns()
+    cilvisitor.visit_prog(replaceReturns, program)
+    replaceReturns.addR30Begins()
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+
+    val spec = Specification(Set(), globals, Map(), List(), List(), List(), Set())
+    IRContext(List(), Set(), globals, Set(), globalOffsets, spec, program)
+  }
+
 }

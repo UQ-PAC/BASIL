@@ -1,7 +1,8 @@
 package ir.transforms.validate
 import ir.*
 import util.SMT.SatResult
-import util.{IRContext, Logger, SimplifyMode}
+import util.{Logger, SimplifyMode}
+import ir.IRContext 
 
 import java.io.File
 

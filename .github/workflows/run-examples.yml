@@ -35,10 +35,10 @@ jobs:
             build-${{ runner.os }}-
             build-
 
-      - run: ./mill compile
-      - run: ./mill test.compile
+      - run: ./mill -i compile
+      - run: ./mill -i test.compile
       # run to warm up cache for scalafmt
-      - run: './mill semanticDbData + test.semanticDbData + mill.scalalib.scalafmt.ScalafmtModule/scalafmtClasspath + test.fix'
+      - run: './mill -i semanticDbData + test.semanticDbData + mill.scalalib.scalafmt.ScalafmtModule/scalafmtClasspath + test.fix'
 
   CheckTestTagging:
     runs-on: ubuntu-latest
@@ -66,7 +66,7 @@ jobs:
             build-${{ runner.os }}-
             build-
 
-      - run: './mill test.compile'
+      - run: './mill -i test.compile'
       - name: Check all test suites have at least one tag
         run: .github/workflows/check-test-tagging.sh
 
@@ -122,7 +122,7 @@ jobs:
       - run: sudo apt-get install -y z3='4.8.12-*'
       - run: dotnet tool install --global boogie --version '3.4.3'
 
-      - run: ./mill test.compile
+      - run: ./mill -i test.compile
       - run: ./scripts/scalatest.sh -PS3 -oGD -T 1000000 -n test_util.tags.StandardSystemTest
 
       - uses: actions/upload-artifact@v4
@@ -190,9 +190,9 @@ jobs:
       - run: choco install z3
       - run: dotnet tool install --global boogie --version '3.4.3'
 
-      - run: ./mill test.compile
+      - run: ./mill -i test.compile
         # XXX: scalatest.sh doesn't work on windows
-      - run: ./mill test.testForked -oGD -T 1000000 -n test_util.tags.UnitTest
+      - run: ./mill -i test.testForked -oGD -T 1000000 -n test_util.tags.UnitTest
 
   UnitTests:
     runs-on: ubuntu-latest
@@ -230,7 +230,7 @@ jobs:
       - run: sudo apt-get install -y z3='4.8.12-*'
       - run: dotnet tool install --global boogie --version '3.4.3'
 
-      - run: ./mill test.compile
+      - run: ./mill -i test.compile
       - run: ./scripts/scalatest.sh -PS3 -oGD -T 1000000 -n test_util.tags.UnitTest
 
         # every test with package prefix:
@@ -285,5 +285,5 @@ jobs:
       - run: sudo apt-get install -y z3='4.8.12-*'
       - run: dotnet tool install --global boogie --version '3.4.3'
 
-      - run: ./mill test.compile
+      - run: ./mill -i test.compile
       - run: "./scripts/scalatest.sh -PS3 -oGD -T 1000000 -n test_util.tags.${{ matrix.test }} -F 2"

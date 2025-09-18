@@ -1,4 +1,4 @@
-import analysis.data_structure_analysis.*
+import analysis.data_structure_analysis.{DSAContext, *}
 import ir.*
 import org.scalatest.funsuite.*
 import test_util.{BASILTest, CaptureOutput, TestConfig, TestCustomisation}

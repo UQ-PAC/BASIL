@@ -56,10 +56,10 @@ object LoopDetector {
     headers: Set[Block] = Set(),
 
     // Algorithm helpers
-    visitedNodes: Set[Block] = Set(),
-    nodeDFSPpos: Map[Block, Int] = Map(),
-    iloopHeaders: Map[Block, Block] = Map(),
-    edgeStack: List[LoopEdge] = List()
+    private[LoopDetector] val visitedNodes: Set[Block] = Set(),
+    private[LoopDetector] val nodeDFSPpos: Map[Block, Int] = Map(),
+    private[LoopDetector] val iloopHeaders: Map[Block, Block] = Map(),
+    private[LoopDetector] val edgeStack: List[LoopEdge] = List()
   ) {
     def irreducibleLoops: Set[Loop] = loops.values.filter(l => !l.reducible).toSet
 
@@ -81,7 +81,12 @@ object LoopDetector {
   }
 
   def identify_loops(entryBlock: Block): State = {
-    traverse_loops_dfs(State(), entryBlock, 1)
+    traverse_loops_dfs(State(), entryBlock, 1).copy(
+      visitedNodes = Set(),
+      nodeDFSPpos = Map(),
+      iloopHeaders = Map(),
+      edgeStack = List()
+    )
   }
 
   /*

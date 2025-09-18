@@ -1,4 +1,4 @@
-import ir.*
+import ir.{IRContext, *}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
 import util.{

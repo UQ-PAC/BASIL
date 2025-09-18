@@ -1,6 +1,6 @@
-import analysis.{InterLiveVarsAnalysis, TwoElementTop}
+import analysis.{InterLiveVarsAnalysis, TwoElement, TwoElementTop}
 import ir.dsl.*
-import ir.{BitVecLiteral, Block, LocalAssign, Program, Register, Variable, cilvisitor, dsl, transforms}
+import ir.{BitVecLiteral, Block, CFGPosition, LocalAssign, Program, Register, Variable, cilvisitor, dsl, transforms}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
 import translating.PrettyPrinter.*
@@ -16,6 +16,16 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
     val staticAnalysisConfig = Some(StaticAnalysisConfig())
     val outputFile = correctPath + s"/$name/gcc/${name}_livevars.bpl"
     runBASIL(inputFile, relfFile, None, outputFile, staticAnalysisConfig)
+  }
+
+  def runAnalysis(program: Program): Map[CFGPosition, Map[Variable, TwoElement]] = {
+    val replaceReturns = transforms.ReplaceReturns()
+    cilvisitor.visit_prog(replaceReturns, program)
+    replaceReturns.addR30Begins()
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+
+    InterLiveVarsAnalysis(program).analyze()
   }
 
   def createSimpleProc(name: String, statements: Seq[NonCallStatement]): EventuallyProcedure = {
@@ -40,11 +50,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
       createSimpleProc("callee2", Seq(r2r1Assign))
     )
 
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
-    val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
+    val liveVarAnalysisResults = runAnalysis(program)
 
     // fix for DSA pairs of results?
     val procs = program.nameToProcedure
@@ -71,11 +77,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
       createSimpleProc("callee2", Seq(r2r1Assign))
     )
 
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
-    val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
+    val liveVarAnalysisResults = runAnalysis(program)
 
     val procs = program.nameToProcedure
     // assert(liveVarAnalysisResults(procs("main")) == Map())
@@ -113,11 +115,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
       )
     )
 
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
-    val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
+    val liveVarAnalysisResults = runAnalysis(program)
     val blocks = program.labelToBlock
     assert(liveVarAnalysisResults(blocks("wrapper1_first_call").jump) == Map(R1 -> TwoElementTop))
     assert(liveVarAnalysisResults(blocks("wrapper2_first_call").jump) == Map(R2 -> TwoElementTop))
@@ -134,11 +132,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
       createSimpleProc("killer", Seq(LocalAssign(R1, bv64(1))))
     )
 
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
-    val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
+    val liveVarAnalysisResults = runAnalysis(program)
     val blocks = program.labelToBlock
 
     assert(liveVarAnalysisResults(blocks("aftercall")) == Map(R1 -> TwoElementTop))
@@ -159,12 +153,8 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
       )
     )
 
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
+    val liveVarAnalysisResults = runAnalysis(program)
     val blocks = program.labelToBlock
-    val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
 
     assert(liveVarAnalysisResults(blocks("branch1")) == Map(R1 -> TwoElementTop))
     assert(liveVarAnalysisResults(blocks("branch2")) == Map(R2 -> TwoElementTop))
@@ -181,11 +171,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
       )
     )
 
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
-    val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
+    val liveVarAnalysisResults = runAnalysis(program)
 
     assert(liveVarAnalysisResults(program.mainProcedure) == Map(R1 -> TwoElementTop, R2 -> TwoElementTop))
   }
@@ -202,11 +188,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
       )
     )
 
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
-    val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
+    val liveVarAnalysisResults = runAnalysis(program)
 
     assert(liveVarAnalysisResults(program.mainProcedure) == Map(R1 -> TwoElementTop, R2 -> TwoElementTop))
   }
@@ -243,7 +225,6 @@ class LiveVarsAnalysisTests extends AnyFunSuite, CaptureOutput, BASILTest {
     val result: BASILResult = runExample("basic_arrays_write")
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.labelToBlock
-    println(blocks)
 
     // main has a parameter, R0 should be alive
     assert(analysisResults(blocks("main_entry")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop))

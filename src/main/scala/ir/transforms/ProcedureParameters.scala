@@ -111,7 +111,7 @@ object DefinedOnAllPaths {
   }
 }
 
-def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
+def liftProcedureCallAbstraction(ctx: ir.IRContext): ir.IRContext = {
   val ns = liftProcedureCallAbstraction(ctx.program, Some(ctx.specification)).get
   ctx.copy(specification = ns)
 }
