@@ -400,11 +400,26 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     case FalseLiteral => sym("false")
   }
 
+  def mkIte(cases: List[Seq[Sexp[Expr]]]): Sexp[Expr] = {
+    cases match {
+      case Seq(cond, casev) :: Nil => casev
+      case Seq(cond, casev) :: tl => list(sym("ite"), (cond), (casev), mkIte(tl))
+    }
+  }
+
   def endianToBool(endian: Endian): Sexp[Expr] = {
     if endian == Endian.LittleEndian then vexpr(FalseLiteral) else vexpr(TrueLiteral)
   }
   override def vfapply_expr(name: String, args: Seq[Sexp[Expr]]): Sexp[Expr] = {
-    list((sym(name) :: args.toList): _*)
+    name match {
+      case "ite" => {
+        val cases = args.grouped(2)
+        mkIte(cases.toList)
+      }
+      case _ => {
+        list(sym(name), Sexp.Slist(args.toList))
+      }
+    }
   }
 
   override def vrvar(e: Variable): Sexp[Variable] = sym(fixVname(e.name))
@@ -431,6 +446,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
 
   def interpretFun(x: FApplyExpr): Option[Sexp[Expr]] = {
     x.name match {
+      case "ite" => None
       case "bool2bv1" => {
         Some(booltoBVDef)
       }

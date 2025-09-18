@@ -127,6 +127,12 @@ object SSADAG {
       case s: Statement => visit_stmt(RenameLHS(substs.get), s)
     }
 
+    def mkIte(cases: List[(Expr, Expr)]) = {
+      /* assume cases are total, i.e. last guard of cases can be discarded  */
+      val rt = cases.head._2.getType
+      FApplyExpr("ite", cases.flatMap { case (c, b) => List(c, b) }, rt)
+    }
+
     val phiLabel = "TVSSADAGPHI"
 
     var phis = 0
@@ -158,17 +164,13 @@ object SSADAG {
             val grouped = defsToJoin.groupBy(_._2).map {
               case (ivar, blockset) => {
                 val blocks = blockset.map(_._1)
-                BinaryExpr(BoolIMPLIES, boolOr(blocks.map(blockDone)), polyEqual(ivar, fresh))
+                (boolOr(blocks.map(blockDone)), ivar)
               }
             }
 
-            val phicond = grouped.toList
+            val phiscond = Seq(LocalAssign(fresh, mkIte(grouped.toList), Some(phiLabel)))
 
-            val phiscond = if (phicond.length > 8) then {
-              phicond.map(b => Assume(b, None, Some(phiLabel)))
-            } else Seq(Assume(boolAnd(phicond), None, Some(phiLabel)))
-
-            phis += phicond.length
+            // phis += grouped.length
             b.statements.prependAll(phiscond)
 
             nrenaming(v) = fresh
@@ -189,7 +191,7 @@ object SSADAG {
       val renaming = mutable.Map.from(renameBefore.getOrElse(b, Map()))
 
       def isPhi(s: Statement) = s match {
-        case a: Assume if a.label.contains(phiLabel) => true
+        case a if a.label.contains(phiLabel) => true
         case _ => false
       }
 
