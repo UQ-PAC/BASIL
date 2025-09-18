@@ -1259,11 +1259,16 @@ object OffsetProp {
         case _ => throw Exception("Unexpected expression structure created by find() at some point")
       }
 
-    final def find(
-      v: Variable,
-      ret: BitVecLiteral | Variable | BinaryExpr => BitVecLiteral | Variable | BinaryExpr = x => x,
-      fuel: Int = 5000
-    ): BitVecLiteral | Variable | BinaryExpr = {
+    def findOff(v: Variable, c: BitVecLiteral, fuel: Int = 1000): BitVecLiteral | Variable | BinaryExpr =
+      find(v, fuel) match {
+        case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
+        case lv: Variable => BinaryExpr(BVADD, lv, c)
+        case BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) =>
+          BinaryExpr(BVADD, l, ir.eval.BitVectorEval.smt_bvadd(r, c))
+        case _ => throw Exception("Unexpected expression structure created by find() at some point")
+      }
+
+    def find(v: Variable, fuel: Int = 1000): BitVecLiteral | Variable | BinaryExpr = {
       if (fuel == 0) {
         var chain = List(v)
         for (i <- 0 to 10) {
@@ -1279,14 +1284,12 @@ object OffsetProp {
       }
       st.get(v) match {
         case None => v
-        case Some((None, None)) => ret(v)
-        case Some((None, Some(c))) => ret(c)
-        case Some((Some(v), None)) => ret(find(v, x => x, fuel - 1))
-        case Some((Some(v), Some(c))) => ret(find(v, eval(c), fuel - 1))
+        case Some((None, None)) => v
+        case Some((None, Some(c))) => c
+        case Some((Some(v), None)) => find(v, fuel - 1)
+        case Some((Some(v), Some(c))) => findOff(v, c, fuel - 1)
       }
     }
-
-    def findOff(e: Variable, v: BitVecLiteral): BitVecLiteral | Variable | BinaryExpr = eval(v)(find(e))
 
     def specJoinState(lhs: Variable, rhs: Expr): Option[(Variable, Value)] = {
       rhs match {

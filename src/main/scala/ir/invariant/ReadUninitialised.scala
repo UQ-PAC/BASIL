@@ -5,25 +5,21 @@ import util.Logger
 
 import scala.collection.mutable
 
-def readUninitialised(p: Procedure): Boolean = {
-  ir.transforms.reversePostOrder(p)
+class ReadUninitialised() {
 
-  val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
-  worklist.addAll(p.blocks)
-
-  var init = Set[Variable]() ++ p.formalInParam
+  var init = Set[Variable]()
   var readUninit = List[(Command, Set[Variable])]()
 
-  def check(a: Command) = {
+  final def check(a: Command) = {
     val free = freeVarsPos(a).filter(_.isInstanceOf[LocalVar]) -- init
     if (free.size > 0) {
       readUninit = (a, free) :: readUninit
     }
   }
 
-  while (worklist.nonEmpty) {
-    val b = worklist.dequeue()
-    b.statements.foreach {
+  final def readUninitialised(b: Iterable[Statement]): Boolean = {
+    val i = readUninit.size
+    b.foreach {
       case a: Assign => {
         check(a)
         init = init ++ a.assignees
@@ -32,24 +28,47 @@ def readUninitialised(p: Procedure): Boolean = {
         check(o)
       }
     }
-    check(b.jump)
+    i != readUninit.size
   }
 
-  if (readUninit.size > 0) {
-    Logger.error(p.name)
-    val msg = readUninit
-      .map { case (s, vars) =>
-        s"   ${vars.mkString(", ")} uninitialised in statement $s"
-      }
-      .mkString("\n")
-    Logger.error(msg)
-    true
-  } else {
-    false
+  final def readUninitialised(b: Block): Boolean = {
+    val i = readUninit.size
+    readUninitialised(b.statements)
+    check(b.jump)
+    i != readUninit.size
   }
+
+  final def getResult(): Option[String] = {
+    if (readUninit.size > 0) {
+      val msg = readUninit
+        .map { case (s, vars) =>
+          s"   ${vars.mkString(", ")} uninitialised in statement $s"
+        }
+        .mkString("\n")
+      Some(msg)
+    } else {
+      None
+    }
+  }
+
+  final def readUninitialised(p: Procedure): Boolean = {
+    init = init ++ p.formalInParam
+
+    ir.transforms.reversePostOrder(p)
+
+    val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
+    worklist.addAll(p.blocks)
+
+    while (worklist.nonEmpty) {
+      val b = worklist.dequeue()
+      readUninitialised(b)
+    }
+    getResult().map(e => Logger.error(p.name + "\n" + e)).isDefined
+  }
+
 }
 
 def readUninitialised(p: Program): Boolean = {
-  val r = p.procedures.map(readUninitialised)
+  val r = p.procedures.map(ReadUninitialised().readUninitialised)
   r.forall(x => !x)
 }

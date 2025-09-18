@@ -54,6 +54,7 @@ object RunUtils {
     Logger.info("[!] Loading Program")
     val q = conf
     var ctx = q.context.getOrElse(IRLoading.load(q.loading))
+    assert(invariant.readUninitialised(ctx.program))
     postLoad(ctx) // allows extracting information from the original loaded program
 
     assert(invariant.checkTypeCorrect(ctx.program))

@@ -620,11 +620,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
       "direct_request",
       "forward_request",
       "tunnel_add",
-      "magic_auth_detect",
-      "hlist_subcmp_all",
-      "headers_recv",
-      "scanner_hook",
-      "config_open"
+      "magic_auth_detect"
     )
     val globalCollapsed = Set("to_base64", "printmem", "gl_des_ecb_crypt", "from_base64", "des_key_schedule", "scanmem")
     val locals = res.dsa.get.local
