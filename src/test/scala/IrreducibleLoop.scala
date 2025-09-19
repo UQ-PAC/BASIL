@@ -114,8 +114,8 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
     assertResult(TestLoopInfo(iloop_headers, headers)) {
       TestLoopInfo(
-        loops.collect { case (k, BlockLoopInfo(_, Some(h), _, _)) => k.label -> h.label },
-        loops.collect { case (k, BlockLoopInfo(_, _, _, hs)) if hs.nonEmpty => k.label -> hs.map(_.label) }
+        loops.collect { case (k, BlockLoopInfo(_, Some(h), _, _, _)) => k.label -> h.label },
+        loops.collect { case (k, BlockLoopInfo(_, _, _, hs, _)) if hs.nonEmpty => k.label -> hs.map(_.label) }
       )
     }
   }

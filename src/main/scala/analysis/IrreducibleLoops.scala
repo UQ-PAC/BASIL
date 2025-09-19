@@ -367,13 +367,14 @@ object NewLoopDetector {
     * Converts the mutable [[BlockLoopState]] into an immutable [[BlockLoopInfo]],
     * suitable for returning to the caller.
     */
-    def toBlockLoopInfo() =
-      BlockLoopInfo(b, iloop_header, dfsp_pos_max, headers)
+    def toBlockLoopInfo(nodes: Set[Block]) =
+      BlockLoopInfo(b, iloop_header, dfsp_pos_max, headers, nodes)
   }
 
   /**
-  * Information about a particular (possibly-irreducible) cycle occuring within a
-  * procedure, with the given `b` as the distinguished header.
+  * Information about the (possibly-irreducible) cycle with the given `b` as the
+  * distinguished header. This may also represent _no cycle_ if `b` is not a
+  * participant in any loop.
   *
   * An irreducible loop will have multiple headers, but one of these will be
   * distinguished due to the block graph traversal order. Although any of the
@@ -383,32 +384,9 @@ object NewLoopDetector {
   *
   * Constructed from a [[BlockLoopState]] with [[BlockLoopState#toBlockLoopInfo]].
   */
-  case class BlockLoopInfo(val b: Block, val iloop_header: Option[Block], val dfsp_pos: Int, val headers: Set[Block]) {
+  case class BlockLoopInfo(val b: Block, val iloop_header: Option[Block], val dfsp_pos: Int, val headers: Set[Block], val nodes: Set[Block]) {
     def isIrreducible() = headers.size > 1
-  }
-
-  def compute_forest(loopBlocks: Map[Block, BlockLoopInfo]) = {
-    // header -> cycle with that header, including sub-cycles
-    val forest = mutable.Map[Block, Set[Block]]()
-
-    loopBlocks.values.foreach {
-      case b if b.headers.nonEmpty => forest += b.b -> Set(b.b)
-      case _ => ()
-    }
-
-    // XXX: do toposort properly. or get order from dfs traversal
-    (0 to 10).foreach { _ =>
-      loopBlocks.values.foreach {
-        case BlockLoopInfo(b, Some(h), _, _) =>
-          forest.updateWith(h) {
-            case None => Some(forest.getOrElse(b, Set()) + b + h)
-            case Some(xs) => Some(xs + b + h ++ forest.getOrElse(b, Set()))
-          }
-        case _ => ()
-      }
-    }
-    loopBlocks.values.foreach(println(_))
-    forest
+    def isCycle() = headers.nonEmpty
   }
 
   def identify_loops(procedure: Procedure): Option[ListMap[Block, BlockLoopInfo]] =
@@ -433,12 +411,30 @@ object NewLoopDetector {
     given Conversion[Block, BlockLoopState] with
       def apply(b: Block) = loopBlocks(b)
 
-    protected def getLoopInfos(): ListMap[Block, BlockLoopInfo] = loopBlocks.toList
-      .map { case (k, v) =>
-        k -> v.toBlockLoopInfo()
+    protected def getLoopInfos(): ListMap[Block, BlockLoopInfo] = {
+      // NOTE: loops are in *bottom-up topological order*.
+      val loops = loopBlocks.values.toList.sortBy(_.dfsp_pos_max).reverse
+
+      var forest = Map[Block, Set[Block]]()
+      forest = loops.foldLeft(forest) {
+        case (forest, b) if b.headers.nonEmpty => forest + (b.b -> Set(b.b))
+        case (forest, _) => forest
       }
-      .sortBy(_._2.dfsp_pos)
-      .to(ListMap)
+
+      // NOTE: iterates the forest in *bottom-up* topological order. this
+      // ensures that node-sets of sub-cycles are fully populated before
+      // processing their parent cycle. this avoids us having to compute
+      // closures of node-sets.
+      forest = loops.foldLeft(forest) {
+        case (forest, BlockLoopState(b, Some(h), _, _, _, _)) =>
+          val entry = h -> (forest(h) + b ++ forest.getOrElse(b, Set()))
+          forest + entry
+        case (forest, _) => forest
+      }
+      println("forest: " + forest)
+
+      loops.map(x => x.b -> x.toBlockLoopInfo(forest.getOrElse(x.b, Set()))).to(ListMap)
+    }
 
     /** Main entry point for the loop identification algorithm. Calls
      *  [[trav_loops_tailrec]] with the appropriate arguments. Returns a
