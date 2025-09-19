@@ -411,10 +411,18 @@ object NewLoopDetector {
     forest
   }
 
-  def identify_loops(procedure: Procedure): Option[ListMap[Block, BlockLoopInfo]] = {
-    TraverseLoops(procedure).traverse_loops().map(_.getLoopInfos())
-  }
+  def identify_loops(procedure: Procedure): Option[ListMap[Block, BlockLoopInfo]] =
+    TraverseLoops(procedure).traverse_loops()
 
+  /** Performs the DFS-based loop analysis as described in [1]. Each instance of
+   *  this should be used at most once. The [[NewLoopDetector#identify_loops]]
+   *  function will construct this class for you and call the appropriate methods.
+   *
+   *  [1] T. Wei, J. Mao, W. Zou, and Y. Chen, “A New Algorithm for Identifying
+   *  Loops in Decompilation,” Lecture Notes in Computer Science. Springer
+   *  Berlin Heidelberg, pp. 170–183, 2007. doi: 10.1007/978-3-540-74061-2_11.
+   *  Available: http://dx.doi.org/10.1007/978-3-540-74061-2_11
+   */
   class TraverseLoops(val procedure: Procedure) {
 
     val loopBlocks: Map[Block, BlockLoopState] =
@@ -425,19 +433,45 @@ object NewLoopDetector {
     given Conversion[Block, BlockLoopState] with
       def apply(b: Block) = loopBlocks(b)
 
-    def getLoopInfos(): ListMap[Block, BlockLoopInfo] = loopBlocks.toList
+    protected def getLoopInfos(): ListMap[Block, BlockLoopInfo] = loopBlocks.toList
       .map { case (k, v) =>
         k -> v.toBlockLoopInfo()
       }
       .sortBy(_._2.dfsp_pos)
       .to(ListMap)
 
+    /** Main entry point for the loop identification algorithm. Calls
+     *  [[trav_loops_tailrec]] with the appropriate arguments. Returns a
+     *  [[scala.collection.immutable.ListMap]] of [[BlockLoopInfo]] if
+     *  successful, or `None` if the procedure has no entry block. The returned
+     *  `ListMap` will be in topological order - outer cycles occur _before_
+     *  their subcycles.
+     */
     def traverse_loops() =
       procedure.entryBlock.map { entry =>
         val _ = this.trav_loops_tailrec(Left((loopBlocks(entry), 1)), Nil)
-        this
+        getLoopInfos()
       }
 
+    /**
+     * Tail-recursive form of the DFS-based traversal described in the paper.
+     *
+     * The original algorithm has one recursive call, so its tail-recursive
+     * form has two "entry points" - one from the beginning of the function,
+     * and one when a recursive subcall has returned and wants to continue.
+     * This is implemented by using an [[scala.util.Either]] parameter. The
+     * `Left` case denotes a normal call to the function with arguments `(b0,
+     * dfsp_pos)`, and the `Right` case denotes a return from a recursive
+     * subcall with arguments `nh`, the return value of the recursive subcall.
+     *
+     * This is combined with a stack of nested calls. A recursive "call"
+     * happens by invoking the function with `Left` and pushing the current
+     * `(b0, dfsp_pos, it)` onto the stack. In particular, storing the `it`
+     * iterator lets us resume the iteration at a later point. Upon completing
+     * execution of one call to the function, if the stack is non-empty, the
+     * function will "return" to the parent call by invoking the function with
+     * a `Right` argument.
+     */
     @tailrec
     final def trav_loops_tailrec(
       input: Either[(BlockLoopState, Int), Option[BlockLoopState]],
@@ -445,23 +479,27 @@ object NewLoopDetector {
     ): Option[BlockLoopState] = {
       println("a")
 
-      val (b0, dfsp_pos, it, nh, continuations) = (input, inputContinuations) match {
+      val (b0, dfsp_pos, it, continuations) = (input, inputContinuations) match {
+
+        // Left denotes a normal function entry. The code here is in the entry
+        // of the paper's algorithm, before the loop begins.
         case (Left((b0, dfsp_pos)), conts) => {
           b0.dfsp_pos = dfsp_pos
           b0.dfsp_pos_max = dfsp_pos
           b0.is_traversed = true
           val it = b0.b.nextBlocks.map(loopBlocks(_)).iterator
-          (b0, dfsp_pos, it, None, conts)
+          (b0, dfsp_pos, it, conts)
         }
+
+        // Right denotes a return from a recursive subcall. This simply calls
+        // tag_lhead, which appears in the algorithm after the recursive
+        // subcall, then continues the iteration using the stored `it`.
         case (Right(nh), (b0, dfsp_pos, it) :: rest) =>
-          (b0, dfsp_pos, it, Some(nh), rest)
+          tag_lhead(b0, nh)
+          (b0, dfsp_pos, it, rest)
+
         case (Right(_), Nil) =>
           throw new Exception("trav_loops_tailrec: stack underflow")
-      }
-
-      nh match {
-        case Some(nh) => tag_lhead(b0, nh)
-        case None => ()
       }
 
       while (it.hasNext) {
@@ -510,6 +548,7 @@ object NewLoopDetector {
       }
     }
 
+    /** Helper function described in the paper and called by [[trav_loops_tailrec]]. */
     def tag_lhead(b: BlockLoopState, h: Option[BlockLoopState]): Unit = h match {
       case Some(h) if b.b ne h.b =>
         var cur1 = b
