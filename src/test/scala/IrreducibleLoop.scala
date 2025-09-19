@@ -126,7 +126,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println("" + loop.header + ": " + loop.nodes.map(_.label))
     }
 
-    println(NewLoopDetector(p.mainProcedure).identify_loops().compute_forest())
+    println(NewLoopDetector(p.mainProcedure).identify_loops().get.compute_forest())
 
   }
 
@@ -150,7 +150,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println(loop)
     }
 
-    println(NewLoopDetector(p.mainProcedure).identify_loops().compute_forest())
+    println(NewLoopDetector(p.mainProcedure).identify_loops().get.compute_forest())
 
   }
 
@@ -175,7 +175,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println(loop)
     }
 
-    println(NewLoopDetector(p.mainProcedure).identify_loops().compute_forest())
+    println(NewLoopDetector(p.mainProcedure).identify_loops().get.compute_forest())
 
   }
 
@@ -199,7 +199,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println(loop)
     }
 
-    println(NewLoopDetector(p.mainProcedure).identify_loops().compute_forest())
+    println(NewLoopDetector(p.mainProcedure).identify_loops().get.compute_forest())
   }
 
   test("nested loop") {
@@ -222,7 +222,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println(loop)
     }
 
-    println(NewLoopDetector(p.mainProcedure).identify_loops().compute_forest())
+    println(NewLoopDetector(p.mainProcedure).identify_loops().get.compute_forest())
   }
 
   test("nested self-loop") {
@@ -244,7 +244,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println(loop)
     }
 
-    println(NewLoopDetector(p.mainProcedure).identify_loops().compute_forest())
+    println(NewLoopDetector(p.mainProcedure).identify_loops().get.compute_forest())
   }
 
   test("plist_free") {
