@@ -17,6 +17,7 @@ import ir.{
 }
 
 import scala.annotation.tailrec
+import scala.collection.immutable.ListMap
 import scala.collection.mutable
 import scala.util.boundary
 
@@ -351,7 +352,6 @@ object LoopDetector {
   }
 }
 
-
 object NewLoopDetector {
 
   case class BlockLoopState(
@@ -362,6 +362,7 @@ object NewLoopDetector {
     var is_traversed: Boolean,
     var headers: Set[Block]
   ) {
+
     /**
     * Converts the mutable [[BlockLoopState]] into an immutable [[BlockLoopInfo]],
     * suitable for returning to the caller.
@@ -382,12 +383,7 @@ object NewLoopDetector {
   *
   * Constructed from a [[BlockLoopState]] with [[BlockLoopState#toBlockLoopInfo]].
   */
-  case class BlockLoopInfo(
-    val b: Block,
-    val iloop_header: Option[Block],
-    val dfsp_pos: Int,
-    val headers: Set[Block]
-  ) {
+  case class BlockLoopInfo(val b: Block, val iloop_header: Option[Block], val dfsp_pos: Int, val headers: Set[Block]) {
     def isIrreducible() = headers.size > 1
   }
 
@@ -415,7 +411,7 @@ object NewLoopDetector {
     forest
   }
 
-  def identify_loops(procedure: Procedure): Option[Map[Block, BlockLoopInfo]] = {
+  def identify_loops(procedure: Procedure): Option[ListMap[Block, BlockLoopInfo]] = {
     TraverseLoops(procedure).traverse_loops().map(_.getLoopInfos())
   }
 
@@ -429,9 +425,12 @@ object NewLoopDetector {
     given Conversion[Block, BlockLoopState] with
       def apply(b: Block) = loopBlocks(b)
 
-    def getLoopInfos(): Map[Block, BlockLoopInfo] = loopBlocks.map {
-      case (k, v) => k -> v.toBlockLoopInfo()
-    }
+    def getLoopInfos(): ListMap[Block, BlockLoopInfo] = loopBlocks.toList
+      .map { case (k, v) =>
+        k -> v.toBlockLoopInfo()
+      }
+      .sortBy(_._2.dfsp_pos)
+      .to(ListMap)
 
     def traverse_loops() =
       procedure.entryBlock.map { entry =>
@@ -470,10 +469,10 @@ object NewLoopDetector {
         if (!b.is_traversed) {
           return trav_loops_tailrec(Left((b, dfsp_pos + 1)), (b0, dfsp_pos, it) :: continuations)
           /* before tailrec transformation:
-          *
-          * val nh = trav_loops_dfs(b, dfsp_pos + 1)
-          * tag_lhead(b0, nh)
-          */
+           *
+           * val nh = trav_loops_dfs(b, dfsp_pos + 1)
+           * tag_lhead(b0, nh)
+           */
         } else {
           if (b.dfsp_pos > 0) {
             println("mark as loop header: " + b + " from " + b0)

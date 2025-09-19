@@ -1,13 +1,15 @@
 import analysis.{LoopDetector, NewLoopDetector}
-import ir.{Block, IRLoading, Program, dotBlockGraph}
+import ir.{Block, IRLoading, Procedure, Program, dotBlockGraph}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
 import translating.PrettyPrinter.pprint
 import translating.{BAPToIR, ReadELFData}
 import util.{ILLoadingConfig, LogLevel, Logger}
 
+import scala.collection.immutable.ListMap
 import scala.sys.process.*
-import scala.util.chaining.scalaUtilChainingOps
+
+import NewLoopDetector.BlockLoopInfo
 
 @test_util.tags.UnitTest
 class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
@@ -103,6 +105,17 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     Logger.debug("Boogie result: " + boogieResult)
     assert(boogieResult.contains("Irreducible flow graphs are unsupported."))
   }
+  case class TestLoopInfo(iloop_headers: ListMap[String, String], headers: Map[String, Set[String]])
+
+  def assertLoopDetector(p: Procedure)(iloop_headers: ListMap[String, String])(headers: Map[String, Set[String]]) = {
+    val loops = NewLoopDetector.identify_loops(p).get
+    assertResult(TestLoopInfo(iloop_headers, headers)) {
+      TestLoopInfo(
+        loops.collect { case (k, BlockLoopInfo(_, Some(h), _, _)) => k.label -> h.label },
+        loops.collect { case (k, BlockLoopInfo(_, _, _, hs)) if hs.nonEmpty => k.label -> hs.map(_.label) }
+      )
+    }
+  }
 
   test("paper fig2") {
     import ir.dsl.*
@@ -127,7 +140,11 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println("" + loop.header + ": " + loop.nodes.map(_.label))
     }
 
-    println(NewLoopDetector.identify_loops(p.mainProcedure).get.pipe(NewLoopDetector.compute_forest))
+    assertLoopDetector(p.mainProcedure) {
+      ListMap("f" -> "e", "b" -> "a", "g" -> "f", "c" -> "b", "d" -> "a", "h" -> "e", "i" -> "h")
+    } {
+      Map("e" -> Set("e"), "a" -> Set("a"), "f" -> Set("f"), "b" -> Set("b"), "h" -> Set("h"))
+    }
 
   }
 
@@ -151,11 +168,12 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println(loop)
     }
 
-    println(NewLoopDetector.identify_loops(p.mainProcedure).get.pipe(NewLoopDetector.compute_forest))
-
+    assertLoopDetector(p.mainProcedure) {
+      ListMap("b" -> "a", "c" -> "b", "d" -> "c")
+    } { ListMap("a" -> Set("a", "d"), "b" -> Set("b"), "c" -> Set("c")) }
   }
 
-  test("multiple entries") {
+  test("multiple entries - irreducible") {
     import ir.dsl.*
     val p = prog(
       proc("main")(
@@ -176,7 +194,9 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println(loop)
     }
 
-    println(NewLoopDetector.identify_loops(p.mainProcedure).get.pipe(NewLoopDetector.compute_forest))
+    assertLoopDetector(p.mainProcedure) {
+      ListMap("loopexit" -> "loop")
+    } { Map("loop" -> Set("loop", "loopexit")) }
 
   }
 
@@ -200,7 +220,9 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println(loop)
     }
 
-    println(NewLoopDetector.identify_loops(p.mainProcedure).get.pipe(NewLoopDetector.compute_forest))
+    assertLoopDetector(p.mainProcedure) {
+      ListMap("loop2" -> "loop", "loop3" -> "loop")
+    } { Map("loop" -> Set("loop")) }
   }
 
   test("nested loop") {
@@ -223,7 +245,9 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println(loop)
     }
 
-    println(NewLoopDetector.identify_loops(p.mainProcedure).get.pipe(NewLoopDetector.compute_forest))
+    assertLoopDetector(p.mainProcedure) {
+      ListMap("loop2" -> "loop", "loop3" -> "loop2", "loop4" -> "loop")
+    } { Map("loop" -> Set("loop"), "loop2" -> Set("loop2")) }
   }
 
   test("nested self-loop") {
@@ -245,7 +269,9 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println(loop)
     }
 
-    println(NewLoopDetector.identify_loops(p.mainProcedure).get.pipe(NewLoopDetector.compute_forest))
+    assertLoopDetector(p.mainProcedure) {
+      ListMap("loop2" -> "loop", "loop3" -> "loop")
+    } { ListMap("loop" -> Set("loop"), "loop2" -> Set("loop2")) }
   }
 
   test("plist_free") {
