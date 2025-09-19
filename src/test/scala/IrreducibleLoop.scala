@@ -286,7 +286,15 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
     util.writeToFile(p.pprint, "/home/rina/progs/basil/plist-before.il")
 
-    println(LoopDetector.identify_loops(p))
+    val result = LoopDetector.identify_loops(p)
+    println(result.iloopHeaders.groupMap(_._2)(_._1))
+    result.loops.values.foreach { loop =>
+      println("" + loop.header + ": " + (loop.nodes ++ loop.edges.flatMap(x => List(x.to, x.from))).map(_.label))
+      println(loop)
+    }
+
+    val loops = NewLoopDetector.identify_loops(p.mainProcedure).get
+    loops.values.foreach(println(_))
 
     analysis.AnalysisPipelineMRA.reducibleLoops(p)
 
