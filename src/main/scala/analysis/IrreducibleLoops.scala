@@ -378,6 +378,12 @@ class NewLoopDetector(procedure: Procedure) {
   def compute_forest() = {
     // Header -> Cycle with that header
     val forest = mutable.Map[Block, Set[Block]]()
+
+    loopBlocks.values.foreach {
+      case BlockLoopInfo(b, _, _, _, headers) if headers.nonEmpty => forest += b -> Set(b)
+      case _ => ()
+    }
+
     // XXX: do toposort properly. or get order from dfs traversal
     (0 to 10).foreach { _ =>
       loopBlocks.values.foreach {
