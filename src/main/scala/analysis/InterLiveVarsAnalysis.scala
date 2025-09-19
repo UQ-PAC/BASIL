@@ -17,6 +17,9 @@ import ir.{
   Return,
   Variable
 }
+import util.Logger
+
+import scala.collection.immutable.ListSet
 
 /** Micro-transfer-functions for LiveVar analysis
  *  This analysis works by inlining function calls - instead of just mapping parameters and returns, all live variables
@@ -136,6 +139,56 @@ trait LiveVarsAnalysisFunctions(inline: Boolean, addExternals: Boolean = true)
   }
 }
 
-class InterLiveVarsAnalysis(program: Program, ignoreExternals: Boolean = false)
-    extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program),
+class InterLiveVarsAnalysis(program: Program, ignoreExternals: Boolean = false, entry: Option[Procedure] = None)
+    extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program, entry),
       LiveVarsAnalysisFunctions(true, !ignoreExternals)
+
+def interLiveVarsAnalysis(
+  program: Program,
+  ignoreExternals: Boolean = false
+): Map[CFGPosition, Map[Variable, TwoElement]] = {
+
+  var procs = ListSet.from(program.procedures)
+  var starts = List[Procedure]()
+
+  while {
+    val entries =
+      procs.toList.filter(p => p.incomingCalls().size == 0 && p.entryBlock.isDefined && p.returnBlock.isDefined)
+    if (entries.nonEmpty) {
+      starts = entries.head :: starts
+      val done = entries.head.reachableFrom
+      procs = procs -- done
+      procs.nonEmpty
+    } else {
+      Logger.warn(s"Live vars :: no program entry candidates remaining")
+      false
+    }
+  } do {}
+
+  val reachable = starts.toSet.flatMap(_.reachableFrom)
+  if (
+    !(reachable.contains(
+      program.mainProcedure
+    )) && procs.nonEmpty && program.mainProcedure.entryBlock.isDefined && program.mainProcedure.returnBlock.isDefined
+  ) {
+    Logger.warn(
+      s"mainProcedure has predecessors but is not reachable from an entry-candidate, using it as an entry candidate."
+    )
+    val remaining = program.procedures.toSet -- program.mainProcedure.reachableFrom
+    starts = List(program.mainProcedure)
+    procs = procs -- program.mainProcedure.reachableFrom
+  } else if (!reachable.contains(program.mainProcedure)) {
+    Logger.warn(s"mainProcedure ${program.mainProcedure.name} is a stub and is not reachable from any entry point")
+  }
+
+  if (procs.nonEmpty) {
+    Logger.error(s"Code unreachable for liveness analysis: ${procs.toList}")
+  }
+
+  var r = Map[CFGPosition, Map[Variable, TwoElement]]()
+  for (p <- starts) {
+    r = r ++ InterLiveVarsAnalysis(program, ignoreExternals, Some(p)).analyze()
+  }
+  r
+
+}

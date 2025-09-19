@@ -1244,48 +1244,50 @@ object OffsetProp {
   // None, Some(Lit) -> Lit
   type Value = (Option[Variable], Option[BitVecLiteral])
 
-  def joinValue(l: Value, r: Value) = {
-    (l, r) match {
-      case ((None, None), _) => (None, None)
-      case (_, (None, None)) => (None, None)
-      case (l, r) if l != r => (None, None)
-      case (l, r) => l
-    }
-  }
-
   class CopyProp() {
     val st = mutable.Map[Variable, Value]()
     var giveUp = false
     val lastUpdate = mutable.Map[Block, Int]()
     var stSequenceNo = 1
 
-    def findOff(v: Variable, c: BitVecLiteral): BitVecLiteral | Variable | BinaryExpr = find(v) match {
-      case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
-      case lv: Variable => BinaryExpr(BVADD, lv, c)
-      case BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) =>
-        BinaryExpr(BVADD, l, ir.eval.BitVectorEval.smt_bvadd(r, c))
-      case _ => throw Exception("Unexpected expression structure created by find() at some point")
-    }
+    def eval(c: BitVecLiteral)(v: BitVecLiteral | Variable | BinaryExpr): BitVecLiteral | Variable | BinaryExpr =
+      v match {
+        case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
+        case lv: Variable => BinaryExpr(BVADD, lv, c)
+        case BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) =>
+          BinaryExpr(BVADD, l, ir.eval.BitVectorEval.smt_bvadd(r, c))
+        case _ => throw Exception("Unexpected expression structure created by find() at some point")
+      }
 
-    def find(v: Variable): BitVecLiteral | Variable | BinaryExpr = {
+    def findOff(v: Variable, c: BitVecLiteral, fuel: Int = 1000): BitVecLiteral | Variable | BinaryExpr =
+      find(v, fuel) match {
+        case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
+        case lv: Variable => BinaryExpr(BVADD, lv, c)
+        case BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) =>
+          BinaryExpr(BVADD, l, ir.eval.BitVectorEval.smt_bvadd(r, c))
+        case _ => throw Exception("Unexpected expression structure created by find() at some point")
+      }
+
+    def find(v: Variable, fuel: Int = 1000): BitVecLiteral | Variable | BinaryExpr = {
+      if (fuel == 0) {
+        var chain = List(v)
+        for (i <- 0 to 10) {
+          chain = st.get(chain.head) match {
+            case Some((Some(v: Variable), _)) => v :: chain
+            case o =>
+              chain
+          }
+        }
+        throw Exception(
+          s"Ran out of fuel recursively resolving copyprop (at $v): probable cycle. Next lookups are: $chain"
+        )
+      }
       st.get(v) match {
         case None => v
         case Some((None, None)) => v
         case Some((None, Some(c))) => c
-        case Some((Some(v), None)) => find(v)
-        case Some((Some(v), Some(c))) => findOff(v, c)
-      }
-    }
-
-    def joinState(lhs: Variable, rhs: Expr) = {
-      specJoinState(lhs, rhs) match {
-        case Some((l, r)) => {
-          if (st.contains(l) && st(l) != r) {
-            stSequenceNo += 1
-          }
-          st(l) = r
-        }
-        case _ => ()
+        case Some((Some(v), None)) => find(v, fuel - 1)
+        case Some((Some(v), Some(c))) => findOff(v, c, fuel - 1)
       }
     }
 
@@ -1302,8 +1304,11 @@ object OffsetProp {
       }
     }
 
-    def clob(v: Variable) = {
-      st(v) = (None, None)
+    def update(v: Variable, r: Value) = {
+      if (!st.get(v).exists(_ == r)) {
+        stSequenceNo += 1
+        st(v) = r
+      }
     }
 
     def transfer(s: Statement) = s match {
@@ -1316,11 +1321,11 @@ object OffsetProp {
             case (l: Variable, _) => Seq(l -> (None, None))
           }
           .foreach { case (l, r) =>
-            st(l) = r
+            update(l, r)
           }
       case a: Assign => {
         // memoryload and DirectCall
-        a.assignees.foreach(clob)
+        a.assignees.foreach(v => update(v, (None, None)))
       }
       case _: MemoryStore => ()
       case _: NOP => ()
