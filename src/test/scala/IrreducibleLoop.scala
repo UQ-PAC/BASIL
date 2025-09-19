@@ -154,11 +154,11 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
   }
 
-  test("multiple entries into same header") {
+  test("multiple entries") {
     import ir.dsl.*
     val p = prog(
       proc("main")(
-        block("S", goto("a", "b")),
+        block("S", goto("a", "loopexit")),
         block("a", goto("loop")),
         block("b", goto("loop")),
         block("loop", goto("loopexit")),
@@ -171,6 +171,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     println(result.iloopHeaders.groupMap(_._2)(_._1))
     result.loops.values.foreach { loop =>
       println("" + loop.header + ": " + loop.nodes.map(_.label))
+      println(loop.reentries)
       println(loop)
     }
 
@@ -182,7 +183,8 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     import ir.dsl.*
     val p = prog(
       proc("main")(
-        block("S", goto("loop")),
+        block("S", goto("preloop")),
+        block("preloop", goto("loop")),
         block("loop", goto("loop2")),
         block("loop2", goto("loop3")),
         block("loop3", goto("loop", "end")),
@@ -193,7 +195,52 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     val result = LoopDetector.identify_loops(p)
     println(result.iloopHeaders.groupMap(_._2)(_._1))
     result.loops.values.foreach { loop =>
-      println("" + loop.header + ": " + loop.nodes.map(_.label))
+      println("" + loop.header + ": " + (loop.nodes ++ loop.edges.flatMap(x => List(x.to, x.from))).map(_.label))
+      println(loop)
+    }
+
+    println(NewLoopDetector(p.mainProcedure).identify_loops().compute_forest())
+  }
+
+  test("nested loop") {
+    import ir.dsl.*
+    val p = prog(
+      proc("main")(
+        block("S", goto("loop")),
+        block("loop", goto("loop2")),
+        block("loop2", goto("loop3")),
+        block("loop3", goto("loop2", "loop4")),
+        block("loop4", goto("loop", "end")),
+        block("end", ret)
+      )
+    )
+
+    val result = LoopDetector.identify_loops(p)
+    println(result.iloopHeaders.groupMap(_._2)(_._1))
+    result.loops.values.foreach { loop =>
+      println("" + loop.header + ": " + (loop.nodes ++ loop.edges.flatMap(x => List(x.to, x.from))).map(_.label))
+      println(loop)
+    }
+
+    println(NewLoopDetector(p.mainProcedure).identify_loops().compute_forest())
+  }
+
+  test("nested self-loop") {
+    import ir.dsl.*
+    val p = prog(
+      proc("main")(
+        block("S", goto("loop")),
+        block("loop", goto("loop2")),
+        block("loop2", goto("loop3", "loop2")),
+        block("loop3", goto("loop", "end")),
+        block("end", ret)
+      )
+    )
+
+    val result = LoopDetector.identify_loops(p)
+    println(result.iloopHeaders.groupMap(_._2)(_._1))
+    result.loops.values.foreach { loop =>
+      println("" + loop.header + ": " + (loop.nodes ++ loop.edges.flatMap(x => List(x.to, x.from))).map(_.label))
       println(loop)
     }
 
