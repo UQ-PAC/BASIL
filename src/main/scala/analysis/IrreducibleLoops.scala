@@ -351,43 +351,69 @@ object LoopDetector {
   }
 }
 
-trait LoopInfo {
-  def b: Block
-  def iloop_header: Option[Block]
-  def headers: Set[Block]
-}
-
-case class BlockLoopInfo(
+case class BlockLoopState(
   val b: Block,
   var iloop_header: Option[Block],
   var dfsp_pos: Int,
+  var dfsp_pos_max: Int,
   var is_traversed: Boolean,
   var headers: Set[Block]
-) extends LoopInfo
+) {
+  /**
+   * Converts the mutable [[BlockLoopState]] into an immutable [[BlockLoopInfo]],
+   * suitable for returning to the caller.
+   */
+  def toBlockLoopInfo() =
+    BlockLoopInfo(b, iloop_header, dfsp_pos_max, headers)
+}
+
+/**
+ * Information about a particular (possibly-irreducible) cycle occuring within a
+ * procedure, with the given `b` as the distinguished header.
+ *
+ * An irreducible loop will have multiple headers, but one of these will be
+ * distinguished due to the block graph traversal order. Although any of the
+ * headers are equally valid for this particular cycle, `b` should not be
+ * arbitrarily changed because _subcycles_ are defined as being loops of `V -
+ * {b}`, where `V` is the set of vertices (blocks).
+ *
+ * Constructed from a [[BlockLoopState]] with [[BlockLoopState#toBlockLoopInfo]].
+ */
+case class BlockLoopInfo(
+  val b: Block,
+  val iloop_header: Option[Block],
+  val dfsp_pos: Int,
+  val headers: Set[Block]
+) {
+  def isIrreducible() = headers.size > 1
+}
 
 class NewLoopDetector(procedure: Procedure) {
 
-  val loopBlocks: Map[Block, BlockLoopInfo] =
-    procedure.blocks.map(b => b -> BlockLoopInfo(b, None, 0, false, Set())).toMap
+  val loopBlocks: Map[Block, BlockLoopState] =
+    procedure.blocks.map(b => b -> BlockLoopState(b, None, 0, 0, false, Set())).toMap
 
   import scala.language.implicitConversions
 
-  given Conversion[Block, BlockLoopInfo] with
+  given Conversion[Block, BlockLoopState] with
     def apply(b: Block) = loopBlocks(b)
 
   def compute_forest() = {
-    // Header -> Cycle with that header
+
+    // val infos = loopBlocks.values.map(_.toBlockLoopInfo()).toList.sort(_.dfsp_pos).reversed
+
+    // header -> cycle with that header, including sub-cycles
     val forest = mutable.Map[Block, Set[Block]]()
 
     loopBlocks.values.foreach {
-      case BlockLoopInfo(b, _, _, _, headers) if headers.nonEmpty => forest += b -> Set(b)
+      case b if b.headers.nonEmpty => forest += b.b -> Set(b.b)
       case _ => ()
     }
 
     // XXX: do toposort properly. or get order from dfs traversal
     (0 to 10).foreach { _ =>
       loopBlocks.values.foreach {
-        case BlockLoopInfo(b, Some(h), _, _, _) =>
+        case BlockLoopState(b, Some(h), _, _, _, _) =>
           forest.updateWith(h) {
             case None => Some(forest.getOrElse(b, Set()) + b + h)
             case Some(xs) => Some(xs + b + h ++ forest.getOrElse(b, Set()))
@@ -399,22 +425,25 @@ class NewLoopDetector(procedure: Procedure) {
     forest
   }
 
-  def identify_loops(): this.type =
-    procedure.entryBlock.map(loopBlocks(_)).map(entry => trav_loops_tailrec(Left((entry, 1)), Nil))
-    this
+  def identify_loops(): Option[this.type] =
+    procedure.entryBlock.map { entry =>
+      trav_loops_tailrec(Left((loopBlocks(entry), 1)), Nil)
+      this
+    }
 
-  case class LoopContext(b0: BlockLoopInfo, dfsp_pos: Int, locals: Option[(BlockLoopInfo, Iterator[BlockLoopInfo])])
+  case class LoopContext(b0: BlockLoopState, dfsp_pos: Int, locals: Option[(BlockLoopState, Iterator[BlockLoopState])])
 
   @tailrec
   final def trav_loops_tailrec(
-    input: Either[(BlockLoopInfo, Int), Option[BlockLoopInfo]],
-    inputContinuations: List[(BlockLoopInfo, Int, Iterator[BlockLoopInfo])]
-  ): Option[BlockLoopInfo] = {
+    input: Either[(BlockLoopState, Int), Option[BlockLoopState]],
+    inputContinuations: List[(BlockLoopState, Int, Iterator[BlockLoopState])]
+  ): Option[BlockLoopState] = {
     println("a")
 
     val (b0, dfsp_pos, it, nh, continuations) = (input, inputContinuations) match {
       case (Left((b0, dfsp_pos)), conts) => {
         b0.dfsp_pos = dfsp_pos
+        b0.dfsp_pos_max = dfsp_pos
         b0.is_traversed = true
         val it = b0.b.nextBlocks.map(loopBlocks(_)).iterator
         (b0, dfsp_pos, it, None, conts)
@@ -476,7 +505,7 @@ class NewLoopDetector(procedure: Procedure) {
     }
   }
 
-  def tag_lhead(b: BlockLoopInfo, h: Option[BlockLoopInfo]): Unit = h match {
+  def tag_lhead(b: BlockLoopState, h: Option[BlockLoopState]): Unit = h match {
     case Some(h) if b.b ne h.b =>
       var cur1 = b
       var cur2 = h
