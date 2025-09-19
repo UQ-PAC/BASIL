@@ -82,7 +82,12 @@ trait LifterIFace[L] extends LiftState[Expr, L, BitVecLiteral] {
     smt_bvlshr(arg0, BitVecLiteral(arg1.value, arg0.size))
 
   def f_decl_bool(arg0: String): Expr = LocalVar(b.fresh_local + "_bool", BoolType)
-  def f_decl_bv(arg0: String, arg1: BigInt): Expr = LocalVar(b.fresh_local + "_bv" + arg1, BitVecType(arg1.toInt))
+  def f_decl_bv(arg0: String, arg1: BigInt): Expr = {
+    val v = LocalVar(b.fresh_local + "_bv" + arg1, BitVecType(arg1.toInt))
+    // FIXME: shouldn't need always clear
+    b.push_stmt(LocalAssign(v, BitVecLiteral(0, arg1.toInt)))
+    v
+  }
 
   def f_AtomicEnd(): Expr = LocalVar("ATOMICEND", BoolType)
   def f_AtomicStart(): Expr = LocalVar("ATOMICSTART", BoolType)
