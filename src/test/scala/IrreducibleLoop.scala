@@ -7,6 +7,7 @@ import translating.{BAPToIR, ReadELFData}
 import util.{ILLoadingConfig, LogLevel, Logger}
 
 import scala.sys.process.*
+import scala.util.chaining.scalaUtilChainingOps
 
 @test_util.tags.UnitTest
 class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
@@ -126,7 +127,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println("" + loop.header + ": " + loop.nodes.map(_.label))
     }
 
-    println(NewLoopDetector(p.mainProcedure).identify_loops().get.compute_forest())
+    println(NewLoopDetector.identify_loops(p.mainProcedure).get.pipe(NewLoopDetector.compute_forest))
 
   }
 
@@ -150,7 +151,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println(loop)
     }
 
-    println(NewLoopDetector(p.mainProcedure).identify_loops().get.compute_forest())
+    println(NewLoopDetector.identify_loops(p.mainProcedure).get.pipe(NewLoopDetector.compute_forest))
 
   }
 
@@ -175,7 +176,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println(loop)
     }
 
-    println(NewLoopDetector(p.mainProcedure).identify_loops().get.compute_forest())
+    println(NewLoopDetector.identify_loops(p.mainProcedure).get.pipe(NewLoopDetector.compute_forest))
 
   }
 
@@ -199,7 +200,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println(loop)
     }
 
-    println(NewLoopDetector(p.mainProcedure).identify_loops().get.compute_forest())
+    println(NewLoopDetector.identify_loops(p.mainProcedure).get.pipe(NewLoopDetector.compute_forest))
   }
 
   test("nested loop") {
@@ -222,7 +223,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println(loop)
     }
 
-    println(NewLoopDetector(p.mainProcedure).identify_loops().get.compute_forest())
+    println(NewLoopDetector.identify_loops(p.mainProcedure).get.pipe(NewLoopDetector.compute_forest))
   }
 
   test("nested self-loop") {
@@ -244,7 +245,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println(loop)
     }
 
-    println(NewLoopDetector(p.mainProcedure).identify_loops().get.compute_forest())
+    println(NewLoopDetector.identify_loops(p.mainProcedure).get.pipe(NewLoopDetector.compute_forest))
   }
 
   test("plist_free") {
