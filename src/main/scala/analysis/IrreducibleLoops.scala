@@ -58,9 +58,14 @@ class Loop(val header: Block) {
 
   def name: String = label(header)
 
-  override def toString: String = {
-    s"Header: ${label(header)}, Body: $edges"
-  }
+  override def toString: String = List(
+    s"\nHeader: ${label(header)}"    ,
+    s"Reducible: $reducible"       ,
+    s"Body: $nodes"                ,
+    s"Entry edges: $entryEdges"    ,
+    s"Back edges: $backEdges"      ,
+    s"Reentries: $reentries"       ,
+  ).mkString("\n")
 }
 
 /* Loop detection and classification with respect to being reducible or irreducible. Implements the algorithm
@@ -387,8 +392,38 @@ object NewLoopDetector {
   case class BlockLoopInfo(val b: Block, val iloop_header: Option[Block], val dfsp_pos: Int, val headers: Set[Block], val nodes: Set[Block]) {
     def isIrreducible() = headers.size > 1
     def isCycle() = headers.nonEmpty
+
+    def toLoop(): Option[Loop] = {
+      if (!isCycle()) return None
+
+      val loop = Loop(b)
+
+// class Loop(val header: Block) {
+//   val reentries: mutable.Set[LoopEdge] = mutable.Set() // Edges to loop from outside that are not to the header
+//   val backEdges: mutable.Set[LoopEdge] = mutable.Set() // Edges from inside loop to the header
+//   val entryEdges: mutable.Set[LoopEdge] = mutable.Set() // Edges into the header node
+//
+//   val nodes: mutable.Set[Block] = mutable.Set() // G_l
+//   val edges: mutable.Set[LoopEdge] = mutable.Set() // G_e
+//   var reducible: Boolean = true // Assume reducible by default
+      loop.reentries ++= (headers - b).flatMap(h => (h.prevBlocks.toSet -- nodes).map(LoopEdge(_, h)))
+      loop.backEdges ++= (Set(b) & headers).flatMap(h => (h.prevBlocks.toSet & nodes).map(LoopEdge(_, h)))
+      loop.entryEdges ++= (Set(b) & headers).flatMap(h => (h.prevBlocks.toSet -- nodes).map(LoopEdge(_, h)))
+      loop.nodes ++= nodes
+      loop.edges ++= nodes.flatMap(n => (n.nextBlocks.toSet & nodes).map(LoopEdge(n, _)))
+      loop.reducible = !isIrreducible()
+      Some(loop)
+    }
   }
 
+
+  /** Main entry point for the loop identification algorithm. Instantiates
+   *  [[TraverseLoops]] with the appropriate arguments. Returns a
+   *  [[scala.collection.immutable.ListMap]] of [[BlockLoopInfo]] if
+   *  successful, or `None` if the procedure has no entry block. The returned
+   *  `ListMap` will be in a topological order - outer cycles occur _before_
+   *  their subcycles.
+   */
   def identify_loops(procedure: Procedure): Option[ListMap[Block, BlockLoopInfo]] =
     TraverseLoops(procedure).traverse_loops()
 
@@ -413,7 +448,7 @@ object NewLoopDetector {
 
     protected def getLoopInfos(): ListMap[Block, BlockLoopInfo] = {
       // NOTE: loops are in *bottom-up topological order*.
-      val loops = loopBlocks.values.toList.sortBy(_.dfsp_pos_max).reverse
+      val loops = loopBlocks.values.toList.sortBy(-_.dfsp_pos_max)
 
       var forest = Map[Block, Set[Block]]()
       forest = loops.foldLeft(forest) {
@@ -427,13 +462,15 @@ object NewLoopDetector {
       // closures of node-sets.
       forest = loops.foldLeft(forest) {
         case (forest, BlockLoopState(b, Some(h), _, _, _, _)) =>
-          val entry = h -> (forest(h) + b ++ forest.getOrElse(b, Set()))
-          forest + entry
+          val updated = h -> (forest(h) + b ++ forest.getOrElse(b, Set()))
+          forest + updated
         case (forest, _) => forest
       }
       println("forest: " + forest)
 
-      loops.map(x => x.b -> x.toBlockLoopInfo(forest.getOrElse(x.b, Set()))).to(ListMap)
+      val newLoops = loops.map(x => x.b -> x.toBlockLoopInfo(forest.getOrElse(x.b, Set()))).to(ListMap)
+      newLoops.values.flatMap(_.toLoop()).foreach(println(_))
+      newLoops
     }
 
     /** Main entry point for the loop identification algorithm. Calls
@@ -473,7 +510,6 @@ object NewLoopDetector {
       input: Either[(BlockLoopState, Int), Option[BlockLoopState]],
       inputContinuations: List[(BlockLoopState, Int, Iterator[BlockLoopState])]
     ): Option[BlockLoopState] = {
-      println("a")
 
       val (b0, dfsp_pos, it, continuations) = (input, inputContinuations) match {
 
@@ -509,7 +545,7 @@ object NewLoopDetector {
            */
         } else {
           if (b.dfsp_pos > 0) {
-            println("mark as loop header: " + b + " from " + b0)
+            // println("mark as loop header: " + b + " from " + b0)
             b.headers = b.headers + b.b
             tag_lhead(b0, Some(b))
           } else if (b.iloop_header.isEmpty) {
@@ -519,7 +555,7 @@ object NewLoopDetector {
             if (h.dfsp_pos > 0) {
               tag_lhead(b0, Some(h))
             } else {
-              println(s"IRRED: mark $b0 as re-entry into $b. irreducible.")
+              // println(s"IRRED: mark $b0 as re-entry into $b. irreducible.")
 
               boundary {
                 while (h.iloop_header.isDefined) {
@@ -530,7 +566,7 @@ object NewLoopDetector {
                   }
                 }
               }
-              println("irred h: " + h)
+              // println("irred h: " + h)
               h.headers = h.headers + b.b
             }
           }
