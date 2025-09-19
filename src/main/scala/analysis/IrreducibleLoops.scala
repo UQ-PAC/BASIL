@@ -351,57 +351,47 @@ object LoopDetector {
   }
 }
 
-case class BlockLoopState(
-  val b: Block,
-  var iloop_header: Option[Block],
-  var dfsp_pos: Int,
-  var dfsp_pos_max: Int,
-  var is_traversed: Boolean,
-  var headers: Set[Block]
-) {
+
+object NewLoopDetector {
+
+  case class BlockLoopState(
+    val b: Block,
+    var iloop_header: Option[Block],
+    var dfsp_pos: Int,
+    var dfsp_pos_max: Int,
+    var is_traversed: Boolean,
+    var headers: Set[Block]
+  ) {
+    /**
+    * Converts the mutable [[BlockLoopState]] into an immutable [[BlockLoopInfo]],
+    * suitable for returning to the caller.
+    */
+    def toBlockLoopInfo() =
+      BlockLoopInfo(b, iloop_header, dfsp_pos_max, headers)
+  }
+
   /**
-   * Converts the mutable [[BlockLoopState]] into an immutable [[BlockLoopInfo]],
-   * suitable for returning to the caller.
-   */
-  def toBlockLoopInfo() =
-    BlockLoopInfo(b, iloop_header, dfsp_pos_max, headers)
-}
+  * Information about a particular (possibly-irreducible) cycle occuring within a
+  * procedure, with the given `b` as the distinguished header.
+  *
+  * An irreducible loop will have multiple headers, but one of these will be
+  * distinguished due to the block graph traversal order. Although any of the
+  * headers are equally valid for this particular cycle, `b` should not be
+  * arbitrarily changed because _subcycles_ are defined as being loops of `V -
+  * {b}`, where `V` is the set of vertices (blocks).
+  *
+  * Constructed from a [[BlockLoopState]] with [[BlockLoopState#toBlockLoopInfo]].
+  */
+  case class BlockLoopInfo(
+    val b: Block,
+    val iloop_header: Option[Block],
+    val dfsp_pos: Int,
+    val headers: Set[Block]
+  ) {
+    def isIrreducible() = headers.size > 1
+  }
 
-/**
- * Information about a particular (possibly-irreducible) cycle occuring within a
- * procedure, with the given `b` as the distinguished header.
- *
- * An irreducible loop will have multiple headers, but one of these will be
- * distinguished due to the block graph traversal order. Although any of the
- * headers are equally valid for this particular cycle, `b` should not be
- * arbitrarily changed because _subcycles_ are defined as being loops of `V -
- * {b}`, where `V` is the set of vertices (blocks).
- *
- * Constructed from a [[BlockLoopState]] with [[BlockLoopState#toBlockLoopInfo]].
- */
-case class BlockLoopInfo(
-  val b: Block,
-  val iloop_header: Option[Block],
-  val dfsp_pos: Int,
-  val headers: Set[Block]
-) {
-  def isIrreducible() = headers.size > 1
-}
-
-class NewLoopDetector(procedure: Procedure) {
-
-  val loopBlocks: Map[Block, BlockLoopState] =
-    procedure.blocks.map(b => b -> BlockLoopState(b, None, 0, 0, false, Set())).toMap
-
-  import scala.language.implicitConversions
-
-  given Conversion[Block, BlockLoopState] with
-    def apply(b: Block) = loopBlocks(b)
-
-  def compute_forest() = {
-
-    // val infos = loopBlocks.values.map(_.toBlockLoopInfo()).toList.sort(_.dfsp_pos).reversed
-
+  def compute_forest(loopBlocks: Map[Block, BlockLoopInfo]) = {
     // header -> cycle with that header, including sub-cycles
     val forest = mutable.Map[Block, Set[Block]]()
 
@@ -413,7 +403,7 @@ class NewLoopDetector(procedure: Procedure) {
     // XXX: do toposort properly. or get order from dfs traversal
     (0 to 10).foreach { _ =>
       loopBlocks.values.foreach {
-        case BlockLoopState(b, Some(h), _, _, _, _) =>
+        case BlockLoopInfo(b, Some(h), _, _) =>
           forest.updateWith(h) {
             case None => Some(forest.getOrElse(b, Set()) + b + h)
             case Some(xs) => Some(xs + b + h ++ forest.getOrElse(b, Set()))
@@ -425,103 +415,121 @@ class NewLoopDetector(procedure: Procedure) {
     forest
   }
 
-  def identify_loops(): Option[this.type] =
-    procedure.entryBlock.map { entry =>
-      trav_loops_tailrec(Left((loopBlocks(entry), 1)), Nil)
-      this
+  def identify_loops(procedure: Procedure): Option[Map[Block, BlockLoopInfo]] = {
+    TraverseLoops(procedure).traverse_loops().map(_.getLoopInfos())
+  }
+
+  class TraverseLoops(val procedure: Procedure) {
+
+    val loopBlocks: Map[Block, BlockLoopState] =
+      procedure.blocks.map(b => b -> BlockLoopState(b, None, 0, 0, false, Set())).toMap
+
+    import scala.language.implicitConversions
+
+    given Conversion[Block, BlockLoopState] with
+      def apply(b: Block) = loopBlocks(b)
+
+    def getLoopInfos(): Map[Block, BlockLoopInfo] = loopBlocks.map {
+      case (k, v) => k -> v.toBlockLoopInfo()
     }
 
-  case class LoopContext(b0: BlockLoopState, dfsp_pos: Int, locals: Option[(BlockLoopState, Iterator[BlockLoopState])])
-
-  @tailrec
-  final def trav_loops_tailrec(
-    input: Either[(BlockLoopState, Int), Option[BlockLoopState]],
-    inputContinuations: List[(BlockLoopState, Int, Iterator[BlockLoopState])]
-  ): Option[BlockLoopState] = {
-    println("a")
-
-    val (b0, dfsp_pos, it, nh, continuations) = (input, inputContinuations) match {
-      case (Left((b0, dfsp_pos)), conts) => {
-        b0.dfsp_pos = dfsp_pos
-        b0.dfsp_pos_max = dfsp_pos
-        b0.is_traversed = true
-        val it = b0.b.nextBlocks.map(loopBlocks(_)).iterator
-        (b0, dfsp_pos, it, None, conts)
+    def traverse_loops() =
+      procedure.entryBlock.map { entry =>
+        val _ = this.trav_loops_tailrec(Left((loopBlocks(entry), 1)), Nil)
+        this
       }
-      case (Right(nh), (b0, dfsp_pos, it) :: rest) =>
-        (b0, dfsp_pos, it, Some(nh), rest)
-      case (Right(_), Nil) =>
-        throw new Exception("trav_loops_tailrec: stack underflow")
-    }
 
-    nh match {
-      case Some(nh) => tag_lhead(b0, nh)
-      case None => ()
-    }
+    @tailrec
+    final def trav_loops_tailrec(
+      input: Either[(BlockLoopState, Int), Option[BlockLoopState]],
+      inputContinuations: List[(BlockLoopState, Int, Iterator[BlockLoopState])]
+    ): Option[BlockLoopState] = {
+      println("a")
 
-    while (it.hasNext) {
-      val b = it.next()
-      if (!b.is_traversed) {
-        return trav_loops_tailrec(Left((b, dfsp_pos + 1)), (b0, dfsp_pos, it) :: continuations)
-        /* before tailrec transformation:
-         *
-         * val nh = trav_loops_dfs(b, dfsp_pos + 1)
-         * tag_lhead(b0, nh)
-         */
-      } else {
-        if (b.dfsp_pos > 0) {
-          println("mark as loop header: " + b + " from " + b0)
-          b.headers = b.headers + b.b
-          tag_lhead(b0, Some(b))
-        } else if (b.iloop_header.isEmpty) {
-          // intentionally empty
+      val (b0, dfsp_pos, it, nh, continuations) = (input, inputContinuations) match {
+        case (Left((b0, dfsp_pos)), conts) => {
+          b0.dfsp_pos = dfsp_pos
+          b0.dfsp_pos_max = dfsp_pos
+          b0.is_traversed = true
+          val it = b0.b.nextBlocks.map(loopBlocks(_)).iterator
+          (b0, dfsp_pos, it, None, conts)
+        }
+        case (Right(nh), (b0, dfsp_pos, it) :: rest) =>
+          (b0, dfsp_pos, it, Some(nh), rest)
+        case (Right(_), Nil) =>
+          throw new Exception("trav_loops_tailrec: stack underflow")
+      }
+
+      nh match {
+        case Some(nh) => tag_lhead(b0, nh)
+        case None => ()
+      }
+
+      while (it.hasNext) {
+        val b = it.next()
+        if (!b.is_traversed) {
+          return trav_loops_tailrec(Left((b, dfsp_pos + 1)), (b0, dfsp_pos, it) :: continuations)
+          /* before tailrec transformation:
+          *
+          * val nh = trav_loops_dfs(b, dfsp_pos + 1)
+          * tag_lhead(b0, nh)
+          */
         } else {
-          var h = b.iloop_header.get
-          if (h.dfsp_pos > 0) {
-            tag_lhead(b0, Some(h))
+          if (b.dfsp_pos > 0) {
+            println("mark as loop header: " + b + " from " + b0)
+            b.headers = b.headers + b.b
+            tag_lhead(b0, Some(b))
+          } else if (b.iloop_header.isEmpty) {
+            // intentionally empty
           } else {
-            println(s"IRRED: mark $b0 as re-entry into $b. irreducible.")
+            var h = b.iloop_header.get
+            if (h.dfsp_pos > 0) {
+              tag_lhead(b0, Some(h))
+            } else {
+              println(s"IRRED: mark $b0 as re-entry into $b. irreducible.")
 
-            boundary {
-              while (h.iloop_header.isDefined) {
-                h = h.iloop_header.get
-                if (h.dfsp_pos > 0) {
-                  tag_lhead(b0, Some(h))
-                  break()
+              boundary {
+                while (h.iloop_header.isDefined) {
+                  h = h.iloop_header.get
+                  if (h.dfsp_pos > 0) {
+                    tag_lhead(b0, Some(h))
+                    break()
+                  }
                 }
               }
+              println("irred h: " + h)
+              h.headers = h.headers + b.b
             }
-            println("irred h: " + h)
-            h.headers = h.headers + b.b
           }
         }
       }
-    }
-    b0.dfsp_pos = 0
-    val result = b0.iloop_header.map(loopBlocks(_))
-    continuations match {
-      case Nil => result
-      case _ :: _ => trav_loops_tailrec(Right(result), continuations)
-    }
-  }
-
-  def tag_lhead(b: BlockLoopState, h: Option[BlockLoopState]): Unit = h match {
-    case Some(h) if b.b ne h.b =>
-      var cur1 = b
-      var cur2 = h
-      while (cur1.iloop_header.isDefined) {
-        val ih = cur1.iloop_header.get
-        if (ih eq cur2.b) return
-        if (ih.dfsp_pos < cur2.dfsp_pos) {
-          cur1.iloop_header = Some(cur2.b)
-          cur1 = cur2
-          cur2 = ih
-        } else {
-          cur1 = ih
-        }
+      b0.dfsp_pos = 0
+      val result = b0.iloop_header.map(loopBlocks(_))
+      continuations match {
+        case Nil => result
+        case _ :: _ => trav_loops_tailrec(Right(result), continuations)
       }
-      cur1.iloop_header = Some(cur2.b)
-    case _ => ()
+    }
+
+    def tag_lhead(b: BlockLoopState, h: Option[BlockLoopState]): Unit = h match {
+      case Some(h) if b.b ne h.b =>
+        var cur1 = b
+        var cur2 = h
+        while (cur1.iloop_header.isDefined) {
+          val ih = cur1.iloop_header.get
+          if (ih eq cur2.b) return
+          if (ih.dfsp_pos < cur2.dfsp_pos) {
+            cur1.iloop_header = Some(cur2.b)
+            cur1 = cur2
+            cur2 = ih
+          } else {
+            cur1 = ih
+          }
+        }
+        cur1.iloop_header = Some(cur2.b)
+      case _ => ()
+    }
+
   }
 
 }
