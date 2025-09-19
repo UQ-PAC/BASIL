@@ -109,6 +109,9 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
   def assertLoopDetector(p: Procedure)(iloop_headers: ListMap[String, String])(headers: Map[String, Set[String]]) = {
     val loops = NewLoopDetector.identify_loops(p).get
+
+    loops.values.foreach(println(_))
+
     assertResult(TestLoopInfo(iloop_headers, headers)) {
       TestLoopInfo(
         loops.collect { case (k, BlockLoopInfo(_, Some(h), _, _)) => k.label -> h.label },
