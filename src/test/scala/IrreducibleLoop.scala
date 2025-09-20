@@ -279,10 +279,10 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
   test("plist_free") {
     val p = ir.parsing.ParseBasilIL.loadILFile("/home/rina/progs/basil/plist-free.il").program
-    p.procedures.foreach { p =>
-      p.blocks.foreach(_.statements.clear())
-      while (ir.transforms.coalesceBlocks(p)) {}
-    }
+    // p.procedures.foreach { p =>
+    //   p.blocks.foreach(_.statements.clear())
+    //   while (ir.transforms.coalesceBlocks(p)) {}
+    // }
 
     util.writeToFile(p.pprint, "/home/rina/progs/basil/plist-before.il")
 
@@ -296,13 +296,22 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     val loops = NewLoopDetector.identify_loops(p.mainProcedure).get
     loops.values.foreach(println(_))
 
+    val hl = loops.filter(_._2.headers.nonEmpty).last._2.nodes
+    println("XXX" + hl)
+    // util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, hl), "/home/rina/progs/basil/out.dot")
+
     analysis.AnalysisPipelineMRA.reducibleLoops(p)
+    util.writeToFile(dotBlockGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/out.dot")
 
     util.writeToFile(p.pprint, "/home/rina/progs/basil/plist-after.il")
 
-    p.procedures.foreach { p =>
+    p.procedures.filter(_.entryBlock.isDefined).foreach { p =>
       val blocksWithoutPrev = p.blocks.filter(b => Some(b) != p.entryBlock && b.prevBlocks.isEmpty).toList
       assertResult(Nil, "after loop transform, all blocks should still be reachable")(blocksWithoutPrev)
+
+      val loops = NewLoopDetector.identify_loops(p).get
+      loops.values.foreach(println(_))
+      assert(loops.values.forall(!_.isIrreducible()))
     }
   }
 

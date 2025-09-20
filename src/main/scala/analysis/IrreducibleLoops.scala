@@ -59,12 +59,12 @@ class Loop(val header: Block) {
   def name: String = label(header)
 
   override def toString: String = List(
-    s"\nHeader: ${label(header)}"    ,
-    s"Reducible: $reducible"       ,
-    s"Body: $nodes"                ,
-    s"Entry edges: $entryEdges"    ,
-    s"Back edges: $backEdges"      ,
-    s"Reentries: $reentries"       ,
+    s"\nHeader: ${label(header)}",
+    s"Reducible: $reducible",
+    s"Body: $nodes",
+    s"Entry edges: $entryEdges",
+    s"Back edges: $backEdges",
+    s"Reentries: $reentries"
   ).mkString("\n")
 }
 
@@ -389,7 +389,13 @@ object NewLoopDetector {
   *
   * Constructed from a [[BlockLoopState]] with [[BlockLoopState#toBlockLoopInfo]].
   */
-  case class BlockLoopInfo(val b: Block, val iloop_header: Option[Block], val dfsp_pos: Int, val headers: Set[Block], val nodes: Set[Block]) {
+  case class BlockLoopInfo(
+    val b: Block,
+    val iloop_header: Option[Block],
+    val dfsp_pos: Int,
+    val headers: Set[Block],
+    val nodes: Set[Block]
+  ) {
     def isIrreducible() = headers.size > 1
     def isCycle() = headers.nonEmpty
 
@@ -415,7 +421,6 @@ object NewLoopDetector {
       Some(loop)
     }
   }
-
 
   /** Main entry point for the loop identification algorithm. Instantiates
    *  [[TraverseLoops]] with the appropriate arguments. Returns a
@@ -469,7 +474,6 @@ object NewLoopDetector {
       println("forest: " + forest)
 
       val newLoops = loops.map(x => x.b -> x.toBlockLoopInfo(forest.getOrElse(x.b, Set()))).to(ListMap)
-      newLoops.values.flatMap(_.toLoop()).foreach(println(_))
       newLoops
     }
 
@@ -634,7 +638,9 @@ object LoopTransform {
    *
    * Returns: A new reducible loop which is semantically equivalent to the input irreducible loop
    */
-  private def llvm_transform_loop(loop: Loop): Loop = {
+  def llvm_transform_loop(loop: Loop): Loop = {
+    if (loop.reducible) return loop
+
     val otherHeaders = loop.reentries.toSet.map(_.to)
     val entryEdges: Set[LoopEdge] =
       loop.entryEdges.toSet ++ loop.reentries ++ loop.backEdges ++ loop.edges.filter(e => otherHeaders.contains(e.to))
