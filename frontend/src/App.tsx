@@ -9,8 +9,8 @@ import CfgViewer from './components/CfgViewer';
 import CombinedViewer from './components/CombinedViewer';
 import SettingsModal from './components/SettingsModal'
 import { API_BASE_URL } from './api';
-import {type DatasetConfig, getDatasetName} from './utils/types';
-import LoadingModal from "./components/LoadingModal.tsx";
+import LoadingModal from "./components/LoadingModal.tsx"; // TODO: Merge these together
+import ErrorModal from "./components/ErrorModal.tsx";
 
 const LOCAL_STORAGE_PROCEDURE_KEY = 'cfgViewerSelectedProcedure';
 const LOCAL_STORAGE_THEME_KEY = 'theme';
@@ -39,14 +39,13 @@ function App() {
         return (savedTheme as  'light' | 'dark' | 'system') || 'system';
     });
 
-    const [datasets, setDatasets] = useState<DatasetConfig[]>([]);
     const [selectedDataset, setSelectedDataset] = useState<string>(() => {
         const savedDataset = localStorage.getItem(LOCAL_STORAGE_DATASET_KEY);
-        return savedDataset || '';
+        return savedDataset || 'dataBaseNameExample'; // TODO: Change to default data config file
     });
     const [postStatus, setPostStatus] = useState({ message: '', type: '' });
     const [datasetLoading, setDatasetLoading] = useState(true);
-    const [datasetError, setDatasetError] = useState(null);
+    const [datasetError, setDatasetError] = useState<string | null>(null);
 
     const [procedureNames, setProcedureNames] = useState<string[]>([]);
     const [loadingProcedures, setLoadingProcedures] = useState(false);
@@ -60,50 +59,11 @@ function App() {
             return null;
         }
     });
-
     const [isAnalysisRunning, setIsAnalysisRunning] = useState(false);
 
     useEffect(() => {
-        const fetchDatasets = async () => {
-            try {
-                setDatasetLoading(true);
-                const response = await fetch(`${API_BASE_URL}/config/datasets`);
-                if (!response.ok) {
-                    throw new Error(`Network response was not ok. Status: ${response.status}`);
-                }
-
-                let data: DatasetConfig[];
-                try {
-                    data = await response.json();
-                } catch {
-                    throw new Error('Failed to parse JSON from response');
-                }
-
-                setDatasets(data);
-                if (data.length > 0) {
-                    if (!selectedDataset) {
-                        setSelectedDataset(data[0].adt);
-                    }
-                }
-                setDatasetError(null);
-                console.info("Successfully received '" + data.length + "' amount of possible conifg datasets. Selected data config: '" + selectedDataset + "'");
-            } catch (err: any) {
-                console.error("Failed to fetch datasets:", err);
-                setDatasetError(err.message);
-            } finally {
-                setDatasetLoading(false);
-            }
-        };
-        fetchDatasets();
+        setDatasetLoading(false);
     }, []);
-
-    useEffect(() => {
-        if (selectedDataset) {
-            localStorage.setItem(LOCAL_STORAGE_DATASET_KEY, selectedDataset);
-        } else {
-            localStorage.removeItem(LOCAL_STORAGE_DATASET_KEY);
-        }
-    }, [selectedDataset]);
 
     useEffect(() => {
         localStorage.setItem(LOCAL_STORAGE_VIEW_MODE_KEY, viewMode);
@@ -180,46 +140,49 @@ function App() {
         };
     }, [isAnalysisRunning, fetchEpochNames]);
 
+    // Add this function inside your App component, near your other handlers
+    const onDirectorySelect = async () => {
+        // TODO: set the {isAnalysisRunning} variable - I need this to make it load
 
-    const onDatasetChange = async (name: string) => {
-        const fullDataset = datasets.find(
-            (dataset) => getDatasetName(dataset.adt) === name
-        );
-
-        if (!fullDataset) {
-            setPostStatus({ message: 'Error: Dataset not found.', type: 'error' });
-            return;
-        }
-
-        setSelectedDataset(name);
-        console.info("Successfully selected data config: '" + name + "'");
-
-        setPostStatus({ message: 'Triggering analysis...', type: 'loading' });
+        setDatasetError(null);
+        setDatasetLoading(true);
 
         try {
-            const response = await fetch(`${API_BASE_URL}/config/select`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    adt: fullDataset.adt,
-                    relf: fullDataset.relf,
-                }),
-            });
+            const directoryIdentifier = prompt(
+                "Please enter the FULL, absolute path to the directory (e.g., /Users/user/folder/BASIL/src/test/correct/arrays_simple/clang/arrays_simple.gts:"
+            );
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const responseText = await response.text();
-            setPostStatus({ message: responseText, type: 'success' });
+            const response = await fetch(`${API_BASE_URL}/config/select-directory`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    // Send the full path string to the Scala backend
+                    directoryPath: directoryIdentifier,
+                }),
+            });
 
-            console.info("Waiting briefly before fetching new epochs...");
-            setIsAnalysisRunning(true);
-        } catch (error: any) {
-            console.error("Failed to trigger analysis:", error);
-            setPostStatus({ message: `Failed to trigger analysis. ${error.message}`, type: 'error' });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || `Backend failed with status: ${response.status}`);
+            }
+
+            setSelectedDataset(directoryIdentifier);
+
+            setDatasetError(null);
+            setPostStatus({ message: `Successfully processed directory: ${directoryIdentifier}`, type: 'success' });
+            setIsAnalysisRunning(true); // This calls the other useEffect that waits until analysis running is false
+
+        } catch (err: any) {
+            setDatasetError(`Error processing directory: ${err.message}`); // Add thus into the post status instead, and keep it open.
+            console.error("Error processing directory:", err);
+        } finally {
+            setDatasetLoading(false);
         }
     };
 
@@ -312,6 +275,10 @@ function App() {
         setIsSettingsOpen(!isSettingsOpen);
     };
 
+    const handleCloseErrorModal = () => {
+        setDatasetError(null);
+    };
+
     useEffect(() => {
         if (theme === 'system') {
             document.documentElement.removeAttribute('data-theme');
@@ -376,11 +343,11 @@ function App() {
                           onEpochSelect={handleEpochSelect}
                           loading={loadingEpochs}
                           error={epochError}
-                          datasets={datasets}
                           selectedDataset={selectedDataset}
-                          onDatasetChange={onDatasetChange}
-                          datasetLoading={datasetLoading}
-                          datasetError={datasetError}
+                          onDirectorySelect={onDirectorySelect}
+                          // onDatasetChange={onDatasetChange}
+                          datasetLoading={datasetLoading} // TODO: I also want to remove this at some point
+                          // datasetError={datasetError} // TODO: remove, as I'll handel it in the errorModal
                         />
                     </ResizableSidebar>
                     {renderViewer()}
@@ -392,11 +359,16 @@ function App() {
                 theme={theme}
                 setTheme={setTheme}
             />
-          <LoadingModal
-            isOpen={isAnalysisRunning}
-            message="Running Analysis..."
-            postStatus={postStatus}
-          />
+            <LoadingModal
+                isOpen={isAnalysisRunning}
+                message="Running Analysis..."
+                postStatus={postStatus}
+            />
+            <ErrorModal
+                isOpen={!!datasetError} // Open if datasetError is not null
+                errorMessage={datasetError} // TODO: OR should it take postStatus as well
+                onClose={handleCloseErrorModal} // Function to clear the error state
+            />
         </div>
     )
 }

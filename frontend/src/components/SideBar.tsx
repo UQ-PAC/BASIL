@@ -1,9 +1,8 @@
 // src/components/SideBar.tsx
 import '../styles/sidebar.css';
-import {type DatasetConfig, getDatasetName} from '../utils/types';
 import React from "react";
 
-import DownArrow from '../assets/arrow-down-icon.svg';
+// import DownArrow from '../assets/arrow-down-icon.svg';
 
 interface SidebarProps {
     epochNames: string[];
@@ -11,35 +10,42 @@ interface SidebarProps {
     onEpochSelect: (epochName: string, event: React.MouseEvent) => void;
     loading: boolean;
     error: string | null;
-    datasets: DatasetConfig[];
+    // datasets: DatasetConfig[];
     selectedDataset: string | null;
-    onDatasetChange: (name: string) => void;
+    // onDatasetChange: (name: string) => void;
+    onDirectorySelect: () => Promise<void>;
     datasetLoading: boolean;
-    datasetError: string | null;
+    // datasetError: string | null;
 }
 
-export function Sidebar({ epochNames, selectedEpochs, onEpochSelect, loading, error, datasets, selectedDataset, onDatasetChange, datasetLoading, datasetError }: SidebarProps) {
+export function Sidebar({ epochNames, selectedEpochs, onEpochSelect, loading, error, selectedDataset, onDirectorySelect, datasetLoading }: SidebarProps) {
     return (
         <aside className="sidebar">
             <h2 className="sidebar-header">Analysis Epochs</h2>
+
             <div className="dataset-select-container">
-                <label className="dataset-label" >Selected Config File</label>
-                {datasetLoading && <p className="sidebar-message">Loading datasets...</p>}
-                {datasetError && <p className="sidebar-error">Error: {datasetError}</p>}
-                {!datasetLoading && !datasetError && datasets.length > 0 && (
-                    <div className="relative">
-                        <select
-                            className="dataset-select"
-                            value={selectedDataset || ''}
-                            onChange={(e) => onDatasetChange(e.target.value)}
-                        >
-                            {datasets.map((dataset) => (
-                                <option key={getDatasetName(dataset.adt)} value={getDatasetName(dataset.adt)}>{getDatasetName(dataset.adt)}</option>
-                            ))}
-                        </select>
-                        <DownArrow className="arrow-down-icon" />
-                    </div>
-                )}
+                <label className="dataset-label">Selected Config Directory</label>
+
+                {/* Display loading/error messages */}
+                {datasetLoading && <p className="sidebar-message">Processing directory...</p>} // TODO: Remove this
+
+                <div className="relative">
+                    {/* Button to trigger the directory selection */}
+                    <button
+                        className="dataset-select-button"
+                        onClick={onDirectorySelect}
+                        disabled={datasetLoading}
+                    >
+                        Select Directory
+                    </button>
+
+                    {/* Display the selected directory path (assuming selectedDataset now holds the path) */}
+                    {selectedDataset && (
+                        <p className="selected-path-display">
+                            Path: {selectedDataset}
+                        </p>
+                    )}
+                </div>
             </div>
 
             {loading && <p className="sidebar-message">Loading epochs...</p>}

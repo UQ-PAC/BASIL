@@ -14,6 +14,8 @@ import org.http4s.circe._
 import io.circe.generic.auto._
 import io.circe.syntax._
 
+import basil.main.Main.{ChooseInput, loadDirectory}  // Note, this could be subject to change to scala, if the package line is uncommented
+
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.LoggerName
@@ -24,9 +26,11 @@ import translating.PrettyPrinter
 
 case class ConfigSelection(adt: String, relf: Option[String])
 case class AnalysisStatus(status: String)
+case class DirectorySelection(directoryPath: String)
 
 implicit val selectionDecoder: EntityDecoder[IO, ConfigSelection] = jsonOf[IO, ConfigSelection]
 implicit val statusEncoder: EntityEncoder[IO, AnalysisStatus] = jsonEncoderOf[AnalysisStatus]
+implicit val directorySelectionDecoder: EntityDecoder[IO, DirectorySelection] = jsonOf[IO, DirectorySelection]
 
 class IrServiceRoutes(
                        epochStore: IREpochStore,
@@ -54,8 +58,7 @@ class IrServiceRoutes(
     getAfterCfgRoute <+>
     getSpecificBeforeIrRoute <+>
     getSpecificAfterIrRoute <+>
-    getConfigDatasetsRoute <+>
-    postSelectConfigRoute
+    postSelectDirectoryRoute
   }
 
   private val statusRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
@@ -73,50 +76,39 @@ class IrServiceRoutes(
         logger.warn("IR data is still initializing. Please try again shortly.") *>
           ServiceUnavailable("IR data is still initializing. Please try again shortly.")
     }
+  // TODO: Add docs and tidy up
+  private val postSelectDirectoryRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
+    case req@POST -> Root / "config" / "select-directory" =>
+      // Define the core logic as an IO block
+      val coreLogic: IO[Response[IO]] = for {
+        selection <- req.as[DirectorySelection] // This handles JSON decoding errors
 
-  /** GET /config/datasets
-   *
-   * Retrieves all available configuration datasets.
-   *
-   * @return A JSON array of dataset names or identifiers.
-   * @throws ServiceUnavailable if the IR data is not ready.
-   */
-  private val getConfigDatasetsRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case GET -> Root / "config" / "datasets" =>
-      ensureReady {
-        IO.blocking {
-          ConfigScanner.scan()
-        }.flatMap { pairs =>
-          Ok(pairs.asJson)
-        }
-      }
-  }
+        // 2. Call loadDirectory using the imported symbols
+        config <- IO(loadDirectory(ChooseInput.Gtirb, selection.directoryPath)) // TODO: Allow the user to specify whether to use a Gtirb (.gts file or Bap)
+          .handleErrorWith { e =>
+            logger.error(e)(s"Failed to load directory: ${selection.directoryPath}. Error: ${e.getMessage}") >>
+              // Throw a custom exception to be caught later
+              IO.raiseError(new Exception(s"Configuration failed: ${e.getMessage}"))
+          }
 
-  /** POST /config/select
-   *
-   * Selects a specific configuration dataset to analyze.
-   *
-   * Param: selection JSON payload containing:
-   *                  - `adt`: The ADT input file path
-   *                  - `relf`: Optional RELF file path
-   * @return Success message indicating that analysis has been triggered.
-   * @throws ServiceUnavailable if IR data cannot be updated.
-   * @note Runs `generateIRAsync` asynchronously and waits for completion before responding.
-   */
-  private val postSelectConfigRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case req@POST -> Root / "config" / "select" =>
-      for {
-        selection <- req.as[ConfigSelection]
-        _ <- logger.info(s"New config selected: ${selection.adt}, ${selection.relf.getOrElse("none")}")
+        _ <- logger.info(s"Successfully loaded config from directory. Input: ${config.inputFile}")
 
-        fiber <- generateIRAsync(selection.adt, selection.relf)
+        // 3. Trigger the IR analysis asynchronously with the paths found by loadDirectory
+        fiber <- generateIRAsync(config.inputFile, config.relfFile)  // TODO: I want to remove this, just go straight to the config
           .handleErrorWith(e => logger.error(e)("IR analysis failed"))
           .start
 
-        _ <- fiber.join
+        _ <- fiber.join // Wait for analysis to complete
 
-        resp <- Ok(s"Analysis triggered for ${selection.adt} / ${selection.relf.getOrElse("none")}")
+        // 4. Return success response
+        resp <- Ok(s"Analysis successfully triggered for directory: ${config.inputFile} / ${config.relfFile.getOrElse("none")}")
+
       } yield resp
+      coreLogic.handleErrorWith { e =>
+        // This part now executes in the correct context (IO[Response[IO]])
+        logger.warn(s"Request failed: ${e.getMessage}") >>
+          BadRequest(e.getMessage)
+      }
   }
 
   /**

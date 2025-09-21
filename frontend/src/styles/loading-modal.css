@@ -69,3 +69,29 @@
     background-color: #e0e7ff;
     color: #3730a3;
 }
+
+.close-button {
+    /* Position the button at the bottom of the modal content */
+    margin-top: 1rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #f0f0f0;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+
+    /* OPTION 1: Center the button (most common for simple modals) */
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+
+    /* OPTION 2: Position to the bottom right (if you want it floating) */
+    /* position: absolute; */
+    /* bottom: 1rem; */
+    /* right: 1rem; */
+}
+
+.close-button:hover {
+    background-color: #e0e0e0;
+}
