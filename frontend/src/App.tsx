@@ -173,6 +173,7 @@ function App() {
             }
 
             setSelectedDataset(directoryIdentifier);
+            localStorage.setItem(LOCAL_STORAGE_DATASET_KEY, directoryIdentifier); // TODO: Ensure this is run on the first opening with the previously selected path... Or always redo the old one...?
 
             setDatasetError(null);
             setPostStatus({ message: `Successfully processed directory: ${directoryIdentifier}`, type: 'success' });
@@ -342,12 +343,10 @@ function App() {
                           selectedEpochs={selectedEpochs}
                           onEpochSelect={handleEpochSelect}
                           loading={loadingEpochs}
-                          error={epochError}
+                          // error={epochError} // TODO: Turn this into a pop up error before I use this
                           selectedDataset={selectedDataset}
                           onDirectorySelect={onDirectorySelect}
-                          // onDatasetChange={onDatasetChange}
-                          datasetLoading={datasetLoading} // TODO: I also want to remove this at some point
-                          // datasetError={datasetError} // TODO: remove, as I'll handel it in the errorModal
+                          datasetLoading={datasetLoading}
                         />
                     </ResizableSidebar>
                     {renderViewer()}
