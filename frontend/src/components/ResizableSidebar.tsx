@@ -1,8 +1,12 @@
 import { useState, useCallback, useRef, type ReactNode } from 'react';
+import '../styles/sidebar.css';
+
+import RightArrow from '../assets/arrow-right-icon.svg';
 
 const INITIAL_WIDTH = 250;
 const MAX_WIDTH = 500;
-const MIN_WIDTH = 80;
+const MIN_WIDTH = 100;
+const COLLAPSED_WIDTH = 20;
 
 interface ResizableSidebarProps {
     children: ReactNode;
@@ -28,10 +32,22 @@ export function ResizableSidebar({
     const resize = useCallback((event: MouseEvent) => {
         if (sidebarRef.current && !isSidebarMinimised) {
             const newWidth = event.clientX;
+
+            if (newWidth < minWidth) {
+                toggleSidebar();
+
+                setWidth(minWidth);
+
+                document.removeEventListener('mousemove', resize);
+                document.removeEventListener('mouseup', stopResizing);
+                isResizing.current = false;
+                return;
+            }
+
             const clampedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
             setWidth(clampedWidth);
         }
-    }, [minWidth, maxWidth, isSidebarMinimised]);
+    }, [minWidth, maxWidth, isSidebarMinimised, toggleSidebar]);
 
     const stopResizing = useCallback(() => {
         isResizing.current = false;
@@ -40,34 +56,41 @@ export function ResizableSidebar({
     }, [resize]);
 
     const startResizing = useCallback(() => {
+        if (isSidebarMinimised) {
+            toggleSidebar();
+            setWidth(width > minWidth ? width : minWidth);
+        }
+
         isResizing.current = true;
         document.addEventListener('mousemove', resize);
         document.addEventListener('mouseup', stopResizing);
-    }, [resize, stopResizing]);
+    }, [resize, stopResizing, isSidebarMinimised, toggleSidebar, width, minWidth]);
+
+    const handleContainerClick = useCallback(() => {
+        if (isSidebarMinimised) {
+            toggleSidebar();
+            setWidth(width > minWidth ? width : MIN_WIDTH + 10);
+        }
+    }, [isSidebarMinimised, toggleSidebar, width, minWidth]);
 
     return (
         <div
             className={`resizable-sidebar-container ${isSidebarMinimised ? 'sidebar-minimized' : ''}`}
-            style={{ width: isSidebarMinimised ? '0px' : `${width}px` }}
+            style={{ width: isSidebarMinimised ? `${COLLAPSED_WIDTH}px` : `${width}px`, cursor: isSidebarMinimised ? 'pointer' : 'default'  }}
             ref={sidebarRef}
+            onClick={isSidebarMinimised ? handleContainerClick : undefined}
         >
-            <button onClick={toggleSidebar} className="collapse-button">
-                {isSidebarMinimised ? (
-                    <img
-                        src="/icon-right-50.png"
-                        alt="Expand Sidebar"
-                        className="collapse-icon"
-                    />
-                ) : (
-                    <img
-                        src="/icon-left-50.png"
-                        alt="Collapse Sidebar"
-                        className="collapse-icon"
-                    />
-                )}
-            </button>
-            {children}
-            <div className="resize-handle" onMouseDown={startResizing}></div>
+            {isSidebarMinimised && (
+                <RightArrow className="arrow-right-icon" ></RightArrow>
+            )}
+
+            {!isSidebarMinimised && (
+                <>
+                    {children}
+                    <div className="resize-handle" onMouseDown={startResizing}></div>
+                </>
+            )}
+
         </div>
     );
 }

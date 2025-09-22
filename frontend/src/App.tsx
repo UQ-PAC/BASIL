@@ -9,7 +9,7 @@ import CfgViewer from './components/CfgViewer';
 import CombinedViewer from './components/CombinedViewer';
 import SettingsModal from './components/SettingsModal'
 import { API_BASE_URL } from './api';
-import LoadingModal from "./components/LoadingModal.tsx"; // TODO: Merge these together
+import LoadingModal from "./components/LoadingModal.tsx";
 import ErrorModal from "./components/ErrorModal.tsx";
 
 const LOCAL_STORAGE_PROCEDURE_KEY = 'cfgViewerSelectedProcedure';
