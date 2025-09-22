@@ -254,6 +254,20 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
       TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = false, dryRun = dryRun)
     case _ => TVJob(None, None)
   }
+
+  Logger.debug {
+    val counter = ir.transforms.CountStatements()
+    val _ = visit_prog(counter, p)
+    "tv-eval-marker: before-stmt-count=" + counter.count
+  }
+  import translating.PrettyPrinter.pprint
+  util.writeToFile(p.pprint, "bzip.il")
+  Logger.info {
+    val counter = ir.transforms.CountGuardStatements()
+    val _ = visit_prog(counter, p)
+    "tv-eval-marker: after-guard-count=" + 1
+  }
+
   transforms.applyRPO(p)
   // nop(config, p)
   // Logger.writeToFile(File("beforeParams.il"), translating.PrettyPrinter.pp_prog(ctx.program))
@@ -269,6 +283,13 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
 
   transforms.applyRPO(p)
   config = guardCleanup(config, p)
+
+
+  Logger.debug {
+    val counter = ir.transforms.CountStatements()
+    val _ = visit_prog(counter, p)
+    "tv-eval-marker: after-stmt-count=" + counter.count
+  }
 
   val failed = config.results.filter(_.verified.exists(_.isInstanceOf[SatResult.SAT]))
 
