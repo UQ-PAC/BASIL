@@ -64,10 +64,9 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
             stmts = stmts ++ (try {
               visitStmt(s, label)
             } catch {
-              case e => {
+              case e: Throwable => 
                 Logger.error(s"Failed to load insn: $e\n${e.getStackTrace.mkString("\n")}")
                 Seq(Assert(FalseLiteral, Some(" Failed to load instruction")))
-              }
             })
           }
 
@@ -757,8 +756,12 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
 
   private def resolveFieldExpr(name: String, field: String): GlobalVar = {
     name match {
-      case "PSTATE" if field == "V" || field == "C" || field == "Z" || field == "N" =>
-        Register(field + "F", 1)
+      case "PSTATE" =>
+        field match {
+          case "V" | "C" | "Z" | "N" => Register(field + "F", 1)
+          case "BTYPE" => Register(field, 2)
+          case _ => throw Exception(s"unidentified Expr_Field ($name, $field)")
+        }
       case _ => throw Exception(s"unidentified Expr_Field ($name, $field)")
     }
   }
