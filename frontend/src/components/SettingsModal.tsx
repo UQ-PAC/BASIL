@@ -1,4 +1,4 @@
-import '../styles/settings-modal.css'
+import '../styles/modal-base.css'
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -12,11 +12,11 @@ function SettingsModal({isOpen, onClose, theme, setTheme}: SettingsModalProps) {
 
     return (
         <div className="modal-overlay">
-            <div className="modal-content">
+            <div className="modal-content-base">
                 <div className="modal-header">
                     <h2 className="modal-title">Settings</h2>
                     <button
-                        className="close-button"
+                        className="modal-close-button"
                         aria-label="Close settings modal"
                         onClick={onClose}
                     >

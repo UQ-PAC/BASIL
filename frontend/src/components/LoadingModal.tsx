@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-import '../styles/loading-modal.css'
+import '../styles/modal-base.css'
 
 import Spinner from '../assets/spinner-loading-icon.svg';
 
@@ -16,14 +16,19 @@ const LoadingModal: React.FC<LoadingModalProps> = ({ isOpen, message, postStatus
     if (!isOpen) return null;
     return (
         <div className="modal-overlay">
-            <div className="modal-content p-6 text-center">
-                <h2 className="text-xl font-bold mb-4">{message || "Running Analysis..."}</h2>
-                <Spinner className="spinner-icon" />
-                {postStatus.message && ( // TODO: Maybe make this appear even upon failure
-                    <div className={`status-message status-${postStatus.type}`}>
-                        {postStatus.message}
-                    </div>
-                )}
+            <div className="modal-content-base">
+                <header className="modal-header">
+                    <h2 className="modal-title">{message || "Running Analysis..."}</h2>
+                    {/* No close button on a non-interruptible loading modal */}
+                </header>
+                <div className="modal-body">
+                    <Spinner className="spinner-icon" />
+                    {postStatus.message && (
+                        <div className={`status-message status-${postStatus.type}`}>
+                            {postStatus.message}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

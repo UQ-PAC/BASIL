@@ -16,10 +16,13 @@
     /* Main display */
     --background-color: #1f2937;
     --text-color: #f3f4f6;
+    --error-text-color: #fa5454;
 
     /* Modal styles */
     --modal-header-background-color: #313d53;
     --border-color: #777;
+    --modal-close-button: #b8b8b8;
+    --spinner-icon: #FFF;
 
     /* Sidebar styles */
     --sidebar-header-color: #f0f0f0;
@@ -78,10 +81,13 @@
     /* Main display */
     --background-color: #ffffff;
     --text-color: #1f2937;
+    --error-text-color: #952222;
 
     /* Modal styles */
     --modal-header-background-color: #f5f5f5;
     --border-color: #ccc;
+    --modal-close-button: #040404;
+    --spinner-icon: #000;
 
     /* Sidebar styles */
     --sidebar-header-color: #333;
