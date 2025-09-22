@@ -2,10 +2,9 @@ package ir.transforms
 
 import ir.*
 import ir.cilvisitor.*
-import util.{Logger, SimplifyMode}
-import scala.util.chaining.scalaUtilChainingOps
-import scala.collection.immutable.ListMap
+import util.Logger
 
+import scala.util.chaining.scalaUtilChainingOps
 
 object CountGuardStatements {
 
@@ -26,14 +25,14 @@ object CountGuardStatements {
   def classifyGuard(s: Assume): List[GuardComplexity] = {
     val vars = s.body.variables
 
-    val flags = vars.collect {
-      case reg @ Register(_, 1) => reg
+    val flags = vars.collect { case reg @ Register(_, 1) =>
+      reg
     }
 
     val ops = listOpsInExpr(s.body)
 
-    val complexOps = ops.collect {
-      case x @ BoolToBV1 => BoolToBV1
+    val complexOps = ops.collect { case x @ BoolToBV1 =>
+      BoolToBV1
     }
 
     (Option.when(flags.nonEmpty) { GuardComplexity.HasFlagRegisters(flags) }
@@ -41,11 +40,11 @@ object CountGuardStatements {
     // allowable number of operations is `2 * vars + 1` to allow for
     // one possibly-negated binary operation per variable. plus one top-level
     // operation like ==.
-    ++ Option.when(ops.size > 2 * vars.size + 1) { GuardComplexity.OpsTooMany(ops) }
+      ++ Option.when(ops.size > 2 * vars.size + 1) { GuardComplexity.OpsTooMany(ops) }
 
-    ++ Option.when(complexOps.nonEmpty) { GuardComplexity.OpsTooComplex(complexOps) }
+      ++ Option.when(complexOps.nonEmpty) { GuardComplexity.OpsTooComplex(complexOps) }
 
-    ++ Option.when(vars.size > 2) { GuardComplexity.VarsTooMany(vars)  }).toList
+      ++ Option.when(vars.size > 2) { GuardComplexity.VarsTooMany(vars) }).toList
   }
 }
 
