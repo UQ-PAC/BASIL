@@ -473,8 +473,10 @@ object NewLoopDetector {
       }
       println("forest: " + forest)
 
-      val newLoops = loops.map(x => x.b -> x.toBlockLoopInfo(forest.getOrElse(x.b, Set()))).to(ListMap)
-      newLoops
+      val newLoops = loops.map(x => x.b -> x.toBlockLoopInfo(forest.getOrElse(x.b, Set())))
+
+      // NOTE: reverse order before returning, so outer loops appear first.
+      newLoops.reverse.to(ListMap)
     }
 
     /** Main entry point for the loop identification algorithm. Calls

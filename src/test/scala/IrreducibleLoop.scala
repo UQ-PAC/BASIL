@@ -1,5 +1,5 @@
-import analysis.{LoopDetector, NewLoopDetector}
-import ir.{Block, IRLoading, Procedure, Program, dotBlockGraph}
+import analysis.{LoopDetector, NewLoopDetector, LoopTransform}
+import ir.{Block, IRLoading, Procedure, Program, dotBlockGraph, dotFlowGraph}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
 import translating.PrettyPrinter.pprint
@@ -277,6 +277,31 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     } { ListMap("loop" -> Set("loop"), "loop2" -> Set("loop2")) }
   }
 
+  test("sub-cycles") {
+    import ir.dsl.*
+    val p = prog(
+      proc("main")(
+        block("S", goto("h1", "h2")),
+        block("h1", goto("h2")),
+        block("h2", goto("h1", "h3")),
+        block("h3", goto("h2", "exit")),
+        block("exit", ret)
+      )
+    )
+    val result = NewLoopDetector.identify_loops(p.mainProcedure).get
+    result.values.foreach(println(_))
+    val loops = result.values.flatMap(_.toLoop())
+
+    loops.foreach(println(_))
+    util.renderDotGraph(dotFlowGraph(p.mainProcedure.blocks.toList, Set()))
+
+    LoopTransform.llvm_transform_loop(loops.head)
+    // analysis.AnalysisPipelineMRA.reducibleLoops(p)
+
+    util.renderDotGraph(dotFlowGraph(p.mainProcedure.blocks.toList, Set()))
+
+  }
+
   test("plist_free") {
     val p = ir.parsing.ParseBasilIL.loadILFile("/home/rina/progs/basil/plist-free.il").program
     // p.procedures.foreach { p =>
@@ -298,7 +323,8 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
     val hl = loops.filter(_._2.headers.nonEmpty).last._2.nodes
     println("XXX" + hl)
-    // util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, hl), "/home/rina/progs/basil/out.dot")
+    util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, hl), "/home/rina/progs/basil/out.dot")
+    // util.renderDotGraph(dotFlowGraph(p.mainProcedure.blocks.toList, Set()))
 
     analysis.AnalysisPipelineMRA.reducibleLoops(p)
     util.writeToFile(dotBlockGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/out.dot")
