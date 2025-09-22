@@ -13,7 +13,8 @@ import ir.{
   LocalAssign,
   LocalVar,
   Procedure,
-  Program
+  Program,
+  Unreachable
 }
 
 import scala.annotation.tailrec
@@ -42,11 +43,18 @@ case class LoopEdge(from: Block, to: Block) {
  *
  */
 class Loop(val header: Block) {
-  val reentries: mutable.Set[LoopEdge] = mutable.Set() // Edges to loop from outside that are not to the header
-  val backEdges: mutable.Set[LoopEdge] = mutable.Set() // Edges from inside loop to the header
-  val entryEdges: mutable.Set[LoopEdge] = mutable.Set() // Edges into the header node
+  /** Edges to loop from outside that are not to the header.
+   *  This set is non-empty if and only if the loop is *irreducible*.
+   */
+  val reentries: mutable.Set[LoopEdge] = mutable.Set()
+  /** Edges from inside loop to the header. */
+  val backEdges: mutable.Set[LoopEdge] = mutable.Set()
+  /** Edges into the header node from outside the loop. */
+  val entryEdges: mutable.Set[LoopEdge] = mutable.Set()
 
+  /** Nodes making up the loop. These form a maximal strongly-connected component. */
   val nodes: mutable.Set[Block] = mutable.Set() // G_l
+  /** Edges internal to the loop, i.e., between two loop [[nodes]]. */
   val edges: mutable.Set[LoopEdge] = mutable.Set() // G_e
   var reducible: Boolean = true // Assume reducible by default
 
@@ -703,5 +711,35 @@ object LoopTransform {
     }
 
     newLoop
+  }
+
+  def new_llvm_transform_loop(loop: Loop): Unit = {
+    if (loop.reducible) return
+
+    // in the transform, all external entries are redirected to the new header.
+    val externalEntries = loop.entryEdges.toSet ++ loop.reentries
+
+    // internal edges to the header are also redirected through the new header.
+    val edgesIntoHeader = loop.backEdges
+
+    // new header is succeeded by all the headers (both canonical + irred. headers).
+    val newHeader = Block(s"${loop.header.label}_loop_N", jump = Unreachable())
+    IRWalk.procedure(loop.header).addBlock(newHeader)
+
+    // TODO:  set up successors of newHeader. with assumes.
+
+    externalEntries.foreach { case LoopEdge(from, to) =>
+      from.jump match {
+        case goto: GoTo => goto.replaceTarget(to, newHeader)
+        case _ => throw new Exception("entry block to loop was terminated by non-goto?!")
+      }
+    }
+
+    edgesIntoHeader.foreach { case LoopEdge(from, to) =>
+      from.jump match {
+        case goto: GoTo => goto.replaceTarget(to, newHeader)
+        case _ => throw new Exception("entry block to loop was terminated by non-goto?!")
+      }
+    }
   }
 }
