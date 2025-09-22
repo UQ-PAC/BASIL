@@ -9,3 +9,5 @@ Makefile text eol=lf
 *.sh text eol=lf
 *.mk text eol=lf
 *.md5sum text eol=lf linguist-generated
+
+src/test/make/bap-normalise.py text eol=lf
