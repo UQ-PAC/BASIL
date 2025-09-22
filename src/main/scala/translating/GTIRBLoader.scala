@@ -64,7 +64,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
             stmts = stmts ++ (try {
               visitStmt(s, label)
             } catch {
-              case e: Throwable => 
+              case e: Throwable =>
                 Logger.error(s"Failed to load insn: $e\n${e.getStackTrace.mkString("\n")}")
                 Seq(Assert(FalseLiteral, Some(" Failed to load instruction")))
             })
