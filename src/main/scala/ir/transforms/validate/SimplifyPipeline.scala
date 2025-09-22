@@ -255,18 +255,15 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
     case _ => TVJob(None, None)
   }
 
-  Logger.debug {
+  Logger.info {
     val counter = ir.transforms.CountStatements()
     val _ = visit_prog(counter, p)
     "tv-eval-marker: before-stmt-count=" + counter.count
   }
-  import translating.PrettyPrinter.pprint
-  util.writeToFile(p.pprint, "bzip.il")
-  Logger.info {
-    val counter = ir.transforms.CountGuardStatements()
-    val _ = visit_prog(counter, p)
-    "tv-eval-marker: after-guard-count=" + 1
-  }
+
+  var counter = ir.transforms.CountGuardStatements()
+  val _ = visit_prog(counter, p)
+  counter.reportToLog("before")
 
   transforms.applyRPO(p)
   // nop(config, p)
@@ -284,8 +281,11 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   transforms.applyRPO(p)
   config = guardCleanup(config, p)
 
+  counter = ir.transforms.CountGuardStatements()
+  val _ = visit_prog(counter, p)
+  counter.reportToLog("after")
 
-  Logger.debug {
+  Logger.info {
     val counter = ir.transforms.CountStatements()
     val _ = visit_prog(counter, p)
     "tv-eval-marker: after-stmt-count=" + counter.count
