@@ -64,10 +64,9 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
             stmts = stmts ++ (try {
               visitStmt(s, label)
             } catch {
-              case e => {
+              case e: Throwable => 
                 Logger.error(s"Failed to load insn: $e\n${e.getStackTrace.mkString("\n")}")
                 Seq(Assert(FalseLiteral, Some(" Failed to load instruction")))
-              }
             })
           }
 
@@ -386,6 +385,7 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
       case "and_bits.0" => resolveBinaryOp(BVAND, function, 1, typeArgs, args, ctx.getText)
       case "eor_bits.0" => resolveBinaryOp(BVXOR, function, 1, typeArgs, args, ctx.getText)
       case "eq_bits.0" => resolveBinaryOp(EQ, function, 1, typeArgs, args, ctx.getText)
+      case "ne_bits.0" => resolveBinaryOp(NEQ, function, 1, typeArgs, args, ctx.getText)
       case "add_bits.0" => resolveBinaryOp(BVADD, function, 1, typeArgs, args, ctx.getText)
       case "sub_bits.0" => resolveBinaryOp(BVSUB, function, 1, typeArgs, args, ctx.getText)
       case "mul_bits.0" => resolveBinaryOp(BVMUL, function, 1, typeArgs, args, ctx.getText)
@@ -756,8 +756,12 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
 
   private def resolveFieldExpr(name: String, field: String): GlobalVar = {
     name match {
-      case "PSTATE" if field == "V" || field == "C" || field == "Z" || field == "N" =>
-        Register(field + "F", 1)
+      case "PSTATE" =>
+        field match {
+          case "V" | "C" | "Z" | "N" => Register(field + "F", 1)
+          case "BTYPE" => Register(field, 2)
+          case _ => throw Exception(s"unidentified Expr_Field ($name, $field)")
+        }
       case _ => throw Exception(s"unidentified Expr_Field ($name, $field)")
     }
   }
