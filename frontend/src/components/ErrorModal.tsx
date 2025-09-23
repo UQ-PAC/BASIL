@@ -4,12 +4,14 @@ import '../styles/modal-base.css'
 
 interface ErrorModalProps {
     isOpen: boolean;
-    errorMessage: string | null;
+    postStatus: { message: string | null; type: string };
     onClose: () => void;
 }
 
-const ErrorModal: React.FC<ErrorModalProps> = ({ isOpen, errorMessage, onClose }) => {
-    if (!isOpen || !errorMessage) return null;
+const ErrorModal: React.FC<ErrorModalProps> = ({ isOpen, postStatus, onClose }) => {
+    if (!isOpen || !postStatus.message) return null;
+
+    const messageClass = `${postStatus.type}-text`;
 
     return (
         <div className="modal-overlay">
@@ -25,7 +27,7 @@ const ErrorModal: React.FC<ErrorModalProps> = ({ isOpen, errorMessage, onClose }
                     </button>
                 </div>
                 <div className="error-message-body">
-                    <p className="mb-4">{errorMessage}</p>
+                    <p className={`mb-4 ${messageClass}`}>{postStatus.message}</p>
                 </div>
             </div>
         </div>

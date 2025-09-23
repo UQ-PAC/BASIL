@@ -31,7 +31,6 @@ function App() {
     const [selectedEpochs, setSelectedEpochs] = useState<Set<string>>(new Set());
     const [lastClickedEpoch, setLastClickedEpoch] = useState<string | null>(null);
     const [loadingEpochs, setLoadingEpochs] = useState(true);
-    const [epochError, setEpochError] = useState<string | null>(null);
     const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
     const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
@@ -45,7 +44,7 @@ function App() {
     });
     const [postStatus, setPostStatus] = useState({ message: '', type: '' });
     const [datasetLoading, setDatasetLoading] = useState(true);
-    const [datasetError, setDatasetError] = useState<string | null>(null);
+    const [datasetError, setDatasetError] = useState<boolean>(false);
 
     const [procedureNames, setProcedureNames] = useState<string[]>([]);
     const [loadingProcedures, setLoadingProcedures] = useState(false);
@@ -70,35 +69,54 @@ function App() {
     }, [viewMode]);
 
     const fetchEpochNames = useCallback(async () => {
+        setLoadingEpochs(true);
+        let names : string[];
+        let errorOccurred = false;
+
         try {
-            setLoadingEpochs(true);
-            setEpochError(null);
             const namesResponse = await fetch(`${API_BASE_URL}/epochs`);
             if (!namesResponse.ok) {
-                throw new Error(`HTTP error fetching epoch names! status: ${namesResponse.status}`);
-            }
-            const names: string[] = await namesResponse.json();
-            setAllEpochNames(names);
-
-            if (names.length > 0) {
-                setSelectedEpochs(new Set([names[0]]));
-                setLastClickedEpoch(names[0]);
+                setPostStatus({
+                    message: `HTTP error fetching epoch names! status: ${namesResponse.status}`,
+                    type: 'error'
+                });
+                setDatasetError(true);
+                errorOccurred = true;
             } else {
-                setEpochError("No analysis epochs found.");
-                setSelectedEpochs(new Set());
+
+                names = await namesResponse.json();
+                setAllEpochNames(names);
+
+                if (names.length > 0) {
+                    setSelectedEpochs(new Set([names[0]]));
+                    setLastClickedEpoch(names[0]);
+                } else {
+                    setPostStatus({message: "No analysis epochs found.", type: "warning"});
+                    setDatasetError(true);
+                }
             }
         } catch (err: any) {
             console.error("Error fetching epoch names:", err);
-            setEpochError(`Error fetching epochs: ${err.message}`);
-            setAllEpochNames([]);
-            setSelectedEpochs(new Set());
+            setPostStatus({message: `Error fetching epochs: \n${err.message}`, type: "error"});
+            setDatasetError(true);
+            errorOccurred = true;
         } finally {
             setLoadingEpochs(false);
+        }
+
+        if (errorOccurred) {
+            setAllEpochNames([]);
+            setSelectedEpochs(new Set());
         }
     }, []);
 
     useEffect(() => {
-        fetchEpochNames();
+        fetchEpochNames().then(() => {
+            console.log("fetchEpochNames run");
+        }).catch(error => {
+            console.error("Error from promise chain of fetchEpochNames", error);
+        })
+
     }, []);
 
     useEffect(() => {
@@ -111,10 +129,10 @@ function App() {
                     const statusResponse = await fetch(`${API_BASE_URL}/status`);
                     const statusData = await statusResponse.json();
                     if (statusData.status === 'completed') {
-                        setIsAnalysisRunning(false);
 
                         // await fetchEpochNames();
                         window.location.reload() // TODO: Maybe there is a smoother approach? But don't worry about it for now
+                        setIsAnalysisRunning(false);
 
                         if (intervalId) {
                             clearInterval(intervalId);
@@ -122,8 +140,9 @@ function App() {
                     }
                 } catch (error) {
                     console.error("Polling for analysis status failed:", error);
-                    // setIsAnalysisRunning(false);
+                    setIsAnalysisRunning(false);
                     setPostStatus({ message: 'Analysis status check failed. Please refresh manually.', type: 'error' });
+                    setDatasetError(true);
                     if (intervalId) {
                         clearInterval(intervalId);
                     }
@@ -142,9 +161,8 @@ function App() {
 
     // Add this function inside your App component, near your other handlers
     const onDirectorySelect = async () => {
-        // TODO: set the {isAnalysisRunning} variable - I need this to make it load
 
-        setDatasetError(null);
+        setDatasetError(false);
         setDatasetLoading(true);
 
         try {
@@ -152,8 +170,10 @@ function App() {
                 "Please enter the FULL, absolute path to the directory (e.g., /Users/user/folder/BASIL/src/test/correct/arrays_simple/clang/arrays_simple.gts:"
             );
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            if (!directoryIdentifier) {
+                console.log("Directory path input cancelled or empty.");
+                setDatasetLoading(false);
+                return;
             }
 
             const response = await fetch(`${API_BASE_URL}/config/select-directory`, {
@@ -169,18 +189,21 @@ function App() {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                throw new Error(errorText || `Backend failed with status: ${response.status}`);
+                setPostStatus({ message: errorText || `Backend failed with status: ${response.status}`, type: 'error' });
+                setDatasetLoading(false);
+                setDatasetError(true);
+                return;
             }
 
             setSelectedDataset(directoryIdentifier);
             localStorage.setItem(LOCAL_STORAGE_DATASET_KEY, directoryIdentifier); // TODO: Ensure this is run on the first opening with the previously selected path... Or always redo the old one...?
 
-            setDatasetError(null);
-            setPostStatus({ message: `Successfully processed directory: ${directoryIdentifier}`, type: 'success' });
-            setIsAnalysisRunning(true); // This calls the other useEffect that waits until analysis running is false
+            console.info(`Successfully processed directory: ${directoryIdentifier}`);
+            setIsAnalysisRunning(true); // This calls the loading modal
 
         } catch (err: any) {
-            setDatasetError(`Error processing directory: ${err.message}`); // Add thus into the post status instead, and keep it open.
+            setPostStatus({ message: `Error processing directory: \n${err.message}`, type: 'error' })
+            setDatasetError(true);
             console.error("Error processing directory:", err);
         } finally {
             setDatasetLoading(false);
@@ -277,7 +300,7 @@ function App() {
     };
 
     const handleCloseErrorModal = () => {
-        setDatasetError(null);
+        setDatasetError(false);
     };
 
     useEffect(() => {
@@ -343,7 +366,6 @@ function App() {
                           selectedEpochs={selectedEpochs}
                           onEpochSelect={handleEpochSelect}
                           loading={loadingEpochs}
-                          // error={epochError} // TODO: Turn this into a pop up error before I use this
                           selectedDataset={selectedDataset}
                           onDirectorySelect={onDirectorySelect}
                           datasetLoading={datasetLoading}
@@ -364,9 +386,9 @@ function App() {
                 postStatus={postStatus}
             />
             <ErrorModal
-                isOpen={!!datasetError} // Open if datasetError is not null
-                errorMessage={datasetError} // TODO: OR should it take postStatus as well
-                onClose={handleCloseErrorModal} // Function to clear the error state
+                isOpen={datasetError}
+                postStatus={postStatus}
+                onClose={handleCloseErrorModal}
             />
         </div>
     )
