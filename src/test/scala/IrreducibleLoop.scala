@@ -290,21 +290,28 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     )
     val p = makeProg
 
-    val result = NewLoopDetector.identify_loops(p.mainProcedure).get
-    result.values.foreach(println(_))
-    val loops = result.values.flatMap(_.toLoop())
+    val loopResult = NewLoopDetector.identify_loops(p.mainProcedure).get
+    loopResult.values.foreach(println(_))
+    val loops = loopResult.values.flatMap(_.toLoop())
 
     loops.foreach(println(_))
     // util.renderDotGraph(dotFlowGraph(p.mainProcedure.blocks.toList, Set()))
 
-    LoopTransform.new_llvm_transform_loop(loops.head)
+    val result = LoopTransform.new_llvm_transform_loop(loops.head).get
     // analysis.AnalysisPipelineMRA.reducibleLoops(p)
 
-    util.renderDotGraph(dotBlockGraph(p.mainProcedure.blocks.toList, Set()))
+    val blocks = p.mainProcedure.labelToBlock
 
-    val p2 = makeProg
-    analysis.AnalysisPipelineMRA.reducibleLoops(p2)
-    util.renderDotGraph(dotBlockGraph(p2.mainProcedure.blocks.toList, Set()))
+    assertResult(List("S", "h1", "h3").map(x => result.entryIndices(blocks(x)))) {
+      result.precedingIndices(blocks("h2"))
+    }
+    assertResult(List("S", "h2").map(x => result.entryIndices(blocks(x)))) {
+      result.precedingIndices(blocks("h1"))
+    }
+
+    assertResult(ListMap(), "there should be no irreducible loops after transform") {
+      NewLoopDetector.identify_loops(p.mainProcedure).get.filter(_._2.isIrreducible())
+    }
   }
 
   test("plist_free") {
