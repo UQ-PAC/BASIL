@@ -714,7 +714,22 @@ object LoopTransform {
     newLoop
   }
 
+  /**
+   * Information about transforms made to convert an irreducible loop into
+   * a reducible one.
+   *
+   * @param newHeader the new (unique) header for the loop. after the transform, this
+   *                  is the header of the *reducible* version of this loop.
+   * @param fromVariable the fresh variable which is used to determine which old header to jump to
+   *                     when reaching the new header. this variable stores an integer index.
+   * @param entryIndices map of entry blocks (i.e., blocks preceding headers) to their
+   *                     integer index.
+   * @param precedingIndices map of (old) header blocks to the entry indices which precede
+   *                         that header.
+   */
   case class IrreducibleTransformInfo(
+    val newHeader: Block,
+    val fromVariable: LocalVar,
     val entryIndices: Map[Block, Int],
     val precedingIndices: Map[Block, List[Int]]
   )
@@ -797,6 +812,6 @@ object LoopTransform {
       }
     }
 
-    Some(IrreducibleTransformInfo(entryIndices, precedingIndices))
+    Some(IrreducibleTransformInfo(newHeader, fromVariable, entryIndices, precedingIndices))
   }
 }
