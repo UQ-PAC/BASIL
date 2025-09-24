@@ -312,7 +312,7 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
     Logger.writeToFile(File(p + "/stats.csv"), csv)
   })
 
-  ir.transforms.genStackAllocationSpec(p)
+  // ir.transforms.genStackAllocationSpec(p)
 
   (config, nctx)
 }
