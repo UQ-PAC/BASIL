@@ -220,7 +220,7 @@ class CILVisitorImpl(val v: CILVisitor) {
   def visit_proc(p: Procedure): List[Procedure] = {
     def continue(p: Procedure) = {
       v.enter_scope(p.formalInParam)
-      for (b <- p.blocks) {
+      for (b <- p.blocks.toList) {
         p.replaceBlock(b, visit_block(b))
       }
       v.leave_scope()
