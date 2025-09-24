@@ -323,32 +323,31 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
     util.writeToFile(p.pprint, "/home/rina/progs/basil/plist-before.il")
 
-    val result = LoopDetector.identify_loops(p)
-    println(result.iloopHeaders.groupMap(_._2)(_._1))
-    result.loops.values.foreach { loop =>
-      println("" + loop.header + ": " + (loop.nodes ++ loop.edges.flatMap(x => List(x.to, x.from))).map(_.label))
-      println(loop)
-    }
-
     val loops = NewLoopDetector.identify_loops(p.mainProcedure).get
-    loops.values.foreach(println(_))
+    loops.values.filter(_.isCycle()).foreach { x =>
+      println()
+      println(x)
+      println(x.toLoop().get)
+    }
 
     val hl = loops.filter(_._2.headers.nonEmpty).last._2.nodes
     println("XXX" + hl)
     util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, hl), "/home/rina/progs/basil/out.dot")
     // util.renderDotGraph(dotFlowGraph(p.mainProcedure.blocks.toList, Set()))
 
+    util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/in.dot")
     analysis.AnalysisPipelineMRA.reducibleLoops(p)
-    util.writeToFile(dotBlockGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/out.dot")
+    util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/out.dot")
 
     util.writeToFile(p.pprint, "/home/rina/progs/basil/plist-after.il")
 
+    println("AFTER TRANSFORM")
     p.procedures.filter(_.entryBlock.isDefined).foreach { p =>
       val blocksWithoutPrev = p.blocks.filter(b => Some(b) != p.entryBlock && b.prevBlocks.isEmpty).toList
       assertResult(Nil, "after loop transform, all blocks should still be reachable")(blocksWithoutPrev)
 
       val loops = NewLoopDetector.identify_loops(p).get
-      loops.values.foreach(println(_))
+      loops.values.flatMap(_.toLoop()).foreach(println(_))
       assert(loops.values.forall(!_.isIrreducible()))
     }
   }

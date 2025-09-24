@@ -30,8 +30,8 @@ object AnalysisPipelineMRA {
       NewLoopDetector.identify_loops(procedure) match {
         case Some(loops) =>
           loops.values.iterator.flatMap(_.toLoop()).foreach { loop =>
-            println(loop)
-            LoopTransform.llvm_transform_loop(loop)
+            // println(loop)
+            val _ = LoopTransform.new_llvm_transform_loop(loop)
           }
         case None => ()
       }

@@ -427,6 +427,7 @@ object NewLoopDetector {
       loop.nodes ++= nodes
       loop.edges ++= nodes.flatMap(n => (n.nextBlocks.toSet & nodes).map(LoopEdge(n, _)))
       loop.reducible = !isIrreducible()
+      println("YYY" + headers)
       Some(loop)
     }
   }
@@ -476,6 +477,7 @@ object NewLoopDetector {
       // closures of node-sets.
       forest = loops.foldLeft(forest) {
         case (forest, BlockLoopState(b, Some(h), _, _, _, _)) =>
+          println("topological order: " + h + " -> " + b)
           val updated = h -> (forest(h) + b ++ forest.getOrElse(b, Set()))
           forest + updated
         case (forest, _) => forest
