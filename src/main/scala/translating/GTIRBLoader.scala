@@ -755,13 +755,9 @@ class GTIRBLoader(parserMap: immutable.Map[String, List[InsnSemantics]]) {
   }
 
   private def resolveFieldExpr(name: String, field: String): GlobalVar = {
-    name match {
-      case "PSTATE" =>
-        field match {
-          case "V" | "C" | "Z" | "N" => Register(field + "F", 1)
-          case "BTYPE" => Register(field, 2)
-          case _ => throw Exception(s"unidentified Expr_Field ($name, $field)")
-        }
+    (name, field) match {
+      case ("PSTATE", "V" | "C" | "Z" | "N") => Register(field + "F", 1)
+      case ("PSTATE", "BTYPE") => Register(field, 2)
       case _ => throw Exception(s"unidentified Expr_Field ($name, $field)")
     }
   }
