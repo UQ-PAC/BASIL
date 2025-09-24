@@ -3,6 +3,7 @@ package analysis
 import ir.{
   Assume,
   BinaryExpr,
+  AssocExpr,
   Block,
   BoolOR,
   EQ,
@@ -713,33 +714,89 @@ object LoopTransform {
     newLoop
   }
 
-  def new_llvm_transform_loop(loop: Loop): Unit = {
-    if (loop.reducible) return
+  case class IrreducibleTransformInfo(
+    val entryIndices: Map[Block, Int],
+    val precedingIndices: Map[Block, List[Int]]
+  )
+
+  def new_llvm_transform_loop(loop: Loop): Option[IrreducibleTransformInfo] = {
+    if (loop.reducible) return None
+
+    // From LLVM: https://llvm.org/doxygen/FixIrreducible_8cpp_source.html
+    //
+    // > To convert an irreducible cycle C to a natural loop L:
+    // >
+    // > 1. Add a new node N to C.
+    // > 2. Redirect all external incoming edges through N.
+    // > 3. Redirect all edges incident on header H through N.
+    // >
+    // > This is sufficient to ensure that:
+    // >
+    // > a. Every closed path in C also exists in L, with the modification that any
+    // >    path passing through H now passes through N before reaching H.
+    // > b. Every external path incident on any entry of C is now incident on N and
+    // >    then redirected to the entry.
+    //
+    // In (3.), we take "incident on H" to mean internal edges pointing to H.
+
+    val procedure = loop.header.parent
 
     // in the transform, all external entries are redirected to the new header.
-    val externalEntries = loop.entryEdges.toSet ++ loop.reentries
+    val externalEntries: Set[LoopEdge] = loop.entryEdges.toSet ++ loop.reentries
+
+    val oldHeaders = externalEntries.map(_.to)
 
     // internal edges to the header are also redirected through the new header.
-    val edgesIntoHeader = loop.backEdges
+    // note this excludes internal edges to alternative headers.
+    val edgesIntoHeader: Set[LoopEdge] = loop.backEdges.toSet
 
-    // new header is succeeded by all the headers (both canonical + irred. headers).
+    // compute entries into any of the old headers. keyed by entry blocks.
+    val entryIndices: Map[Block, Int] = oldHeaders.flatMap(_.prevBlocks).zipWithIndex.toMap
+    // included entry blocks should be a superset of (externalEntries ++ edgesIntoHeader).
+    // in particular, it additionally includes internal edges to alternative headers.
+    assert((externalEntries.toSet ++ edgesIntoHeader).map(_.from).subsetOf(entryIndices.keys.toSet))
+
+    // indices of blocks which may go to a particular header. keyed by header block.
+    val precedingIndices: Map[Block, List[Int]] = oldHeaders.iterator.map { h =>
+      h -> h.prevBlocks.toList.map(entryIndices(_))
+    }.toMap
+
+    // new header is succeeded by all the old headers.
+    // NOTE: created after oldHeaders are iterated to make sure newHeader doesn't appear in those maps.
     val newHeader = Block(s"${loop.header.label}_loop_N", jump = Unreachable())
-    IRWalk.procedure(loop.header).addBlock(newHeader)
+    newHeader.replaceJump(GoTo(oldHeaders))
+    procedure.addBlock(newHeader)
 
-    // TODO:  set up successors of newHeader. with assumes.
+    // the "from" variable is assigned based on blocks which enter the loop.
+    // entering blocks might enter a *subset* of the headers, and this needs to
+    // be maintained when redirecting through the new header.
+    //
+    // as such, each entering block gets its own value for this variable
+    // and this is disjoined into an assume statement within each header.
+    //
+    // this includes both external and internal entries.
+    val fromVariable = LocalVar(s"${loop.header.label}_loop_from", IntType)
 
-    externalEntries.foreach { case LoopEdge(from, to) =>
+    // transform each old header by adding an assume of the blocks which might enter it.
+    precedingIndices.foreach { (h, indices) =>
+      val eqs = indices.map(i => BinaryExpr(EQ, fromVariable, IntLiteral(BigInt(i))))
+      h.statements.prepend(Assume(AssocExpr(BoolOR, eqs)))
+    }
+
+    // for every predecessor of all old headers, assign its from variable. this makes
+    // sure that the assume works.
+    entryIndices.foreach { (entry, i) =>
+      entry.statements.append(LocalAssign(fromVariable, IntLiteral(BigInt(i))))
+    }
+
+    // for predecessors of the distinguished old header, replace their gotos with the new header.
+    (externalEntries.iterator ++ edgesIntoHeader).foreach { case edge @ LoopEdge(from, to) =>
       from.jump match {
         case goto: GoTo => goto.replaceTarget(to, newHeader)
-        case _ => throw new Exception("entry block to loop was terminated by non-goto?!")
+        case _ => throw new Exception(s"edge $edge into loop was terminated by non-goto?!")
       }
     }
 
-    edgesIntoHeader.foreach { case LoopEdge(from, to) =>
-      from.jump match {
-        case goto: GoTo => goto.replaceTarget(to, newHeader)
-        case _ => throw new Exception("entry block to loop was terminated by non-goto?!")
-      }
-    }
+    Some(IrreducibleTransformInfo(entryIndices, precedingIndices))
   }
 }

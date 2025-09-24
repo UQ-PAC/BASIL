@@ -279,7 +279,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
   test("sub-cycles") {
     import ir.dsl.*
-    val p = prog(
+    def makeProg = prog(
       proc("main")(
         block("S", goto("h1", "h2")),
         block("h1", goto("h2")),
@@ -288,18 +288,23 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
         block("exit", ret)
       )
     )
+    val p = makeProg
+
     val result = NewLoopDetector.identify_loops(p.mainProcedure).get
     result.values.foreach(println(_))
     val loops = result.values.flatMap(_.toLoop())
 
     loops.foreach(println(_))
-    util.renderDotGraph(dotFlowGraph(p.mainProcedure.blocks.toList, Set()))
+    // util.renderDotGraph(dotFlowGraph(p.mainProcedure.blocks.toList, Set()))
 
-    LoopTransform.llvm_transform_loop(loops.head)
+    LoopTransform.new_llvm_transform_loop(loops.head)
     // analysis.AnalysisPipelineMRA.reducibleLoops(p)
 
-    util.renderDotGraph(dotFlowGraph(p.mainProcedure.blocks.toList, Set()))
+    util.renderDotGraph(dotBlockGraph(p.mainProcedure.blocks.toList, Set()))
 
+    val p2 = makeProg
+    analysis.AnalysisPipelineMRA.reducibleLoops(p2)
+    util.renderDotGraph(dotBlockGraph(p2.mainProcedure.blocks.toList, Set()))
   }
 
   test("plist_free") {
