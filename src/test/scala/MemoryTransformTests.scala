@@ -214,7 +214,7 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
           MemoryStore(mem, xAddress, R31, LittleEndian, 64, Some("01")),
           MemoryLoad(R0, mem, xAddress, LittleEndian, 64, Some("02")),
           MemoryStore(mem, zAddress, R0, LittleEndian, 64, Some("03")),
-          goto("k")
+          goto("k", "dummy")
         ),
         block("h", goto("k")),
         block("k", ret),

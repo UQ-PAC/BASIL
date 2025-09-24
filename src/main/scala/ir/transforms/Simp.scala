@@ -1249,21 +1249,44 @@ object OffsetProp {
     val lastUpdate = mutable.Map[Block, Int]()
     var stSequenceNo = 1
 
-    def findOff(v: Variable, c: BitVecLiteral): BitVecLiteral | Variable | BinaryExpr = find(v) match {
-      case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
-      case lv: Variable => BinaryExpr(BVADD, lv, c)
-      case BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) =>
-        BinaryExpr(BVADD, l, ir.eval.BitVectorEval.smt_bvadd(r, c))
-      case _ => throw Exception("Unexpected expression structure created by find() at some point")
-    }
+    def eval(c: BitVecLiteral)(v: BitVecLiteral | Variable | BinaryExpr): BitVecLiteral | Variable | BinaryExpr =
+      v match {
+        case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
+        case lv: Variable => BinaryExpr(BVADD, lv, c)
+        case BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) =>
+          BinaryExpr(BVADD, l, ir.eval.BitVectorEval.smt_bvadd(r, c))
+        case _ => throw Exception("Unexpected expression structure created by find() at some point")
+      }
 
-    def find(v: Variable): BitVecLiteral | Variable | BinaryExpr = {
+    def findOff(v: Variable, c: BitVecLiteral, fuel: Int = 1000): BitVecLiteral | Variable | BinaryExpr =
+      find(v, fuel) match {
+        case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
+        case lv: Variable => BinaryExpr(BVADD, lv, c)
+        case BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) =>
+          BinaryExpr(BVADD, l, ir.eval.BitVectorEval.smt_bvadd(r, c))
+        case _ => throw Exception("Unexpected expression structure created by find() at some point")
+      }
+
+    def find(v: Variable, fuel: Int = 1000): BitVecLiteral | Variable | BinaryExpr = {
+      if (fuel == 0) {
+        var chain = List(v)
+        for (i <- 0 to 10) {
+          chain = st.get(chain.head) match {
+            case Some((Some(v: Variable), _)) => v :: chain
+            case o =>
+              chain
+          }
+        }
+        throw Exception(
+          s"Ran out of fuel recursively resolving copyprop (at $v): probable cycle. Next lookups are: $chain"
+        )
+      }
       st.get(v) match {
         case None => v
         case Some((None, None)) => v
         case Some((None, Some(c))) => c
-        case Some((Some(v), None)) => find(v)
-        case Some((Some(v), Some(c))) => findOff(v, c)
+        case Some((Some(v), None)) => find(v, fuel - 1)
+        case Some((Some(v), Some(c))) => findOff(v, c, fuel - 1)
       }
     }
 

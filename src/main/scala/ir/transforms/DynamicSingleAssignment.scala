@@ -316,7 +316,7 @@ class OnePassDSA(
     val worklist = mutable.PriorityQueue[Block]()(Ordering.by(b => b.rpoOrder))
     worklist.addAll(p.blocks)
     var seen = Set[Block]()
-    val count = mutable.Map[Variable, Int]().withDefaultValue(0)
+    val count = mutable.Map[Variable, Int]().withDefaultValue(p.ssaCount)
 
     while (worklist.nonEmpty) {
       while (worklist.nonEmpty) {

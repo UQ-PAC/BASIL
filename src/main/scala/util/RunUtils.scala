@@ -54,23 +54,26 @@ object RunUtils {
     Logger.info("[!] Loading Program")
     val q = conf
     var ctx = q.context.getOrElse(IRLoading.load(q.loading))
+    assert(invariant.readUninitialised(ctx.program))
     postLoad(ctx) // allows extracting information from the original loaded program
 
-    assert(ir.invariant.checkTypeCorrect(ctx.program))
+    assert(invariant.checkTypeCorrect(ctx.program))
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
+    assert(invariant.readUninitialised(ctx.program))
 
     val analysisManager = AnalysisManager(ctx.program)
 
     if conf.simplify != SimplifyMode.Disabled then doCleanupWithSimplify(ctx, analysisManager)
     else doCleanupWithoutSimplify(ctx, analysisManager)
 
-    assert(ir.invariant.programDiamondForm(ctx.program))
+    assert(invariant.programDiamondForm(ctx.program))
+    assert(invariant.readUninitialised(ctx.program))
 
     transforms.inlinePLTLaunchpad(ctx, analysisManager)
 
-    assert(ir.invariant.programDiamondForm(ctx.program))
+    assert(invariant.programDiamondForm(ctx.program))
 
     if q.loading.trimEarly then
       getStripUnreachableFunctionsTransform(q.loading.procedureTrimDepth)(ctx, analysisManager)
@@ -84,6 +87,7 @@ object RunUtils {
     if (q.loading.parameterForm && !(q.simplify != SimplifyMode.Disabled)) {
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
+      assert(ir.invariant.readUninitialised(ctx.program))
       if (conf.assertCalleeSaved) {
         transforms.CalleePreservedParam.transform(ctx.program)
       }
@@ -110,15 +114,6 @@ object RunUtils {
     ir.eval.SimplifyValidation.validate = conf.validateSimp
 
     conf.simplify match {
-      case SimplifyMode.Disabled => ()
-      case _ => {
-        for (p <- ctx.program.procedures) {
-          p.normaliseBlockNames()
-        }
-      }
-    }
-
-    conf.simplify match {
       case c: SimplifyMode.ValidatedSimplify => {
         ir.transforms.clearParams(ctx.program)
         ir.transforms.liftIndirectCall(ctx.program)
@@ -127,19 +122,24 @@ object RunUtils {
         ctx = nctx
       }
       case SimplifyMode.Simplify => {
+        assert(ir.invariant.readUninitialised(ctx.program))
         ir.transforms.clearParams(ctx.program)
+        assert(ir.invariant.readUninitialised(ctx.program))
 
         ir.transforms.liftIndirectCall(ctx.program)
         transforms.liftSVCompNonDetEarlyIR(ctx.program)
 
+        assert(ir.invariant.readUninitialised(ctx.program))
         DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
         ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
         DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
 
+        assert(ir.invariant.readUninitialised(ctx.program))
         if (conf.assertCalleeSaved) {
           transforms.CalleePreservedParam.transform(ctx.program)
         }
 
+        assert(ir.invariant.readUninitialised(ctx.program))
         assert(ir.invariant.programDiamondForm(ctx.program))
         doSimplify(ctx, conf.staticAnalysis)
       }
@@ -166,6 +166,7 @@ object RunUtils {
         val memTransferTimer = PerformanceTimer("Mem Transfer Timer", INFO)
         visit_prog(MemoryTransform(dsaResults.topDown, dsaResults.globals), ctx.program)
         memTransferTimer.checkPoint("Performed Memory Transform")
+        invariant.readUninitialised(ctx.program)
     }
 
     if q.summariseProcedures then
