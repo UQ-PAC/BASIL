@@ -1,104 +1,161 @@
 /* TODO: Move these to a different class */
 
 :root {
-    /* Main display */
-    --background-color: #ffffff;
-    --text-color: #1f2937;
+  /* Main display */
+  --background-color: #ffffff;
+  --text-color: #1f2937;
 
-    /* Modal styles */
-    --modal-header-background-color: #f5f5f5;
-    --border-color: #ccc;
+  /* Modal styles */
+  --modal-header-background-color: #f5f5f5;
+  --border-color: #ccc;
 }
 
 /* TODO: Maybe there is a cleaner way to do this later on */
 /* TODO: System isn't working? */
 [data-theme='dark'] {
-    /* Main display */
-    --background-color: #1f2937;
-    --text-color: #f3f4f6;
-    --error-text-color: #fa5454;
+  /* Main display */
+  --background-color: #1f2937;
+  --text-color: #f3f4f6;
+  --error-text-color: #fa5454;
 
-    /* Modal styles */
-    --modal-header-background-color: #313d53;
-    --border-color: #777;
-    --modal-close-button: #b8b8b8;
-    --spinner-icon: #FFF;
+  /* Modal styles */
+  --modal-header-background-color: #313d53;
+  --border-color: #777;
+  --modal-close-button: #b8b8b8;
+  --spinner-icon: #fff;
 
-    /* Sidebar styles */
-    --sidebar-header-color: #f0f0f0;
-    --sidebar-background-color: #313d53;
-    --sidebar-epoch-button-background-color: #0d2e5c;
-    --sidebar-epoch-button-border-color: #010b23;
-    --sidebar-epoch-button-text-color: #fff;
-    --sidebar-config-button-background-color: #000000;
-    --sidebar-config-button-background-hover-color: #222;
-    --sidebar-config-button-border-color: #0030d1;
-    --sidebar-dataset-label-color: #ffffff;
+  /* Sidebar styles */
+  --sidebar-header-color: #f0f0f0;
+  --sidebar-background-color: #313d53;
+  --sidebar-epoch-button-background-color: #0d2e5c;
+  --sidebar-epoch-button-border-color: #010b23;
+  --sidebar-epoch-button-text-color: #fff;
+  --sidebar-config-button-background-color: #000000;
+  --sidebar-config-button-background-hover-color: #222;
+  --sidebar-config-button-border-color: #0030d1;
+  --sidebar-dataset-label-color: #ffffff;
 
-    /* Header styles */
-    --header-settings-icon-color: #919daa;
-    --header-settings-icon-color-hover: #b3bad5;
+  /* Header styles */
+  --header-settings-icon-color: #919daa;
+  --header-settings-icon-color-hover: #b3bad5;
 
-    /* DropDown styles */
-    --dropdown-background-color-hover: #3c3c3c;
+  /* DropDown styles */
+  --dropdown-background-color-hover: #3c3c3c;
 
-    /* CFG styles */
-    --cfg-header-background--color: #161B22;
-    --cfg-header-border-color: #444;
-    --cfg-header-text-color: #444;
-    --cfg-graph-border-color: #444;
-    --cfg-graph-background-color: #1e293b;
-    --cfg-graph-shadow-color: rgba(0, 0, 0, 0.3);
-    --cfg-graph-header-background: #313d53;
-    --cfg-graph-header-border: #444;
-    --cfg-graph-header-text: #f3f4f6;
-    --cfg-node-background-color: #000;
-    --cfg-node-text-color: #FFF;
-    --cfg-button-hover-color: #333;
+  /* CFG styles */
+  --cfg-header-background--color: #161b22;
+  --cfg-header-border-color: #444;
+  --cfg-header-text-color: #444;
+  --cfg-graph-border-color: #444;
+  --cfg-graph-background-color: #1e293b;
+  --cfg-graph-shadow-color: rgba(0, 0, 0, 0.3);
+  --cfg-graph-header-background: #313d53;
+  --cfg-graph-header-border: #444;
+  --cfg-graph-header-text: #f3f4f6;
+  --cfg-node-background-color: #000;
+  --cfg-node-text-color: #fff;
+  --cfg-button-hover-color: #333;
 
-    /* Combined Viewer */
-    --combined--header-background-color: #161B22;
-    --combined-border-background-color: #444;
-    --combined-ir-code-panel-background-color: #000;
-    --combined-ir-code-panel-border-color: #555;
+  /* Combined Viewer */
+  --combined--header-background-color: #161b22;
+  --combined-border-background-color: #444;
+  --combined-ir-code-panel-background-color: #000;
+  --combined-ir-code-panel-border-color: #555;
 
-    /* Colour scheme */
-    --token-keyword-color: #569cd6;
-    --token-variable-color: #9cdcfe;
-    --token-label-color: #FFCC66;
-    --token-function-color: #dcdcaa;
-    --token-type-color: #4ec9b0;
-    --token-boolean-color: #569cd6;
-    --token-number-color: #b5cea8;
-    --token-comment-color: #6a9955;
-    --token-string-color: #ce9178;
-    --token-operator-color: #d4d4d4;
-    --token-punctuation-color: #808080;
-    --token-property-color: #9CDCFE;
+  /* Colour scheme */
+  --token-keyword-color: #569cd6;
+  --token-variable-color: #9cdcfe;
+  --token-label-color: #ffcc66;
+  --token-function-color: #dcdcaa;
+  --token-type-color: #4ec9b0;
+  --token-boolean-color: #569cd6;
+  --token-number-color: #b5cea8;
+  --token-comment-color: #6a9955;
+  --token-string-color: #ce9178;
+  --token-operator-color: #d4d4d4;
+  --token-punctuation-color: #808080;
+  --token-property-color: #9cdcfe;
 }
 
 [data-theme='light'] {
+  /* Main display */
+  --background-color: #ffffff;
+  --text-color: #1f2937;
+  --error-text-color: #952222;
+
+  /* Modal styles */
+  --modal-header-background-color: #f5f5f5;
+  --border-color: #ccc;
+  --modal-close-button: #040404;
+  --spinner-icon: #000;
+
+  /* Sidebar styles */
+  --sidebar-header-color: #333;
+  --sidebar-background-color: #f0f0f0;
+  --sidebar-epoch-button-background-color: #9bb8e1;
+  --sidebar-epoch-button-border-color: #ccc;
+  --sidebar-epoch-button-text-color: #000;
+  --sidebar-config-button-background-color: #fff;
+  --sidebar-config-button-border-color: #d1d5db;
+  --sidebar-dataset-label-color: #4b5563;
+  --sidebar-config-button-background-hover-color: #ddd;
+
+  /* Header styles */
+  --header-settings-icon-color: #6a737d;
+  --header-settings-icon-color-hover: #3d4c6a;
+
+  /* DropDown styles */
+  --dropdown-background-color-hover: #bfbfbf;
+
+  /* CFG styles */
+  --cfg-header-background--color: #e0e0e0;
+  --cfg-header-border-color: #000;
+  --cfg-header-text-color: #000;
+  --cfg-graph-border-color: #ddd;
+  --cfg-graph-background-color: #f9f9f9;
+  --cfg-graph-shadow-color: rgba(0, 0, 0, 0.1);
+  --cfg-graph-header-background: #e0e0e0;
+  --cfg-graph-header-border: #ccc;
+  --cfg-graph-header-text: #333;
+  --cfg-node-background-color: #fff;
+  --cfg-node-text-color: #000;
+  --cfg-button-hover-color: #f0f0f0;
+
+  /* Combined Viewer */
+  --combined--header-background-color: #e0e0e0;
+  --combined-border-background-color: #000;
+  --combined-ir-code-panel-background-color: #fff;
+  --combined-ir-code-panel-border-color: #ddd;
+
+  /* Color Scheme */
+  --token-keyword-color: #005cc5;
+  --token-variable-color: #e36209;
+  --token-label-color: #e69900;
+  --token-function-color: #6f42c1;
+  --token-type-color: #005cc5;
+  --token-boolean-color: #d73a49;
+  --token-number-color: #005cc5;
+  --token-comment-color: #6a737d;
+  --token-string-color: #032f62;
+  --token-operator-color: #d73a49;
+  --token-punctuation-color: #24292e;
+  --token-property-color: #a52a2a;
+}
+
+/* TODO: Check that this works */
+[data-theme='system'] {
+  @media (prefers-color-scheme: light) {
     /* Main display */
     --background-color: #ffffff;
     --text-color: #1f2937;
-    --error-text-color: #952222;
 
     /* Modal styles */
     --modal-header-background-color: #f5f5f5;
     --border-color: #ccc;
-    --modal-close-button: #040404;
-    --spinner-icon: #000;
 
     /* Sidebar styles */
     --sidebar-header-color: #333;
     --sidebar-background-color: #f0f0f0;
-    --sidebar-epoch-button-background-color: #9bb8e1;
-    --sidebar-epoch-button-border-color: #ccc;
-    --sidebar-epoch-button-text-color: #000;
-    --sidebar-config-button-background-color: #fff;
-    --sidebar-config-button-border-color: #d1d5db;
-    --sidebar-dataset-label-color: #4b5563;
-    --sidebar-config-button-background-hover-color: #ddd;
 
     /* Header styles */
     --header-settings-icon-color: #6a737d;
@@ -108,7 +165,7 @@
     --dropdown-background-color-hover: #bfbfbf;
 
     /* CFG styles */
-    --cfg-header-background--color: #E0E0E0;
+    --cfg-header-background--color: #e0e0e0;
     --cfg-header-border-color: #000;
     --cfg-header-text-color: #000;
     --cfg-graph-border-color: #ddd;
@@ -117,130 +174,73 @@
     --cfg-graph-header-background: #e0e0e0;
     --cfg-graph-header-border: #ccc;
     --cfg-graph-header-text: #333;
-    --cfg-node-background-color: #FFF;
+    --cfg-node-background-color: #fff;
     --cfg-node-text-color: #000;
     --cfg-button-hover-color: #f0f0f0;
 
     /* Combined Viewer */
-    --combined--header-background-color: #E0E0E0;
+    --combined--header-background-color: #e0e0e0;
     --combined-border-background-color: #000;
-    --combined-ir-code-panel-background-color: #FFF;
-    --combined-ir-code-panel-border-color: #DDD;
-
-    /* Color Scheme */
-    --token-keyword-color: #005cc5;
-    --token-variable-color: #e36209;
-    --token-label-color: #E69900;
-    --token-function-color: #6f42c1;
-    --token-type-color: #005cc5;
-    --token-boolean-color: #d73a49;
-    --token-number-color: #005cc5;
-    --token-comment-color: #6a737d;
-    --token-string-color: #032f62;
-    --token-operator-color: #d73a49;
-    --token-punctuation-color: #24292e;
-    --token-property-color: #A52A2A;
-}
-
-/* TODO: Check that this works */
-[data-theme='system'] {
-    @media (prefers-color-scheme: light) {
-        /* Main display */
-        --background-color: #ffffff;
-        --text-color: #1f2937;
-
-        /* Modal styles */
-        --modal-header-background-color: #f5f5f5;
-        --border-color: #ccc;
-
-        /* Sidebar styles */
-        --sidebar-header-color: #333;
-        --sidebar-background-color: #f0f0f0;
-
-        /* Header styles */
-        --header-settings-icon-color: #6a737d;
-        --header-settings-icon-color-hover: #3d4c6a;
-
-        /* DropDown styles */
-        --dropdown-background-color-hover: #bfbfbf;
-
-        /* CFG styles */
-        --cfg-header-background--color: #E0E0E0;
-        --cfg-header-border-color: #000;
-        --cfg-header-text-color: #000;
-        --cfg-graph-border-color: #ddd;
-        --cfg-graph-background-color: #f9f9f9;
-        --cfg-graph-shadow-color: rgba(0, 0, 0, 0.1);
-        --cfg-graph-header-background: #e0e0e0;
-        --cfg-graph-header-border: #ccc;
-        --cfg-graph-header-text: #333;
-        --cfg-node-background-color: #FFF;
-        --cfg-node-text-color: #000;
-        --cfg-button-hover-color: #f0f0f0;
-
-        /* Combined Viewer */
-        --combined--header-background-color: #E0E0E0;
-        --combined-border-background-color: #000;
-        --combined-ir-code-panel-background-color: #FFF;
-        --combined-ir-code-panel-border-color: #DDD;
-    }
+    --combined-ir-code-panel-background-color: #fff;
+    --combined-ir-code-panel-border-color: #ddd;
+  }
 }
 
 [data-theme='system'] {
-    @media (prefers-color-scheme: dark) {
-        /* Main display */
-        --background-color: #1f2937;
-        --text-color: #f3f4f6;
+  @media (prefers-color-scheme: dark) {
+    /* Main display */
+    --background-color: #1f2937;
+    --text-color: #f3f4f6;
 
-        /* Modal styles */
-        --modal-header-background-color: #313d53;
-        --border-color: #777;
+    /* Modal styles */
+    --modal-header-background-color: #313d53;
+    --border-color: #777;
 
-        /* Sidebar styles */
-        --sidebar-header-color: #f0f0f0;
-        --sidebar-background-color: #313d53;
+    /* Sidebar styles */
+    --sidebar-header-color: #f0f0f0;
+    --sidebar-background-color: #313d53;
 
-        /* Header styles */
-        --header-settings-icon-color: #919daa;
-        --header-settings-icon-color-hover: #b3bad5;
+    /* Header styles */
+    --header-settings-icon-color: #919daa;
+    --header-settings-icon-color-hover: #b3bad5;
 
-        /* DropDown styles */
-        --dropdown-background-color-hover: #3c3c3c;
+    /* DropDown styles */
+    --dropdown-background-color-hover: #3c3c3c;
 
-        /* CFG styles */
-        --cfg-header-background--color: #161B22;
-        --cfg-header-border-color: #444;
-        --cfg-header-text-color: #444;
-        --cfg-graph-border-color: #444;
-        --cfg-graph-background-color: #1e293b;
-        --cfg-graph-shadow-color: rgba(0, 0, 0, 0.3);
-        --cfg-graph-header-background: #313d53;
-        --cfg-graph-header-border: #444;
-        --cfg-graph-header-text: #f3f4f6;
-        --cfg-node-background-color: #000;
-        --cfg-node-text-color: #FFF;
-        --cfg-button-hover-color: #333;
+    /* CFG styles */
+    --cfg-header-background--color: #161b22;
+    --cfg-header-border-color: #444;
+    --cfg-header-text-color: #444;
+    --cfg-graph-border-color: #444;
+    --cfg-graph-background-color: #1e293b;
+    --cfg-graph-shadow-color: rgba(0, 0, 0, 0.3);
+    --cfg-graph-header-background: #313d53;
+    --cfg-graph-header-border: #444;
+    --cfg-graph-header-text: #f3f4f6;
+    --cfg-node-background-color: #000;
+    --cfg-node-text-color: #fff;
+    --cfg-button-hover-color: #333;
 
-        /* Combined Viewer */
-        --combined--header-background-color: #161B22;
-        --combined-border-background-color: #444;
-        --combined-ir-code-panel-background-color: #000;
-        --combined-ir-code-panel-border-color: #555;
-    }
+    /* Combined Viewer */
+    --combined--header-background-color: #161b22;
+    --combined-border-background-color: #444;
+    --combined-ir-code-panel-background-color: #000;
+    --combined-ir-code-panel-border-color: #555;
+  }
 }
 
 .app-layout {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-    background-color: var(--background-color);
-    color: var(--text-color);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--background-color);
+  color: var(--text-color);
 }
 
 .main-layout {
-    display: flex;
-    flex: 1;
-    flex-direction: row;
-    width: 100vw;
-    box-sizing: border-box;
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  width: 100vw;
+  box-sizing: border-box;
 }

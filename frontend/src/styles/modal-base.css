@@ -3,158 +3,175 @@
 /* --- BASE STYLES FOR ALL MODALS --- */
 
 .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
 }
 
 .modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-left: 10px;
-    border-bottom: 1px solid var(--border-color);
-    background-color: var(--modal-header-background-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-left: 10px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--modal-header-background-color);
 }
 
 .modal-content-base {
-    background-color: var(--background-color);
-    color: var(--text-color);
-    border-radius: 0.75rem;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); /* TODO: This should be updated */
-    width: 100%; /* TODO: was 90% */
-    max-width: 400px; /* TODO: max-width to settings' value: was 28rem */
-    margin-left: auto;
-    margin-right: auto;
-    position: relative;
-    animation: scaleIn 0.25s ease-in-out;
-    overflow: hidden;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  border-radius: 0.75rem;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04); /* TODO: This should be updated */
+  width: 100%; /* TODO: was 90% */
+  max-width: 400px; /* TODO: max-width to settings' value: was 28rem */
+  margin-left: auto;
+  margin-right: auto;
+  position: relative;
+  animation: scaleIn 0.25s ease-in-out;
+  overflow: hidden;
 }
 
 .modal-body {
-    padding: 10px;
-    text-align: center;
-    border-bottom-left-radius: 0.75rem;
-    border-bottom-right-radius: 0.75rem;
+  padding: 10px;
+  text-align: center;
+  border-bottom-left-radius: 0.75rem;
+  border-bottom-right-radius: 0.75rem;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes scaleIn {
-    from { transform: scale(0.8); opacity: 0; }
-    to   { transform: scale(1); opacity: 1; }
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
-.spinner-icon { /* TODO: Set a colour for this (Dark + light) */
-    width: 3rem;
-    height: 3rem;
-    margin: 1rem auto 0;
-    animation: spin 1s linear infinite;
-    display: block;
-    fill: var(--spinner-icon);
+.spinner-icon {
+  /* TODO: Set a colour for this (Dark + light) */
+  width: 3rem;
+  height: 3rem;
+  margin: 1rem auto 0;
+  animation: spin 1s linear infinite;
+  display: block;
+  fill: var(--spinner-icon);
 }
 
 @keyframes spin {
-    0%   { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Status messages (used by both loading and error modals) */
 .status-message {
-    margin: 1rem auto 0;
-    padding: 0.5rem 1rem;
-    border-radius: 0.25rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    max-width: 80%;
-    overflow-wrap: break-word;
+  margin: 1rem auto 0;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  max-width: 80%;
+  overflow-wrap: break-word;
 }
 
 .status-success {
-    background-color: #d1fae5;
-    color: #065f46;
+  background-color: #d1fae5;
+  color: #065f46;
 }
 
 .status-error {
-    background-color: #fee2e2;
-    color: #991b1b;
+  background-color: #fee2e2;
+  color: #991b1b;
 }
 
 .status-loading {
-    background-color: #e0e7ff;
-    color: #3730a3;
+  background-color: #e0e7ff;
+  color: #3730a3;
 }
 
 /* Close button for simple modals */
 .modal-simple-close-button {
-    margin-top: 1rem;
-    padding: 0.5rem 1rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background-color: #f0f0f0;
-    cursor: pointer;
-    font-weight: bold;
-    transition: background-color 0.2s;
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #f0f0f0;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .modal-simple-close-button:hover {
-    background-color: #e0e0e0;
+  background-color: #e0e0e0;
 }
 
 .modal-title {
-    font-size: 1.25em;
-    font-weight: bold;
-    margin: 0;
-    color: var(--text-color);
-    padding: 15px;
+  font-size: 1.25em;
+  font-weight: bold;
+  margin: 0;
+  color: var(--text-color);
+  padding: 15px;
 }
 
 .selection-options {
-    padding: 10px;
-    border-bottom: 1px solid var(--border-color);
-    border-right: 1px solid var(--border-color);
-    border-left: 1px solid var(--border-color);
+  padding: 10px;
+  border-bottom: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  border-left: 1px solid var(--border-color);
 
-    border-bottom-left-radius: 0.75rem;
-    border-bottom-right-radius: 0.75rem;
+  border-bottom-left-radius: 0.75rem;
+  border-bottom-right-radius: 0.75rem;
 }
 
 .modal-close-button {
-    background-color: transparent;
-    border: none;
-    font-size: 25px;
-    cursor: pointer;
-    color: var(--modal-close-button);
+  background-color: transparent;
+  border: none;
+  font-size: 25px;
+  cursor: pointer;
+  color: var(--modal-close-button);
 }
 
 .modal-close-button:hover {
-    color: #777;
+  color: #777;
 }
 
 .error-message-body {
-    padding: 10px 20px 20px 20px;
-    text-align: left;
-    color: var(--error-text-color, #991b1b); /* Default as error colour (red) */
+  padding: 10px 20px 20px 20px;
+  text-align: left;
+  color: var(--error-text-color, #991b1b); /* Default as error colour (red) */
 }
 
 .error-message-body p {
-    margin-bottom: 0;
-    white-space: pre-wrap;
-    word-break: break-word;
+  margin-bottom: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .error-message-body .warning-text {
-    color: #ffc107; /* Yellow colour for warnings */
+  color: #ffc107; /* Yellow colour for warnings */
 }
 
 /* Possibility to expand different warning styles and colours */

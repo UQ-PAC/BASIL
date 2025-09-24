@@ -1,205 +1,206 @@
 /* sidebar.css */
 .sidebar {
-    width: 100%;
-    height: 100%;
-    background-color: var(--sidebar-background-color);
-    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
+  width: 100%;
+  height: 100%;
+  background-color: var(--sidebar-background-color);
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
 }
 
 .sidebar-header {
-    font-size: 1.2rem;
-    margin-bottom: 1rem;
-    color: var(--sidebar-header-color);
-    text-align: center;
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  color: var(--sidebar-header-color);
+  text-align: center;
 }
 
 .sidebar-loading,
 .sidebar-message {
-    font-style: italic;
-    color: #666;
-    text-align: center;
+  font-style: italic;
+  color: #666;
+  text-align: center;
 }
 
 .sidebar-error {
-    color: #dc3545;
-    font-weight: bold;
-    text-align: center;
+  color: #dc3545;
+  font-weight: bold;
+  text-align: center;
 }
 
 .epoch-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem; /* Space between buttons */
-    padding-left: 10px;
-    padding-right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem; /* Space between buttons */
+  padding-left: 10px;
+  padding-right: 10px;
 }
 
 .epoch-button {
-    background-color: var(--sidebar-epoch-button-background-color);
-    border: 1px solid var(--sidebar-epoch-button-border-color);
-    color: var(--sidebar-epoch-button-text-color);
-    padding: 0.75rem 1rem;
-    text-align: left;
-    cursor: pointer;
-    border-radius: 4px;
-    font-size: 0.95rem;
-    transition: background-color 0.2s ease, border-color 0.2s ease;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  background-color: var(--sidebar-epoch-button-background-color);
+  border: 1px solid var(--sidebar-epoch-button-border-color);
+  color: var(--sidebar-epoch-button-text-color);
+  padding: 0.75rem 1rem;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .epoch-button:not(.selected):hover {
-    background-color: #d0d0d0;
+  background-color: #d0d0d0;
 }
 
 .epoch-button.selected {
-    background-color: #007bff;
-    color: white;
-    border-color: #007bff;
-    font-weight: bold;
+  background-color: #007bff;
+  color: white;
+  border-color: #007bff;
+  font-weight: bold;
 }
 
-
 .resizable-sidebar-container {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    height: 100vh; /* TODO: Ensure that when there are so many options it is off the screen it still works */
-    flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  height: 100vh; /* TODO: Ensure that when there are so many options it is off the screen it still works */
+  flex-shrink: 0;
 }
 
 .collapse-button {
-    background: #9c9c9c;
-    border: none;
-    cursor: pointer;
-    width: 25px;
-    height: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: absolute;
-    top: 0;
-    right: -25px;
-    z-index: 100;
-    border-top-right-radius: 9999px;
-    border-bottom-right-radius: 9999px;
-    box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-    padding: 0;
-    margin: 0;
+  background: #9c9c9c;
+  border: none;
+  cursor: pointer;
+  width: 25px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: 0;
+  right: -25px;
+  z-index: 100;
+  border-top-right-radius: 9999px;
+  border-bottom-right-radius: 9999px;
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  padding: 0;
+  margin: 0;
 }
 
 .collapse-icon {
-    width: 14px;
-    height: 14px;
+  width: 14px;
+  height: 14px;
 }
 
 .resize-handle {
-    width: 8px;
-    background-color: transparent;
-    cursor: ew-resize;
-    position: absolute;
-    top: 0;
-    right: -4px;
-    height: 100%;
-    z-index: 10;
-    transition: background-color 0.2s ease;
-    border-radius: 999px;
+  width: 8px;
+  background-color: transparent;
+  cursor: ew-resize;
+  position: absolute;
+  top: 0;
+  right: -4px;
+  height: 100%;
+  z-index: 10;
+  transition: background-color 0.2s ease;
+  border-radius: 999px;
 }
 
 .resize-handle:hover {
-    background-color: #ccc;
+  background-color: #ccc;
 }
 
 .dataset-label {
-    display: block;
-    margin-bottom: 1px;
-    margin-left: 4px;
-    font-weight: 500;
-    color: var(--sidebar-dataset-label-color);
+  display: block;
+  margin-bottom: 1px;
+  margin-left: 4px;
+  font-weight: 500;
+  color: var(--sidebar-dataset-label-color);
 }
 
 .relative {
-    position: relative;
+  position: relative;
 }
 
 .dataset-select-container {
-    display: inline-block;
-    font-family: 'Inter', sans-serif;
-    padding: 10px;
+  display: inline-block;
+  font-family: 'Inter', sans-serif;
+  padding: 10px;
 }
 
 .dataset-select {
-    display: block;
-    width: 100%;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-    background-color: var(--sidebar-config-button-background-color);
-    color: var(--text-color);
-    border-width: 2px;
-    border-color: var(--sidebar-config-button-border-color);
-    border-radius: 9999px;
-    padding: 0.75rem 2.5rem 0.75rem 1rem;
-    transition: all 0.3s ease-in-out;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    cursor: pointer;
+  display: block;
+  width: 100%;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-color: var(--sidebar-config-button-background-color);
+  color: var(--text-color);
+  border-width: 2px;
+  border-color: var(--sidebar-config-button-border-color);
+  border-radius: 9999px;
+  padding: 0.75rem 2.5rem 0.75rem 1rem;
+  transition: all 0.3s ease-in-out;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
 }
 
 .dataset-select:hover {
-    background-color: var(--sidebar-config-button-background-hover-color);
+  background-color: var(--sidebar-config-button-background-hover-color);
 }
 
 .dataset-select:focus {
-    outline: none;
-    border-color: #6366f1;
+  outline: none;
+  border-color: #6366f1;
 }
 
 .arrow-right-icon {
-    position: absolute;
-    top: 10px;
-    transform: translateY(-50%);
-    width: 1rem;
-    height: 1rem;
-    fill: var(--text-color)
+  position: absolute;
+  top: 10px;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  fill: var(--text-color);
 }
 
 .selected-path-button {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    background-color: var(--sidebar-config-button-background-color);
-    color: var(--text-color);
-    border-width: 2px;
-    border-style: solid;
-    border-color: var(--sidebar-config-button-border-color);
-    border-radius: 9999px;
-    padding: 0.75rem 1rem;
-    cursor: pointer;
-    transition: all 0.3s ease-in-out;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background-color: var(--sidebar-config-button-background-color);
+  color: var(--text-color);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--sidebar-config-button-border-color);
+  border-radius: 9999px;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease-in-out;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 
-    text-align: left;
-    overflow: hidden;
+  text-align: left;
+  overflow: hidden;
 }
 
 .path-prefix {
-    font-weight: bold;
-    margin-right: 0.5rem;
-    flex-shrink: 0;
+  font-weight: bold;
+  margin-right: 0.5rem;
+  flex-shrink: 0;
 }
 
 .path-value {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 0;
-    font-size: 0.9rem;
-    font-family: monospace;
-    direction: rtl;
-    unicode-bidi: isolate;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  font-size: 0.9rem;
+  font-family: monospace;
+  direction: rtl;
+  unicode-bidi: isolate;
 }

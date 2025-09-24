@@ -1,96 +1,96 @@
 /* src/styles/cfg-viewer.css */
 
 .cfg-comparison-container-wrapper {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: 100%;
-    flex: 1;
-    min-height: 0;
-    padding-right: 20px;
-    padding-bottom: 20px;
-    box-sizing: border-box;
-    overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  padding-right: 20px;
+  padding-bottom: 20px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .cfg-viewer-header {
-    display: flex;
-    border: 1px solid var(--cfg-header-border-color);
-    background-color: var(--cfg-header-background--color);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    flex-shrink: 0;
-    border-radius: 8px;
+  display: flex;
+  border: 1px solid var(--cfg-header-border-color);
+  background-color: var(--cfg-header-background--color);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+  border-radius: 8px;
 }
 
 .cfg-comparison-container {
-    display: flex;
-    justify-content: space-around;
-    gap: 10px;
-    height: 100%;
-    width: 100%;
-    flex: 1;
-    min-height: 0;
+  display: flex;
+  justify-content: space-around;
+  gap: 10px;
+  height: 100%;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .cfg-panel {
-    border-color: var(--cfg-graph-border-color) !important;
-    background-color: var(--cfg-graph-background-color) !important;
+  border-color: var(--cfg-graph-border-color) !important;
+  background-color: var(--cfg-graph-background-color) !important;
 }
 
 .cfg-panel-message {
-    color: var(--cfg-graph-header-text) !important;
+  color: var(--cfg-graph-header-text) !important;
 }
 
 .graph-wrapper {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    border: 1px solid var(--cfg-graph-border-color);
-    border-radius: 8px;
-    background-color: var(--cfg-graph-background-color);
-    box-shadow: 0 4px 8px var(--cfg-graph-shadow-color);
-    min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--cfg-graph-border-color);
+  border-radius: 8px;
+  background-color: var(--cfg-graph-background-color);
+  box-shadow: 0 4px 8px var(--cfg-graph-shadow-color);
+  min-height: 0;
 }
 
 .graph-wrapper h3 {
-    text-align: center;
-    padding: 5px 0;
-    margin: 0;
-    background-color: var(--cfg-graph-header-background);
-    border-bottom: 1px solid var(--cfg-graph-header-border);
-    color: var(--cfg-graph-header-text);
-    font-size: 1.2em;
-    flex-shrink: 0; /* Prevent title from shrinking */
+  text-align: center;
+  padding: 5px 0;
+  margin: 0;
+  background-color: var(--cfg-graph-header-background);
+  border-bottom: 1px solid var(--cfg-graph-header-border);
+  color: var(--cfg-graph-header-text);
+  font-size: 1.2em;
+  flex-shrink: 0; /* Prevent title from shrinking */
 }
 
 .react-flow-instance {
-    flex-grow: 1;
-    height: 100vh;
-    width: 100%;
-    position: relative;
+  flex-grow: 1;
+  height: 100vh;
+  width: 100%;
+  position: relative;
 }
 
 .cfg-viewer-message,
 .cfg-viewer-error {
-    text-align: center;
-    padding: 20px;
-    font-size: 1.1em;
-    color: var(--cfg-graph-header-text);
-    margin-top: 50px;
+  text-align: center;
+  padding: 20px;
+  font-size: 1.1em;
+  color: var(--cfg-graph-header-text);
+  margin-top: 50px;
 }
 
 .cfg-viewer-error {
-    color: #d9534f;
-    font-weight: bold;
+  color: #d9534f;
+  font-weight: bold;
 }
 
 .react-flow__handle {
-    width: 1px;
-    height: 1px;
-    cursor: default !important;
+  width: 1px;
+  height: 1px;
+  cursor: default !important;
 }
 
 .icon {
-    width: 24px;
-    height: 24px;
+  width: 24px;
+  height: 24px;
 }

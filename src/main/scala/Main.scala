@@ -1,4 +1,4 @@
-// package scala
+ package basil.main // TODO: IS this okay, I require this
 
 import gtirb.GTIRBReadELF
 import mainargs.{Flag, ParserForClass, arg, main}
@@ -61,7 +61,7 @@ object Main {
     p.resolveSibling(p.getFileName().toString + newExtension)
   }
 
-  def loadDirectory(i: ChooseInput = ChooseInput.Gtirb, d: String): ILLoadingConfig = {
+  def loadDirectory(i: ChooseInput = ChooseInput.Gtirb, d: String): ILLoadingConfig = { // TODO: Try and use this
 
     val path = {
       val cwd = java.nio.file.Path.of(".")

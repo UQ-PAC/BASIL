@@ -1,4 +1,5 @@
-:root { { /* TODO: I should find out what this is doing and customise it more - if need be that is */ }
+:root {
+  /* TODO: I should find out what this is doing and customise it more - if need be that is */
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;

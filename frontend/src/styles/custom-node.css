@@ -3,41 +3,41 @@
 /* Preventing conflicting flex behaviours and allowing 'custom-flow-node' to dictate height and width. */
 /* Overriding from: @xyflow/react/dist/style.css. */
 .react-flow__node.react-flow__node-customNode {
-    width: auto !important;
-    height: auto !important;
+  width: auto !important;
+  height: auto !important;
 }
 
 .custom-flow-node {
-    padding: 10px 15px;
-    background-color: var(--cfg-node-background-color) !important;
-    border-radius: 5px;
-    font-family: 'Mono', monospace;
-    font-size: 0.8em;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    display: flex;
-    flex-grow: 1;
-    align-items: center;
-    box-sizing: border-box;
+  padding: 10px 15px;
+  background-color: var(--cfg-node-background-color) !important;
+  border-radius: 5px;
+  font-family: 'Mono', monospace;
+  font-size: 0.8em;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-grow: 1;
+  align-items: center;
+  box-sizing: border-box;
 }
 
 /* Specific styling for selected nodes */
 .custom-flow-node.selected {
-    border: 2px solid #007bff;
+  border: 2px solid #007bff;
 }
 
 .custom-node-header-text {
-    flex-grow: 1;
-    color: var(--cfg-node-text-color);
+  flex-grow: 1;
+  color: var(--cfg-node-text-color);
 }
 
 .react-flow__panel.react-flow__minimap {
-    background-color: var(--cfg-graph-background-color);
+  background-color: var(--cfg-graph-background-color);
 }
 
 .react-flow__controls-button {
-    background-color: var(--cfg-node-background-color);
+  background-color: var(--cfg-node-background-color);
 }
 
 .react-flow__controls-button:hover {
-    background-color: var(--cfg-button-hover-color);
+  background-color: var(--cfg-button-hover-color);
 }
