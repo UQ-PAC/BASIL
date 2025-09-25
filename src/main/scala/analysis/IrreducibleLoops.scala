@@ -382,7 +382,9 @@ object NewLoopDetector {
     * suitable for returning to the caller.
     */
     def toBlockLoopInfo(nodes: Set[Block]) =
-      BlockLoopInfo(b, iloop_header, dfsp_pos_max, entries.map(_.to), nodes)
+      BlockLoopInfo(b, iloop_header, dfsp_pos_max, entries.filter {
+        case LoopEdge(from, to) => to == b || !nodes.contains(from)
+      }.map(_.to), nodes)
   }
 
   /**
@@ -575,6 +577,10 @@ object NewLoopDetector {
             } else {
               println(s"IRRED: mark $b0 as re-entry into $b. irreducible.")
 
+              val h0 = h
+
+              h.entries = h.entries + LoopEdge(b0.b, b.b)
+
               var continue = true
               while (continue && h.iloop_header.isDefined) {
                 h = h.iloop_header.get
@@ -585,11 +591,18 @@ object NewLoopDetector {
                 // println("irred h: " + h)
                 // h.headers = h.headers + b.b
               }
+              println("continue: " + continue)
 
-              // possibly add an irreducible entry, making sure that the edge
-              // is not actually an internal edge.
-              if (b0.b != h) {
-                h.entries = h.entries + LoopEdge(b0.b, b.b)
+              println("h0: " + h0)
+              println("h: " + h)
+              println("b0: " + b0)
+              println("b: " + b)
+              // if continuing, then the new header does not appear in the current ancestors
+              // to the b0 node. in such cases, the new header is presumed to be its own
+              // subcycle and the *subcycle* should be declared irreducible.
+              if (continue) {
+              } else {
+                // h0.entries = h0.entries + LoopEdge(b0.b, b.b)
               }
             }
           }

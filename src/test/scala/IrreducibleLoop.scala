@@ -277,7 +277,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     } { ListMap("loop" -> Set("loop"), "loop2" -> Set("loop2")) }
   }
 
-  test("sub-cycles") {
+  test("sub-cycles applying transform") {
     import ir.dsl.*
     def makeProg = prog(
       proc("main")(
@@ -339,8 +339,127 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
     println("\nAFTER\n")
 
-    NewLoopDetector.identify_loops(p.mainProcedure).get.values.foreach(println(_))
+    assert(NewLoopDetector.identify_loops(p.mainProcedure).get.values.forall(!_.isIrreducible()))
+  }
 
+  test("paper fig4a") {
+    import ir.dsl.*
+    val p = prog(
+      proc("main")(
+        block("S", goto("1")),
+        block("1", goto("2")),
+        block("2", goto("b0")),
+        block("b0", goto("b")),
+        block("b", goto("exit")),
+        block("exit", ret)
+      )
+    )
+
+    val loopResult = NewLoopDetector.identify_loops(p.mainProcedure).get
+    assertResult(Nil) {
+      loopResult.values.filter(_.isCycle()).toList
+    }
+  }
+
+  test("paper fig4b") {
+    import ir.dsl.*
+    val p = prog(
+      proc("main")(
+        block("S", goto("1")),
+        block("1", goto("b")),
+        block("b", goto("x")),
+        block("x", goto("b0")),
+        block("b0", goto("exit", "b")),
+        block("exit", ret)
+      )
+    )
+
+    val loopResult = NewLoopDetector.identify_loops(p.mainProcedure).get
+    assertResult(List(Set("b", "b0", "x"))) {
+      loopResult.values.filter(_.isCycle()).toList.map(_.nodes.map(_.label))
+    }
+  }
+
+  test("paper fig4c") {
+    import ir.dsl.*
+    val p = prog(
+      proc("main")(
+        block("S", goto("1")),
+        block("1", goto("h")),
+        block("h", goto("x", "b0")),
+        block("x", goto("b")),
+        block("b0", goto("b")),
+        block("b", goto("z")),
+        block("z", goto("exit")),
+        block("exit", ret)
+      )
+    )
+
+    val loopResult = NewLoopDetector.identify_loops(p.mainProcedure).get
+    val cycles = loopResult.values.filter(_.isCycle()).toList
+    assertResult(Nil) {
+      cycles.map(_.nodes.map(_.label))
+    }
+  }
+
+  test("paper fig4d") {
+    import ir.dsl.*
+    val p = prog(
+      proc("main")(
+        block("S", goto("1")),
+        block("1", goto("h")),
+        block("h", goto("x")),
+        block("x", goto("b0", "y")),
+        block("y", goto("b")),
+        block("b0", goto("b")),
+        block("b", goto("z")),
+        block("z", goto("exit", "h")),
+        block("exit", ret)
+      )
+    )
+
+    val loopResult = NewLoopDetector.identify_loops(p.mainProcedure).get
+    val cycles = loopResult.values.filter(_.isCycle()).toList
+    assertResult(List(Set("b", "b0", "x", "y", "h", "z"))) {
+      cycles.map(_.nodes.map(_.label))
+    }
+  }
+
+  test("paper fig4e") {
+    import ir.dsl.*
+    val p = prog(
+      proc("main")(
+        block("S", goto("h1")),
+        block("h1", goto("y", "z")),
+        block("y", goto("h")),
+        block("h", goto("b")),
+        block("z", goto("b0")),
+        block("b0", goto("b")),
+        block("b", goto("a")),
+        block("a", goto("h", "h1", "exit")),
+        block("exit", ret)
+      )
+    )
+
+    val blocks = p.mainProcedure.labelToBlock
+
+    val loopResult = NewLoopDetector.identify_loops(p.mainProcedure).get
+    val cycles = loopResult.filter(_._2.isCycle())
+    cycles.foreach(println)
+
+    val h1 = cycles(blocks("h1"))
+    assertResult(Set("h1")) {
+      h1.headers.map(_.label)
+    }
+
+    val inner = (cycles - blocks("h1")).head._2
+    assertResult(Some(blocks("h1"))) {
+      inner.iloop_header
+    }
+
+    assertResult(Set("h", "b")) {
+      inner.headers.map(_.label)
+    }
   }
 
   test("plist_free") {
