@@ -7,20 +7,20 @@ import {
   useNodesState,
   useEdgesState,
 } from '@xyflow/react';
-import { API_BASE_URL } from '../api';
+import { API_BASE_URL } from '../../api';
 import { Graphviz } from '@hpcc-js/wasm-graphviz';
-import { getLayoutedElements } from '../utils/graphLayout.ts';
-import { type CustomNodeData } from './CustomNode';
-import GraphPanel from './GraphPanel';
+import { getLayoutedElements } from '../../utils/graphLayout.ts';
+import { type CustomNodeData } from './graph/CustomNode.tsx';
+import GraphPanel from './graph/GraphPanel.tsx';
 
-import '../styles/combined-viewer.css';
-import '../styles/button-selection.css';
-import '../styles/graph.css';
-import { FIT_VIEW_OPTIONS, ZOOM_CONFIGS } from '../constants';
+import '../../styles/components/viewers/combined-viewer.css';
+import '../../styles/components/button-selection.css';
+import '../../styles/components/viewers/graph/graph.css';
+import { FIT_VIEW_OPTIONS, ZOOM_CONFIGS } from '../../constants.ts';
 
 declare const Prism: any;
 
-import '../lib/prism-ir.ts';
+import '../../lib/prism-ir.ts';
 import 'prismjs/plugins/line-numbers/prism-line-numbers.js';
 import 'prismjs/plugins/line-numbers/prism-line-numbers.css';
 

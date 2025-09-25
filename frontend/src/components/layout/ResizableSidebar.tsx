@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, type ReactNode } from 'react';
-import '../styles/sidebar.css';
+import '../../styles/components/layout/sidebar.css';
 
-import RightArrow from '../assets/arrow-right-icon.svg';
+import RightArrow from '../../assets/arrow-right-icon.svg';
 
 const INITIAL_WIDTH = 250;
 const MAX_WIDTH = 500;

@@ -1,7 +1,7 @@
 // src/utils/graphLayout.ts
 import ELK from 'elkjs/lib/elk.bundled.js';
 import { type Node, type Edge, MarkerType } from '@xyflow/react';
-import { type CustomNodeData } from '../components/CustomNode';
+import { type CustomNodeData } from '../components/viewers/graph/CustomNode.tsx';
 
 const elk = new ELK();
 

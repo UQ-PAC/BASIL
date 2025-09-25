@@ -8,7 +8,7 @@ import {
   type NodeProps,
 } from '@xyflow/react';
 
-import '../styles/custom-node.css';
+import '../../../styles/components/viewers/graph/custom-node.css';
 
 declare const Prism: any;
 

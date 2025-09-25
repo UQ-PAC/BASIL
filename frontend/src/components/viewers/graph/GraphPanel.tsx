@@ -14,13 +14,13 @@ import {
 } from '@xyflow/react';
 import type { Node, Edge, FitViewOptions } from '@xyflow/react';
 
-import CustomNode from './CustomNode';
-import { type CustomNodeData } from './CustomNode';
-import CustomBackground from './CustomBackground';
-import { applyLayout } from '../utils/graphLayout';
+import CustomNode from './CustomNode.tsx';
+import { type CustomNodeData } from './CustomNode.tsx';
+import CustomBackground from './CustomBackground.tsx';
+import { applyLayout } from '../../../utils/graphLayout.ts';
 
-import ExpandIcon from '../assets/expand-icon.svg';
-import CollapseIcon from '../assets/collapse-icon.svg';
+import ExpandIcon from '../../../assets/expand-icon.svg';
+import CollapseIcon from '../../../assets/collapse-icon.svg';
 
 interface GraphPanelProps {
   nodes: Node<CustomNodeData>[];

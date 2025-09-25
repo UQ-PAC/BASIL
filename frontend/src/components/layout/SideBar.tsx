@@ -1,5 +1,5 @@
 // src/components/SideBar.tsx
-import '../styles/sidebar.css';
+import '../../styles/components/layout/sidebar.css';
 import React from 'react';
 
 interface SidebarProps {

@@ -1,6 +1,6 @@
 // src/components/ErrorModal.tsx
 import React from 'react';
-import '../styles/modal-base.css';
+import '../../styles/components/modals/modal-base.css';
 
 interface ErrorModalProps {
   isOpen: boolean;

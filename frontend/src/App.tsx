@@ -1,16 +1,16 @@
 // App.tsx
 import React, { useEffect, useState, useCallback } from 'react';
 import './App.css';
-import { DiffViewer } from './components/DiffViewer';
-import { Header } from './components/Header';
-import { Sidebar } from './components/SideBar';
-import { ResizableSidebar } from './components/ResizableSidebar';
-import CfgViewer from './components/CfgViewer';
-import CombinedViewer from './components/CombinedViewer';
-import SettingsModal from './components/SettingsModal';
+import { DiffViewer } from './components/viewers/diff/DiffViewer.tsx';
+import { Header } from './components/layout/Header.tsx';
+import { Sidebar } from './components/layout/SideBar.tsx';
+import { ResizableSidebar } from './components/layout/ResizableSidebar.tsx';
+import CfgViewer from './components/viewers/graph/CfgViewer.tsx';
+import CombinedViewer from './components/viewers/CombinedViewer.tsx';
+import SettingsModal from './components/modals/SettingsModal.tsx';
 import { API_BASE_URL } from './api';
-import LoadingModal from './components/LoadingModal.tsx';
-import ErrorModal from './components/ErrorModal.tsx';
+import LoadingModal from './components/modals/LoadingModal.tsx';
+import ErrorModal from './components/modals/ErrorModal.tsx';
 
 const LOCAL_STORAGE_PROCEDURE_KEY = 'cfgViewerSelectedProcedure';
 const LOCAL_STORAGE_THEME_KEY = 'theme';

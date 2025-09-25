@@ -7,18 +7,18 @@ import {
   MarkerType,
 } from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
-
 import '@xyflow/react/dist/style.css';
-import '../styles/cfg-viewer.css';
-import '../styles/graph.css';
-
-import { API_BASE_URL } from '../api';
 import { Graphviz } from '@hpcc-js/wasm-graphviz';
-import { getLayoutedElements } from '../utils/graphLayout.ts';
 
-import { type CustomNodeData } from './CustomNode';
-import GraphPanel from './GraphPanel';
-import { FIT_VIEW_OPTIONS, ZOOM_CONFIGS } from '../constants';
+import { API_BASE_URL } from '../../../api';
+import { getLayoutedElements } from '../../../utils/graphLayout.ts';
+import { FIT_VIEW_OPTIONS, ZOOM_CONFIGS } from '../../../constants.ts';
+
+import { type CustomNodeData } from './CustomNode.tsx';
+import GraphPanel from './GraphPanel.tsx';
+
+import '../../../styles/components/viewers/cfg-viewer.css';
+import '../../../styles/components/viewers/graph/graph.css';
 
 const NODE_COLORS = {
   RED: '#FF4D4D',

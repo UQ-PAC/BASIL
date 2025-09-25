@@ -1,6 +1,6 @@
-import '../styles/header.css';
+import '../../styles/components/layout/header.css';
 
-import SettingsIcon from '../assets/icon-settings.svg';
+import SettingsIcon from '../../assets/icon-settings.svg';
 
 interface HeaderProps {
   setViewMode: (mode: 'IR' | 'CFG' | 'IR/CFG') => void;

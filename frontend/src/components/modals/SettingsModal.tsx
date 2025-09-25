@@ -1,4 +1,4 @@
-import '../styles/modal-base.css';
+import '../../styles/components/modals/modal-base.css';
 
 interface SettingsModalProps {
   isOpen: boolean;

@@ -2,9 +2,9 @@
 
 import React from 'react';
 
-import '../styles/modal-base.css';
+import '../../styles/components/modals/modal-base.css';
 
-import Spinner from '../assets/spinner-loading-icon.svg';
+import Spinner from '../../assets/spinner-loading-icon.svg';
 
 interface LoadingModalProps {
   isOpen: boolean;
