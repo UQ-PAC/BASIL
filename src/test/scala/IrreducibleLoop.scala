@@ -1,4 +1,4 @@
-import analysis.{LoopDetector, NewLoopDetector, LoopTransform}
+import analysis.{LoopDetector, LoopTransform, NewLoopDetector}
 import ir.{Block, IRLoading, Procedure, Program, dotBlockGraph, dotFlowGraph}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
@@ -115,7 +115,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     assertResult(TestLoopInfo(iloop_headers, headers)) {
       TestLoopInfo(
         loops.collect { case (k, BlockLoopInfo(_, Some(h), _, _, _)) => k.label -> h.label },
-        loops.collect { case (k, BlockLoopInfo(_, _, _, hs, _)) if hs.nonEmpty => k.label -> hs.map(_.label) }
+        loops.collect { case (k, info) if info.headers.nonEmpty => k.label -> info.headers.map(_.label) }
       )
     }
   }
@@ -314,7 +314,37 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     }
   }
 
+  test("crossover") {
+    import ir.dsl.*
+    val p = prog(
+      proc("main")(
+        block("S", goto("h1", "h2")),
+        block("h1", goto("x")),
+        block("x", goto("h2", "h1")),
+        block("h2", goto("y")),
+        block("y", goto("x", "exit")),
+        block("exit", ret)
+      )
+    )
+
+    println(p)
+
+    val loopResult = NewLoopDetector.identify_loops(p.mainProcedure).get
+    loopResult.values.foreach(println(_))
+
+    val result =
+      LoopTransform.new_llvm_transform_loop(loopResult.values.filter(_.isIrreducible()).flatMap(_.toLoop()).head).get
+
+    util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/out2.dot")
+
+    println("\nAFTER\n")
+
+    NewLoopDetector.identify_loops(p.mainProcedure).get.values.foreach(println(_))
+
+  }
+
   test("plist_free") {
+    cancel()
     val p = ir.parsing.ParseBasilIL.loadILFile("/home/rina/progs/basil/plist-free.il").program
     // p.procedures.foreach { p =>
     //   p.blocks.foreach(_.statements.clear())

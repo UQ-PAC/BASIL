@@ -262,4 +262,3 @@ def renderDotGraph(dotContent: String): Unit = {
 
   Seq("xdg-open", out.getCanonicalPath()).!
 }
-

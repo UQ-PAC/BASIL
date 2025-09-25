@@ -1,9 +1,9 @@
 package analysis
 
-import ir.{
+import _root_.ir.{
+  AssocExpr,
   Assume,
   BinaryExpr,
-  AssocExpr,
   Block,
   BoolOR,
   EQ,
@@ -21,9 +21,6 @@ import ir.{
 import scala.annotation.tailrec
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
-import scala.util.boundary
-
-import boundary.break
 
 private def label(p: Block) = "block." + p.label
 
@@ -44,12 +41,15 @@ case class LoopEdge(from: Block, to: Block) {
  *
  */
 class Loop(val header: Block) {
+
   /** Edges to loop from outside that are not to the header.
    *  This set is non-empty if and only if the loop is *irreducible*.
    */
   val reentries: mutable.Set[LoopEdge] = mutable.Set()
+
   /** Edges from inside loop to the header. */
   val backEdges: mutable.Set[LoopEdge] = mutable.Set()
+
   /** Edges into the header node from outside the loop. */
   val entryEdges: mutable.Set[LoopEdge] = mutable.Set()
 
@@ -374,7 +374,7 @@ object NewLoopDetector {
     var dfsp_pos: Int,
     var dfsp_pos_max: Int,
     var is_traversed: Boolean,
-    var headers: Set[Block]
+    var entries: Set[LoopEdge]
   ) {
 
     /**
@@ -382,7 +382,7 @@ object NewLoopDetector {
     * suitable for returning to the caller.
     */
     def toBlockLoopInfo(nodes: Set[Block]) =
-      BlockLoopInfo(b, iloop_header, dfsp_pos_max, headers, nodes)
+      BlockLoopInfo(b, iloop_header, dfsp_pos_max, entries.map(_.to), nodes)
   }
 
   /**
@@ -405,6 +405,7 @@ object NewLoopDetector {
     val headers: Set[Block],
     val nodes: Set[Block]
   ) {
+
     def isIrreducible() = headers.size > 1
     def isCycle() = headers.nonEmpty
 
@@ -467,7 +468,7 @@ object NewLoopDetector {
 
       var forest = Map[Block, Set[Block]]()
       forest = loops.foldLeft(forest) {
-        case (forest, b) if b.headers.nonEmpty => forest + (b.b -> Set(b.b))
+        case (forest, b) if b.entries.nonEmpty => forest + (b.b -> Set(b.b))
         case (forest, _) => forest
       }
 
@@ -563,7 +564,7 @@ object NewLoopDetector {
         } else {
           if (b.dfsp_pos > 0) {
             // println("mark as loop header: " + b + " from " + b0)
-            b.headers = b.headers + b.b
+            b.entries = b.entries + LoopEdge(b0.b, b.b)
             tag_lhead(b0, Some(b))
           } else if (b.iloop_header.isEmpty) {
             // intentionally empty
@@ -572,19 +573,24 @@ object NewLoopDetector {
             if (h.dfsp_pos > 0) {
               tag_lhead(b0, Some(h))
             } else {
-              // println(s"IRRED: mark $b0 as re-entry into $b. irreducible.")
+              println(s"IRRED: mark $b0 as re-entry into $b. irreducible.")
 
-              boundary {
-                while (h.iloop_header.isDefined) {
-                  h = h.iloop_header.get
-                  if (h.dfsp_pos > 0) {
-                    tag_lhead(b0, Some(h))
-                    break()
-                  }
+              var continue = true
+              while (continue && h.iloop_header.isDefined) {
+                h = h.iloop_header.get
+                if (h.dfsp_pos > 0) {
+                  tag_lhead(b0, Some(h))
+                  continue = false
                 }
+                // println("irred h: " + h)
+                // h.headers = h.headers + b.b
               }
-              // println("irred h: " + h)
-              h.headers = h.headers + b.b
+
+              // possibly add an irreducible entry, making sure that the edge
+              // is not actually an internal edge.
+              if (b0.b != h) {
+                h.entries = h.entries + LoopEdge(b0.b, b.b)
+              }
             }
           }
         }
