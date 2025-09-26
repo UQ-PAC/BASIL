@@ -383,7 +383,7 @@ object LoopDetector {
   }
 }
 
-object NewLoopDetector {
+object IrreducibleLoops {
 
   /**
    * @param possibleReentries
@@ -408,6 +408,80 @@ object NewLoopDetector {
     */
     def toBlockLoopInfo(nodes: Set[Block], headers: Set[Block]) =
       BlockLoopInfo(b, iloop_header, dfsp_pos_max, headers, nodes)
+  }
+
+  object BlockLoopState {
+
+    def computeBlockLoopInfo(loopStates: Map[Block, BlockLoopState]): ListMap[Block, BlockLoopInfo] = {
+      // NOTE: loops are in *bottom-up topological order*.
+      val loops = loopStates.values.toList.sortBy(-_.dfsp_pos_max)
+
+      var forest = Map[Block, Set[Block]]()
+      forest = loops.foldLeft(forest) { case (forest, b) =>
+        forest ++ Option.when(b.is_header)(b.b -> Set(b.b))
+      }
+
+      // NOTE: iterates the forest in *bottom-up* topological order. this
+      // ensures that node-sets of sub-cycles are fully populated before
+      // processing their parent cycle. this avoids us having to compute
+      // closures of node-sets.
+      forest = loops.foldLeft(forest) { case (forest, b) =>
+        forest ++ b.iloop_header.map(h => h -> (forest(h) + b.b))
+      }
+
+      // map of headers to internal blocks which have that as their innermost
+      // loop header.
+      val selfNodes = forest
+
+      forest = loops.foldLeft(forest) { case (forest, b) =>
+        forest ++ b.iloop_header.map(h => h -> (forest(h) ++ forest.getOrElse(b.b, Set())))
+      }
+
+      // we need to hoist possible re-entries up to and including
+      // the outermost loop which is a parent of edge.from which does
+      // not contain edge.to
+      val hoistedEntries = loops.foldLeft(Map[Block, Set[LoopEdge]]()) { (acc, loop) =>
+        var hoistedEntries = acc
+
+        val loopHoistedEntries = hoistedEntries.getOrElse(loop.b, Set())
+        hoistedEntries -= loop.b
+
+        // slice the re-entry edges into those which will be hoisted and those which
+        // will not. hoisted edges will also be applied to the containing loop.
+        val (thisLoopEntries, toHoist) = (loop.possibleReentries ++ loopHoistedEntries).partitionMap {
+          case edge @ LoopEdge(_, to) if to == loop.b => Left(edge)
+          case edge @ LoopEdge(from, to) =>
+            loop.iloop_header.map(h => (h, forest(h))) match {
+              case None => Left(edge)
+              case Some((_, outerNodes)) if outerNodes.contains(from) => Left(edge)
+              case Some((h, _)) => Right(edge)
+            }
+        }
+
+        // add normal entries to the header which are not stored
+        val simpleEntries = if (loop.is_header) {
+          val nodes = forest(loop.b)
+          (loop.b.prevBlocks.toSet -- nodes).map(LoopEdge(_, loop.b))
+        } else {
+          Set()
+        }
+
+        hoistedEntries += loop.b -> (thisLoopEntries ++ simpleEntries ++ toHoist)
+        loop.iloop_header match {
+          case Some(h) => hoistedEntries += h -> toHoist
+          case None => assert(toHoist.isEmpty, "attempting to hoist entries but there is no parent loop!")
+        }
+        hoistedEntries
+      }
+
+      val newLoops = loops.map { x =>
+        x.b -> x.toBlockLoopInfo(forest.getOrElse(x.b, Set()), hoistedEntries.getOrElse(x.b, Set()).map(_.to))
+      }
+
+      // NOTE: reverse order before returning, so outer loops appear first.
+      newLoops.reverse.to(ListMap)
+    }
+
   }
 
   /**
@@ -511,6 +585,7 @@ object NewLoopDetector {
    */
   class TraverseLoops(val procedure: Procedure) {
 
+    var used = false
     val loopBlocks: Map[Block, BlockLoopState] =
       procedure.blocks.map(b => b -> BlockLoopState(b, None, false, 0, 0, false, Set())).toMap
 
@@ -519,76 +594,6 @@ object NewLoopDetector {
     given Conversion[Block, BlockLoopState] with
       def apply(b: Block) = loopBlocks(b)
 
-    protected def getLoopInfos(): ListMap[Block, BlockLoopInfo] = {
-      // NOTE: loops are in *bottom-up topological order*.
-      val loops = loopBlocks.values.toList.sortBy(-_.dfsp_pos_max)
-
-      var forest = Map[Block, Set[Block]]()
-      forest = loops.foldLeft(forest) { case (forest, b) =>
-        forest ++ Option.when(b.is_header)(b.b -> Set(b.b))
-      }
-
-      // NOTE: iterates the forest in *bottom-up* topological order. this
-      // ensures that node-sets of sub-cycles are fully populated before
-      // processing their parent cycle. this avoids us having to compute
-      // closures of node-sets.
-      forest = loops.foldLeft(forest) { case (forest, b) =>
-        forest ++ b.iloop_header.map(h => h -> (forest(h) + b.b))
-      }
-
-      // map of headers to internal blocks which have that as their innermost
-      // loop header.
-      val selfNodes = forest
-
-      forest = loops.foldLeft(forest) { case (forest, b) =>
-        forest ++ b.iloop_header.map(h => h -> (forest(h) ++ forest.getOrElse(b.b, Set())))
-      }
-
-      // we need to hoist possible re-entries up to and including
-      // the outermost loop which is a parent of edge.from which does
-      // not contain edge.to
-      val hoistedEntries = loops.foldLeft(Map[Block, Set[LoopEdge]]()) { (acc, loop) =>
-        var hoistedEntries = acc
-
-        val loopHoistedEntries = hoistedEntries.getOrElse(loop.b, Set())
-        hoistedEntries -= loop.b
-
-        // slice the re-entry edges into those which will be hoisted and those which
-        // will not. hoisted edges will also be applied to the containing loop.
-        val (thisLoopEntries, toHoist) = (loop.possibleReentries ++ loopHoistedEntries).partitionMap {
-          case edge @ LoopEdge(_, to) if to == loop.b => Left(edge)
-          case edge @ LoopEdge(from, to) =>
-            loop.iloop_header.map(h => (h, forest(h))) match {
-              case None => Left(edge)
-              case Some((_, outerNodes)) if outerNodes.contains(from) => Left(edge)
-              case Some((h, _)) => Right(edge)
-            }
-        }
-
-        // add normal entries to the header which are not stored
-        val simpleEntries = if (loop.is_header) {
-          val nodes = forest(loop.b)
-          (loop.b.prevBlocks.toSet -- nodes).map(LoopEdge(_, loop.b))
-        } else {
-          Set()
-        }
-
-        hoistedEntries += loop.b -> (thisLoopEntries ++ simpleEntries ++ toHoist)
-        loop.iloop_header match {
-          case Some(h) => hoistedEntries += h -> toHoist
-          case None => assert(toHoist.isEmpty, "attempting to hoist entries but there is no parent loop!")
-        }
-        hoistedEntries
-      }
-
-      val newLoops = loops.map { x =>
-        x.b -> x.toBlockLoopInfo(forest.getOrElse(x.b, Set()), hoistedEntries.getOrElse(x.b, Set()).map(_.to))
-      }
-
-      // NOTE: reverse order before returning, so outer loops appear first.
-      newLoops.reverse.to(ListMap)
-    }
-
     /** Main entry point for the loop identification algorithm. Calls
      *  [[trav_loops_tailrec]] with the appropriate arguments. Returns a
      *  [[scala.collection.immutable.ListMap]] of [[BlockLoopInfo]] if
@@ -596,11 +601,14 @@ object NewLoopDetector {
      *  `ListMap` will be in topological order - outer cycles occur _before_
      *  their subcycles.
      */
-    def traverse_loops() =
+    def traverse_loops() = {
+      require(!used, "cannot call traverse_loops twice")
+      used = true
       procedure.entryBlock.map { entry =>
         val _ = this.trav_loops_tailrec(Left((loopBlocks(entry), 1)), Nil)
-        getLoopInfos()
+        BlockLoopState.computeBlockLoopInfo(loopBlocks)
       }
+    }
 
     /**
      * Tail-recursive form of the DFS-based traversal described in the paper.
@@ -725,6 +733,116 @@ object NewLoopDetector {
 
   }
 
+  /**
+   * Information about transforms made to convert an irreducible loop into
+   * a reducible one.
+   *
+   * @param newHeader the new (unique) header for the loop. after the transform, this
+   *                  is the header of the *reducible* version of this loop.
+   * @param fromVariable the fresh variable which is used to determine which old header to jump to
+   *                     when reaching the new header. this variable stores an integer index.
+   * @param entryIndices map of entry blocks (i.e., blocks preceding headers) to their
+   *                     integer index.
+   * @param precedingIndices map of (old) header blocks to the entry indices which precede
+   *                         that header.
+   */
+  case class IrreducibleTransformInfo(
+    val newHeader: Block,
+    val fromVariable: LocalVar,
+    val entryIndices: Map[Block, Int],
+    val precedingIndices: Map[Block, List[Int]]
+  )
+
+  def transform_many_loops(loops: Iterable[BlockLoopInfo]) = {
+    loops.toList.sortBy(_.dfsp_pos).flatMap { loop =>
+      IrreducibleLoops.transform_loop(loop)
+    }
+  }
+
+  def transform_loop(loop: BlockLoopInfo): Option[IrreducibleTransformInfo] = {
+    if (!loop.isIrreducible()) return None
+
+    // From LLVM: https://llvm.org/doxygen/FixIrreducible_8cpp_source.html
+    //
+    // > To convert an irreducible cycle C to a natural loop L:
+    // >
+    // > 1. Add a new node N to C.
+    // > 2. Redirect all external incoming edges through N.
+    // > 3. Redirect all edges incident on header H through N.
+    // >
+    // > This is sufficient to ensure that:
+    // >
+    // > a. Every closed path in C also exists in L, with the modification that any
+    // >    path passing through H now passes through N before reaching H.
+    // > b. Every external path incident on any entry of C is now incident on N and
+    // >    then redirected to the entry.
+    //
+    // In (3.), we take "incident on H" to mean internal edges pointing to H.
+
+    val header = loop.b
+    val procedure = header.parent
+
+    // in the transform, all external entries are redirected to the new header.
+    val externalEntries = loop.computeEntries()
+
+    val backEdges = loop.computeBackEdges()
+
+    // internal edges to the first header are also redirected through the new header.
+    // note this excludes internal edges to alternative headers.
+    val backEdgesToFirstHeader: Set[LoopEdge] = backEdges.filter(_.to == header)
+
+    // compute entries into any of the old headers. keyed by entry blocks.
+    val entryIndices: Map[Block, Int] = (externalEntries ++ backEdges).map(_.from).zipWithIndex.toMap
+    // included entry blocks should be a superset of (externalEntries ++ backEdgesToFirstHeader).
+    // in particular, it additionally includes internal edges to alternative headers.
+    assert((externalEntries.toSet ++ backEdgesToFirstHeader).map(_.from).subsetOf(entryIndices.keys.toSet))
+
+    // indices of blocks which may go to a particular header. keyed by header block.
+    val precedingIndices: Map[Block, List[Int]] =
+      (externalEntries ++ backEdges).toList.groupMap(_.to)(_.from).map {
+        (h, prevs) => h -> prevs.map(entryIndices(_)).sorted
+      }
+
+    // new header is succeeded by all the old headers.
+    // NOTE: created after oldHeaders are iterated to make sure newHeader doesn't appear in those maps.
+    val newHeader = Block(s"${header.label}_loop_N", jump = Unreachable())
+    val oldHeaders = externalEntries.map(_.to)
+    newHeader.replaceJump(GoTo(oldHeaders))
+    procedure.addBlock(newHeader)
+
+    // the "from" variable is assigned based on blocks which enter the loop.
+    // entering blocks might enter a *subset* of the headers, and this needs to
+    // be maintained when redirecting through the new header.
+    //
+    // as such, each entering block gets its own value for this variable
+    // and this is disjoined into an assume statement within each header.
+    //
+    // this includes both external and internal entries.
+    val fromVariable = LocalVar(s"${header.label}_loop_from", IntType)
+
+    // transform each old header by adding an assume of the blocks which might enter it.
+    precedingIndices.foreach { (h, indices) =>
+      val eqs = indices.map(i => BinaryExpr(EQ, fromVariable, IntLiteral(BigInt(i))))
+      h.statements.prepend(Assume(AssocExpr(BoolOR, eqs)))
+    }
+
+    // for every predecessor of all old headers, assign its from variable. this makes
+    // sure that the assume works.
+    entryIndices.foreach { (entry, i) =>
+      entry.statements.append(LocalAssign(fromVariable, IntLiteral(BigInt(i))))
+    }
+
+    // for predecessors of the distinguished old header, replace their gotos with the new header.
+    (externalEntries.iterator ++ backEdgesToFirstHeader).foreach { case edge @ LoopEdge(from, to) =>
+      from.jump match {
+        case goto: GoTo => goto.replaceTarget(to, newHeader)
+        case _ => throw new Exception(s"edge $edge into loop was terminated by non-goto?!")
+      }
+    }
+
+    Some(IrreducibleTransformInfo(newHeader, fromVariable, entryIndices, precedingIndices))
+  }
+
 }
 
 object LoopTransform {
@@ -822,107 +940,4 @@ object LoopTransform {
     newLoop
   }
 
-  /**
-   * Information about transforms made to convert an irreducible loop into
-   * a reducible one.
-   *
-   * @param newHeader the new (unique) header for the loop. after the transform, this
-   *                  is the header of the *reducible* version of this loop.
-   * @param fromVariable the fresh variable which is used to determine which old header to jump to
-   *                     when reaching the new header. this variable stores an integer index.
-   * @param entryIndices map of entry blocks (i.e., blocks preceding headers) to their
-   *                     integer index.
-   * @param precedingIndices map of (old) header blocks to the entry indices which precede
-   *                         that header.
-   */
-  case class IrreducibleTransformInfo(
-    val newHeader: Block,
-    val fromVariable: LocalVar,
-    val entryIndices: Map[Block, Int],
-    val precedingIndices: Map[Block, List[Int]]
-  )
-
-  def new_llvm_transform_loop(loop: NewLoopDetector.BlockLoopInfo): Option[IrreducibleTransformInfo] = {
-    if (!loop.isIrreducible()) return None
-
-    // From LLVM: https://llvm.org/doxygen/FixIrreducible_8cpp_source.html
-    //
-    // > To convert an irreducible cycle C to a natural loop L:
-    // >
-    // > 1. Add a new node N to C.
-    // > 2. Redirect all external incoming edges through N.
-    // > 3. Redirect all edges incident on header H through N.
-    // >
-    // > This is sufficient to ensure that:
-    // >
-    // > a. Every closed path in C also exists in L, with the modification that any
-    // >    path passing through H now passes through N before reaching H.
-    // > b. Every external path incident on any entry of C is now incident on N and
-    // >    then redirected to the entry.
-    //
-    // In (3.), we take "incident on H" to mean internal edges pointing to H.
-
-    val header = loop.b
-    val procedure = header.parent
-
-    // in the transform, all external entries are redirected to the new header.
-    val externalEntries = loop.computeEntries()
-
-    val backEdges = loop.computeBackEdges()
-
-    // internal edges to the first header are also redirected through the new header.
-    // note this excludes internal edges to alternative headers.
-    val backEdgesToFirstHeader: Set[LoopEdge] = backEdges.filter(_.to == header)
-
-    // compute entries into any of the old headers. keyed by entry blocks.
-    val entryIndices: Map[Block, Int] = (externalEntries ++ backEdges).map(_.from).zipWithIndex.toMap
-    // included entry blocks should be a superset of (externalEntries ++ backEdgesToFirstHeader).
-    // in particular, it additionally includes internal edges to alternative headers.
-    assert((externalEntries.toSet ++ backEdgesToFirstHeader).map(_.from).subsetOf(entryIndices.keys.toSet))
-
-    // indices of blocks which may go to a particular header. keyed by header block.
-    val precedingIndices: Map[Block, List[Int]] =
-      (externalEntries ++ backEdges).toList.groupMap(_.to)(_.from).map {
-        (h, prevs) => h -> prevs.map(entryIndices(_)).sorted
-      }
-
-    // new header is succeeded by all the old headers.
-    // NOTE: created after oldHeaders are iterated to make sure newHeader doesn't appear in those maps.
-    val newHeader = Block(s"${header.label}_loop_N", jump = Unreachable())
-    val oldHeaders = externalEntries.map(_.to)
-    newHeader.replaceJump(GoTo(oldHeaders))
-    procedure.addBlock(newHeader)
-
-    // the "from" variable is assigned based on blocks which enter the loop.
-    // entering blocks might enter a *subset* of the headers, and this needs to
-    // be maintained when redirecting through the new header.
-    //
-    // as such, each entering block gets its own value for this variable
-    // and this is disjoined into an assume statement within each header.
-    //
-    // this includes both external and internal entries.
-    val fromVariable = LocalVar(s"${header.label}_loop_from", IntType)
-
-    // transform each old header by adding an assume of the blocks which might enter it.
-    precedingIndices.foreach { (h, indices) =>
-      val eqs = indices.map(i => BinaryExpr(EQ, fromVariable, IntLiteral(BigInt(i))))
-      h.statements.prepend(Assume(AssocExpr(BoolOR, eqs)))
-    }
-
-    // for every predecessor of all old headers, assign its from variable. this makes
-    // sure that the assume works.
-    entryIndices.foreach { (entry, i) =>
-      entry.statements.append(LocalAssign(fromVariable, IntLiteral(BigInt(i))))
-    }
-
-    // for predecessors of the distinguished old header, replace their gotos with the new header.
-    (externalEntries.iterator ++ backEdgesToFirstHeader).foreach { case edge @ LoopEdge(from, to) =>
-      from.jump match {
-        case goto: GoTo => goto.replaceTarget(to, newHeader)
-        case _ => throw new Exception(s"edge $edge into loop was terminated by non-goto?!")
-      }
-    }
-
-    Some(IrreducibleTransformInfo(newHeader, fromVariable, entryIndices, precedingIndices))
-  }
 }

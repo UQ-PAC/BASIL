@@ -27,13 +27,8 @@ object AnalysisPipelineMRA {
     StaticAnalysisLogger.debug("reducible loops")
 
     IRProgram.procedures.foreach { procedure =>
-      NewLoopDetector.identify_loops(procedure) match {
-        case Some(loops) =>
-          loops.values.foreach { loop =>
-            // NOTE: it is important that toLoop is called only after all earlier
-            // irreducible loops have been transformed.
-            val _ = LoopTransform.new_llvm_transform_loop(loop)
-          }
+      IrreducibleLoops.identify_loops(procedure) match {
+        case Some(loops) => IrreducibleLoops.transform_many_loops(loops.values)
         case None => ()
       }
     }
