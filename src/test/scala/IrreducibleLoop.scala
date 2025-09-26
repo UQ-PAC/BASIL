@@ -306,16 +306,16 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     loops.foreach(println(_))
     // util.renderDotGraph(dotFlowGraph(p.mainProcedure.blocks.toList, Set()))
 
-    val result = LoopTransform.new_llvm_transform_loop(loops.head).get
+    val result = LoopTransform.new_llvm_transform_loop(loopResult.values.filter(_.isIrreducible()).head).get
     // analysis.AnalysisPipelineMRA.reducibleLoops(p)
 
     val blocks = p.mainProcedure.labelToBlock
 
-    assertResult(List("S", "h1", "h3").map(x => result.entryIndices(blocks(x)))) {
-      result.precedingIndices(blocks("h2"))
+    assertResult(Set("S", "h1", "h3").map(x => result.entryIndices(blocks(x)))) {
+      result.precedingIndices(blocks("h2")).toSet
     }
-    assertResult(List("S", "h2").map(x => result.entryIndices(blocks(x)))) {
-      result.precedingIndices(blocks("h1"))
+    assertResult(Set("S", "h2").map(x => result.entryIndices(blocks(x)))) {
+      result.precedingIndices(blocks("h1")).toSet
     }
 
     assertResult(ListMap(), "there should be no irreducible loops after transform") {

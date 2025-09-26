@@ -32,9 +32,7 @@ object AnalysisPipelineMRA {
           loops.values.foreach { loop =>
             // NOTE: it is important that toLoop is called only after all earlier
             // irreducible loops have been transformed.
-            loop.toLoop().foreach { loop =>
-              val _ = LoopTransform.new_llvm_transform_loop(loop)
-            }
+            val _ = LoopTransform.new_llvm_transform_loop(loop)
           }
         case None => ()
       }
