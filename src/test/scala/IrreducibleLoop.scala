@@ -181,6 +181,8 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     newLoopResult.values.foreach(println(_))
 
     assert(newLoopResult.values.forall(!_.isIrreducible()))
+
+    util.writeToFile(dotBlockGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/out3.dot")
   }
 
   test("multiple entries - irreducible") {
@@ -339,9 +341,9 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     val loopResult = NewLoopDetector.identify_loops(p.mainProcedure).get
     loopResult.values.foreach(println(_))
 
-    util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/in2.dot")
 
     analysis.AnalysisPipelineMRA.reducibleLoops(p)
+    util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/out2.dot")
 
     // val result =
     //   LoopTransform.new_llvm_transform_loop(loopResult.values.filter(_.isIrreducible()).flatMap(_.toLoop()).head).get
@@ -437,6 +439,68 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     assertResult(List(Set("b", "b0", "x", "y", "h", "z"))) {
       cycles.map(_.nodes.map(_.label))
     }
+  }
+
+  test("paper fig6a") {
+    import ir.dsl.*
+    val p = prog(
+      proc("main")(
+        block("S", goto("h3")),
+        block("h3", goto("x")),
+        block("x", goto("h2", "y")),
+        block("y", goto("b0")),
+        block("b0", goto("b")),
+        block("h2", goto("h1")),
+        block("h1", goto("b")),
+        block("b", goto("z")),
+        block("z", goto("h1", "a")),
+        block("a", goto("h2", "back")),
+        block("back", goto("h3", "exit")),
+        block("exit", ret)
+      )
+    )
+    val loopResult = NewLoopDetector.identify_loops(p.mainProcedure).get
+    loopResult.values.foreach(println(_))
+    assertResult(2) {
+      loopResult.values.filter(_.isIrreducible()).size
+    }
+
+    analysis.AnalysisPipelineMRA.reducibleLoops(p)
+
+    val newLoopResult = NewLoopDetector.identify_loops(p.mainProcedure).get
+    newLoopResult.values.foreach(println(_))
+
+    assert(newLoopResult.values.forall(!_.isIrreducible()))
+  }
+
+  test("paper fig6b") {
+    import ir.dsl.*
+    val p = prog(
+      proc("main")(
+        block("S", goto("h4")),
+        block("h4", goto("h3")),
+        block("h3", goto("h2")),
+        block("h2", goto("h1")),
+        block("h1", goto("x")),
+        block("x", goto("y", "h4")),
+        block("y", goto("z", "h3")),
+        block("z", goto("back", "h2")),
+        block("back", goto("h1", "exit")),
+        block("exit", ret)
+      )
+    )
+    val loopResult = NewLoopDetector.identify_loops(p.mainProcedure).get
+    loopResult.values.foreach(println(_))
+    assertResult(Nil) {
+      loopResult.values.filter(_.isIrreducible()).toList
+    }
+
+    analysis.AnalysisPipelineMRA.reducibleLoops(p)
+
+    val newLoopResult = NewLoopDetector.identify_loops(p.mainProcedure).get
+    newLoopResult.values.foreach(println(_))
+
+    assert(newLoopResult.values.forall(!_.isIrreducible()))
   }
 
   test("paper fig4e") {

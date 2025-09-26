@@ -448,7 +448,7 @@ object NewLoopDetector {
       loop.entryEdges ++= (Set(b) & headers).flatMap(h => (h.prevBlocks.toSet -- nodes).map(LoopEdge(_, h)))
       loop.nodes ++= nodes
       loop.edges ++= nodes.flatMap(n => (n.nextBlocks.toSet & nodes).map(LoopEdge(n, _)))
-      loop.reducible = !isIrreducible()
+      loop.reducible = loop.reentries.isEmpty
       println("YYY" + headers)
       Some(loop)
     }
