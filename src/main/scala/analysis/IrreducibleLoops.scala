@@ -374,7 +374,7 @@ object NewLoopDetector {
     var dfsp_pos: Int,
     var dfsp_pos_max: Int,
     var is_traversed: Boolean,
-    var entries: Set[LoopEdge]
+    var headers: Set[Block]
   ) {
 
     /**
@@ -382,9 +382,10 @@ object NewLoopDetector {
     * suitable for returning to the caller.
     */
     def toBlockLoopInfo(nodes: Set[Block]) =
-      BlockLoopInfo(b, iloop_header, dfsp_pos_max, entries.filter {
-        case LoopEdge(from, to) => to == b || !nodes.contains(from)
-      }.map(_.to), nodes)
+      BlockLoopInfo(b, iloop_header, dfsp_pos_max, headers.filter {
+        _ => true
+        // case LoopEdge(from, to) => to == b || !nodes.contains(from)
+      }, nodes)
   }
 
   /**
@@ -429,7 +430,7 @@ object NewLoopDetector {
       loop.entryEdges ++= (Set(b) & headers).flatMap(h => (h.prevBlocks.toSet -- nodes).map(LoopEdge(_, h)))
       loop.nodes ++= nodes
       loop.edges ++= nodes.flatMap(n => (n.nextBlocks.toSet & nodes).map(LoopEdge(n, _)))
-      loop.reducible = !isIrreducible()
+      loop.reducible = loop.reentries.isEmpty
       println("YYY" + headers)
       Some(loop)
     }
@@ -468,9 +469,10 @@ object NewLoopDetector {
       // NOTE: loops are in *bottom-up topological order*.
       val loops = loopBlocks.values.toList.sortBy(-_.dfsp_pos_max)
 
+
       var forest = Map[Block, Set[Block]]()
       forest = loops.foldLeft(forest) {
-        case (forest, b) if b.entries.nonEmpty => forest + (b.b -> Set(b.b))
+        case (forest, b) if b.headers.nonEmpty => forest + (b.b -> Set(b.b))
         case (forest, _) => forest
       }
 
@@ -486,6 +488,12 @@ object NewLoopDetector {
         case (forest, _) => forest
       }
       println("forest: " + forest)
+
+      loops.foreach { loop =>
+        loop.iloop_header.foreach { h =>
+          loopBlocks(h).headers ++= loop.headers -- forest(h)
+        }
+      }
 
       val newLoops = loops.map(x => x.b -> x.toBlockLoopInfo(forest.getOrElse(x.b, Set())))
 
@@ -566,7 +574,7 @@ object NewLoopDetector {
         } else {
           if (b.dfsp_pos > 0) {
             // println("mark as loop header: " + b + " from " + b0)
-            b.entries = b.entries + LoopEdge(b0.b, b.b)
+            b.headers += b.b
             tag_lhead(b0, Some(b))
           } else if (b.iloop_header.isEmpty) {
             // intentionally empty
@@ -578,8 +586,7 @@ object NewLoopDetector {
               println(s"IRRED: mark $b0 as re-entry into $b. irreducible.")
 
               val h0 = h
-
-              h.entries = h.entries + LoopEdge(b0.b, b.b)
+              h.headers += b.b
 
               var continue = true
               while (continue && h.iloop_header.isDefined) {
