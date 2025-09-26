@@ -14,9 +14,9 @@ def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]): Unit = {
   val timer = PerformanceTimer("Simplify")
   val program = ctx.program
 
-  val foundLoops = LoopDetector.identify_loops(program)
-  val newLoops = foundLoops.reducibleTransformIR()
-  newLoops.updateIrWithLoops()
+  program.procedures.foreach { p =>
+    IrreducibleLoops.identify_loops(p).foreach(IrreducibleLoops.transform_many_loops)
+  }
 
   for (p <- program.procedures) {
     p.normaliseBlockNames()

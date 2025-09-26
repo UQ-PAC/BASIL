@@ -28,7 +28,7 @@ object AnalysisPipelineMRA {
 
     IRProgram.procedures.foreach { procedure =>
       IrreducibleLoops.identify_loops(procedure) match {
-        case Some(loops) => IrreducibleLoops.transform_many_loops(loops.values)
+        case Some(loops) => IrreducibleLoops.transform_many_loops(loops)
         case None => ()
       }
     }
