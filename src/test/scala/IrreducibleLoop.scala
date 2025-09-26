@@ -332,7 +332,6 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     val loopResult = NewLoopDetector.identify_loops(p.mainProcedure).get
     loopResult.values.foreach(println(_))
 
-    util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/in2.dot")
     val result =
       LoopTransform.new_llvm_transform_loop(loopResult.values.filter(_.isIrreducible()).flatMap(_.toLoop()).head).get
 
@@ -340,10 +339,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
     println("\nAFTER\n")
 
-    val newLoopResult = NewLoopDetector.identify_loops(p.mainProcedure).get
-    newLoopResult.values.foreach(println(_))
-
-    assert(newLoopResult.values.forall(!_.isIrreducible()))
+    assert(NewLoopDetector.identify_loops(p.mainProcedure).get.values.forall(!_.isIrreducible()))
   }
 
   test("paper fig4a") {
