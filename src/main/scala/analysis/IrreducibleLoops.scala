@@ -371,22 +371,21 @@ object NewLoopDetector {
   case class BlockLoopState(
     val b: Block,
     var iloop_header: Option[Block],
-    var is_header: Boolean,
     var dfsp_pos: Int,
     var dfsp_pos_max: Int,
     var is_traversed: Boolean,
-    var possibleReentries: Set[LoopEdge]
+    var entries: Set[LoopEdge]
   ) {
 
     /**
     * Converts the mutable [[BlockLoopState]] into an immutable [[BlockLoopInfo]],
     * suitable for returning to the caller.
     */
-    def toBlockLoopInfo(nodes: Set[Block], entries: Set[LoopEdge]) =
+    def toBlockLoopInfo(nodes: Set[Block], selfNodes: Set[Block]) =
       BlockLoopInfo(b, iloop_header, dfsp_pos_max, entries.filter {
         // case LoopEdge(from, to) => to == b || !nodes.contains(from)
         _ => true
-      }, nodes)
+      }.map(_.to), nodes, selfNodes)
   }
 
   /**
@@ -406,10 +405,10 @@ object NewLoopDetector {
     val b: Block,
     val iloop_header: Option[Block],
     val dfsp_pos: Int,
-    val entries: Set[LoopEdge],
+    val headers: Set[Block],
     val nodes: Set[Block],
+    val selfNodes: Set[Block]
   ) {
-    val headers = entries.map(_.to)
 
     def isIrreducible() = headers.size > 1
     def isCycle() = headers.nonEmpty
@@ -460,7 +459,7 @@ object NewLoopDetector {
   class TraverseLoops(val procedure: Procedure) {
 
     val loopBlocks: Map[Block, BlockLoopState] =
-      procedure.blocks.map(b => b -> BlockLoopState(b, None, false, 0, 0, false, Set())).toMap
+      procedure.blocks.map(b => b -> BlockLoopState(b, None, 0, 0, false, Set())).toMap
 
     import scala.language.implicitConversions
 
@@ -473,7 +472,8 @@ object NewLoopDetector {
 
       var forest = Map[Block, Set[Block]]()
       forest = loops.foldLeft(forest) {
-        case (forest, b) => forest ++ Option.when(b.is_header)(b.b -> Set(b.b))
+        case (forest, b) if b.entries.nonEmpty => forest + (b.b -> Set(b.b))
+        case (forest, _) => forest
       }
 
       // NOTE: iterates the forest in *bottom-up* topological order. this
@@ -481,55 +481,27 @@ object NewLoopDetector {
       // processing their parent cycle. this avoids us having to compute
       // closures of node-sets.
       forest = loops.foldLeft(forest) {
-        case (forest, b) =>
-          forest ++ b.iloop_header.map(h => h -> (forest(h) + b.b))
+        case (forest, BlockLoopState(b, Some(h), _, _, _, _)) =>
+          forest + (h -> (forest(h) + b))
+        case (forest, _) => forest
       }
       println("forest: " + forest)
 
-      // map of headers to internal blocks which have that as their innermost
-      // loop header.
       val selfNodes = forest
 
       forest = loops.foldLeft(forest) {
-        case (forest, b) =>
-          forest ++ b.iloop_header.map(h => h -> (forest(h) ++ forest.getOrElse(b.b, Set())))
+        case (forest, BlockLoopState(b, Some(h), _, _, _, _)) =>
+          val updated = h -> (forest(h) ++ forest.getOrElse(b, Set()))
+          forest + updated
+        case (forest, _) => forest
       }
 
-      // we need to hoist possible re-entries into the outermost loop
-      // which is a parent of edge.from which does not contain edge.to
-      val hoistedEntries = loops.foldLeft(Map[Block, Set[LoopEdge]]()) { (acc, loop) =>
-        var hoistedEntries = acc
+      val blockToSelfHeader = selfNodes.flatMap { (h, selfs) => selfs.map(_ -> h) }
+      println(blockToSelfHeader)
 
-        val loopHoistedEntries = hoistedEntries.getOrElse(loop.b, Set())
-        hoistedEntries -= loop.b
-
-        val (thisLoopEntries, toHoist) = (loop.possibleReentries ++ loopHoistedEntries).partitionMap {
-          case edge @ LoopEdge(_, to) if to == loop.b => Left(edge)
-          case edge @ LoopEdge(from, to) => loop.iloop_header.map(h => (h, forest(h))) match {
-            case None => Left(edge)
-            case Some((_, outerNodes)) if outerNodes.contains(from) => Left(edge)
-            case Some((h, _)) => Right(edge)
-          }
-        }
-
-        val simpleEntries = if (loop.is_header) {
-          val nodes = forest(loop.b)
-          loop.b.prevBlocks.iterator.map(LoopEdge(_, loop.b)).filterNot(e => nodes.contains(e.from)).toSet
-        } else {
-          Set()
-        }
-
-        hoistedEntries += loop.b -> (thisLoopEntries ++ simpleEntries)
-        loop.iloop_header match {
-          case Some(h) => hoistedEntries += h -> toHoist
-          case None => ()
-        }
-        hoistedEntries
-      }
-      println(hoistedEntries)
 
       val newLoops = loops.map { x =>
-        x.b -> x.toBlockLoopInfo(forest.getOrElse(x.b, Set()), hoistedEntries.getOrElse(x.b, Set()))
+        x.b -> x.toBlockLoopInfo(forest.getOrElse(x.b, Set()), selfNodes.getOrElse(x.b, Set()))
       }
 
       // NOTE: reverse order before returning, so outer loops appear first.
@@ -608,8 +580,8 @@ object NewLoopDetector {
            */
         } else {
           if (b.dfsp_pos > 0) {
-            println("mark as loop header: " + b + " from " + b0)
-            b.is_header = true
+            // println("mark as loop header: " + b + " from " + b0)
+            b.entries = b.entries + LoopEdge(b0.b, b.b)
             tag_lhead(b0, Some(b))
           } else if (b.iloop_header.isEmpty) {
             // intentionally empty
@@ -625,7 +597,7 @@ object NewLoopDetector {
               // WARN: improper assignment of entry edge to the innermost loop.
               // later, in getLoopInfos, we hoist the entry into the outermost
               // loop which does not contain the "from" node.
-              h.possibleReentries = h.possibleReentries + LoopEdge(b0.b, b.b)
+              h.entries = h.entries + LoopEdge(b0.b, b.b)
 
               var continue = true
               while (continue && h.iloop_header.isDefined) {
