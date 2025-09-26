@@ -39,14 +39,7 @@ case class LoopEdge(from: Block, to: Block) {
 }
 
 /**
- * A loop is a strongly-connected component in the block graph. This class is
- * constructed by [[NewLoopDetector.BlockLoopInfo#toLoop]] and, compared to
- * [[NewLoopDetector.BlockLoopInfo]], the [[Loop]] class contains more detailed
- * information such as _edges_ rather than just blocks.
- *
- * However, this information can become invalidated if a transform modifies
- * those edges. As such, users should be mindful to construct a [[Loop]] after
- * all relevant transformations have been done.
+ * A loop is a strongly-connected component in the block graph.
  */
 class Loop(val header: Block) {
 
@@ -383,111 +376,30 @@ object LoopDetector {
   }
 }
 
+/**
+ * Loop identification and irreducible loop transformation.
+ *
+ * The [[IrreducibleLoops.identify_loops]] method performs loop identification,
+ * and results of this can be passed to [[IrreducibleLoops.transform_loop]]
+ * to transform an irreducible loop to a reducible one.
+ */
 object IrreducibleLoops {
 
-  /**
-   * @param possibleReentries
-   *   re-entry into this loop to a secondary header. note that this is only
-   *   populated for the _innermost_ loop which is re-entered. later, in
-   *   [[BlockLoopState.computeBlockLoopInfo]], this is attached to other
-   *   containing loops as well.
+  /** Main entry point for the loop identification algorithm. Instantiates
+   *  [[TraverseLoops]] with the appropriate arguments. Returns a
+   *  [[scala.collection.immutable.ListMap]] of [[BlockLoopInfo]] if
+   *  successful, or `None` if the procedure has no entry block. The returned
+   *  `ListMap` will be in a topological order - outer cycles occur _before_
+   *  their subcycles.
    */
-  case class BlockLoopState(
-    val b: Block,
-    var iloop_header: Option[Block],
-    var is_header: Boolean,
-    var dfsp_pos: Int,
-    var dfsp_pos_max: Int,
-    var is_traversed: Boolean,
-    var possibleReentries: Set[LoopEdge]
-  ) {
-
-    /**
-    * Converts the mutable [[BlockLoopState]] into an immutable [[BlockLoopInfo]],
-    * suitable for returning to the caller.
-    */
-    def toBlockLoopInfo(nodes: Set[Block], headers: Set[Block]) =
-      BlockLoopInfo(b, iloop_header, dfsp_pos_max, headers, nodes)
-  }
-
-  object BlockLoopState {
-
-    def computeBlockLoopInfo(loopStates: Map[Block, BlockLoopState]): ListMap[Block, BlockLoopInfo] = {
-      // NOTE: loops are in *bottom-up topological order*.
-      val loops = loopStates.values.toList.sortBy(-_.dfsp_pos_max)
-
-      var forest = Map[Block, Set[Block]]()
-      forest = loops.foldLeft(forest) { case (forest, b) =>
-        forest ++ Option.when(b.is_header)(b.b -> Set(b.b))
-      }
-
-      // NOTE: iterates the forest in *bottom-up* topological order. this
-      // ensures that node-sets of sub-cycles are fully populated before
-      // processing their parent cycle. this avoids us having to compute
-      // closures of node-sets.
-      forest = loops.foldLeft(forest) { case (forest, b) =>
-        forest ++ b.iloop_header.map(h => h -> (forest(h) + b.b))
-      }
-
-      // map of headers to internal blocks which have that as their innermost
-      // loop header.
-      val selfNodes = forest
-
-      forest = loops.foldLeft(forest) { case (forest, b) =>
-        forest ++ b.iloop_header.map(h => h -> (forest(h) ++ forest.getOrElse(b.b, Set())))
-      }
-
-      // we need to hoist possible re-entries up to and including
-      // the outermost loop which is a parent of edge.from which does
-      // not contain edge.to
-      val hoistedEntries = loops.foldLeft(Map[Block, Set[LoopEdge]]()) { (acc, loop) =>
-        var hoistedEntries = acc
-
-        val loopHoistedEntries = hoistedEntries.getOrElse(loop.b, Set())
-        hoistedEntries -= loop.b
-
-        // slice the re-entry edges into those which will be hoisted and those which
-        // will not. hoisted edges will also be applied to the containing loop.
-        val (thisLoopEntries, toHoist) = (loop.possibleReentries ++ loopHoistedEntries).partitionMap {
-          case edge @ LoopEdge(_, to) if to == loop.b => Left(edge)
-          case edge @ LoopEdge(from, to) =>
-            loop.iloop_header.map(h => (h, forest(h))) match {
-              case None => Left(edge)
-              case Some((_, outerNodes)) if outerNodes.contains(from) => Left(edge)
-              case Some((h, _)) => Right(edge)
-            }
-        }
-
-        // add normal entries to the header which are not stored
-        val simpleEntries = if (loop.is_header) {
-          val nodes = forest(loop.b)
-          (loop.b.prevBlocks.toSet -- nodes).map(LoopEdge(_, loop.b))
-        } else {
-          Set()
-        }
-
-        hoistedEntries += loop.b -> (thisLoopEntries ++ simpleEntries ++ toHoist)
-        loop.iloop_header match {
-          case Some(h) => hoistedEntries += h -> toHoist
-          case None => assert(toHoist.isEmpty, "attempting to hoist entries but there is no parent loop!")
-        }
-        hoistedEntries
-      }
-
-      val newLoops = loops.map { x =>
-        x.b -> x.toBlockLoopInfo(forest.getOrElse(x.b, Set()), hoistedEntries.getOrElse(x.b, Set()).map(_.to))
-      }
-
-      // NOTE: reverse order before returning, so outer loops appear first.
-      newLoops.reverse.to(ListMap)
-    }
-
-  }
+  def identify_loops(procedure: Procedure): Option[ListMap[Block, BlockLoopInfo]] =
+    TraverseLoops(procedure).traverse_loops()
 
   /**
   * Loop-related information for a particular block `b`. This includes whether
   * `b` participates in any loops, and whether `b` is a distinguished header
-  * for a loop.
+  * for a loop. This information is passed to [[transform_loop]] to transform
+  * irreducible loops.
   *
   * The loop analysis produces a loop-nesting *tree* where nested sub-loops are
   * children of containing loops. A *sub-loop* of a loop is defined as a
@@ -564,18 +476,115 @@ object IrreducibleLoops {
     }
   }
 
-  /** Main entry point for the loop identification algorithm. Instantiates
-   *  [[TraverseLoops]] with the appropriate arguments. Returns a
-   *  [[scala.collection.immutable.ListMap]] of [[BlockLoopInfo]] if
-   *  successful, or `None` if the procedure has no entry block. The returned
-   *  `ListMap` will be in a topological order - outer cycles occur _before_
-   *  their subcycles.
+  /**
+   * Temporary mutable state for block information within [[TraverseLoops]].
+   * Converted to an immutable [[BlockLoopInfo]] once the traversal is complete
+   * and the information is finalised.
+   *
+   * @param possibleReentries
+   *   re-entry into this loop to a secondary header. note that this is only
+   *   populated for the _innermost_ loop which is re-entered. later, in
+   *   [[BlockLoopState.computeBlockLoopInfo]], this is attached to other
+   *   containing loops as well.
    */
-  def identify_loops(procedure: Procedure): Option[ListMap[Block, BlockLoopInfo]] =
-    TraverseLoops(procedure).traverse_loops()
+  case class BlockLoopState(
+    val b: Block,
+    var iloop_header: Option[Block],
+    var is_header: Boolean,
+    var dfsp_pos: Int,
+    var dfsp_pos_max: Int,
+    var is_traversed: Boolean,
+    var possibleReentries: Set[LoopEdge]
+  ) {
+
+    /**
+    * Converts the mutable [[BlockLoopState]] into an immutable [[BlockLoopInfo]],
+    * suitable for returning to the caller.
+    */
+    def toBlockLoopInfo(nodes: Set[Block], headers: Set[Block]) =
+      BlockLoopInfo(b, iloop_header, dfsp_pos_max, headers, nodes)
+  }
+
+  /** Helper methods. Notably, includes [[BlockLoopState.computeBlockLoopInfo]]
+   *  to convert a temporary BlockLoopState into a BlockLoopInfo suitable for
+   *  transforming.
+   */
+  object BlockLoopState {
+
+    def computeBlockLoopInfo(loopStates: Map[Block, BlockLoopState]): ListMap[Block, BlockLoopInfo] = {
+      // NOTE: loops are in *bottom-up topological order*.
+      val loops = loopStates.values.toList.sortBy(-_.dfsp_pos_max)
+
+      var forest = Map[Block, Set[Block]]()
+      forest = loops.foldLeft(forest) { case (forest, b) =>
+        forest ++ Option.when(b.is_header)(b.b -> Set(b.b))
+      }
+
+      // NOTE: iterates the forest in *bottom-up* topological order. this
+      // ensures that node-sets of sub-cycles are fully populated before
+      // processing their parent cycle. this avoids us having to compute
+      // closures of node-sets.
+      forest = loops.foldLeft(forest) { case (forest, b) =>
+        forest ++ b.iloop_header.map(h => h -> (forest(h) + b.b))
+      }
+
+      // map of headers to internal blocks which have that as their innermost
+      // loop header.
+      val selfNodes = forest
+
+      forest = loops.foldLeft(forest) { case (forest, b) =>
+        forest ++ b.iloop_header.map(h => h -> (forest(h) ++ forest.getOrElse(b.b, Set())))
+      }
+
+      // we need to hoist possible re-entries up to and including
+      // the outermost loop which is a parent of edge.from which does
+      // not contain edge.to
+      val hoistedEntries = loops.foldLeft(Map[Block, Set[LoopEdge]]()) { (acc, loop) =>
+        var hoistedEntries = acc
+
+        val loopHoistedEntries = hoistedEntries.getOrElse(loop.b, Set())
+        hoistedEntries -= loop.b
+
+        // slice the re-entry edges into those which will be hoisted and those which
+        // will not. hoisted edges will also be applied to the containing loop.
+        val (thisLoopEntries, toHoist) = (loop.possibleReentries ++ loopHoistedEntries).partitionMap {
+          case edge @ LoopEdge(_, to) if to == loop.b => Left(edge)
+          case edge @ LoopEdge(from, to) =>
+            loop.iloop_header.map(h => (h, forest(h))) match {
+              case None => Left(edge)
+              case Some((_, outerNodes)) if outerNodes.contains(from) => Left(edge)
+              case Some((h, _)) => Right(edge)
+            }
+        }
+
+        // add normal entries to the header which are not stored
+        val simpleEntries = if (loop.is_header) {
+          val nodes = forest(loop.b)
+          (loop.b.prevBlocks.toSet -- nodes).map(LoopEdge(_, loop.b))
+        } else {
+          Set()
+        }
+
+        hoistedEntries += loop.b -> (thisLoopEntries ++ simpleEntries ++ toHoist)
+        loop.iloop_header match {
+          case Some(h) => hoistedEntries += h -> toHoist
+          case None => assert(toHoist.isEmpty, "attempting to hoist entries but there is no parent loop!")
+        }
+        hoistedEntries
+      }
+
+      val newLoops = loops.map { x =>
+        x.b -> x.toBlockLoopInfo(forest.getOrElse(x.b, Set()), hoistedEntries.getOrElse(x.b, Set()).map(_.to))
+      }
+
+      // NOTE: reverse order before returning, so outer loops appear first.
+      newLoops.reverse.to(ListMap)
+    }
+
+  }
 
   /** Performs the DFS-based loop analysis as described in [1]. Each instance of
-   *  this should be used at most once. The [[NewLoopDetector#identify_loops]]
+   *  this should be used at most once. The [[identify_loops]]
    *  function will construct this class for you and call the appropriate methods.
    *
    *  [1] T. Wei, J. Mao, W. Zou, and Y. Chen, “A New Algorithm for Identifying
@@ -799,8 +808,8 @@ object IrreducibleLoops {
 
     // indices of blocks which may go to a particular header. keyed by header block.
     val precedingIndices: Map[Block, List[Int]] =
-      (externalEntries ++ backEdges).toList.groupMap(_.to)(_.from).map {
-        (h, prevs) => h -> prevs.map(entryIndices(_)).sorted
+      (externalEntries ++ backEdges).toList.groupMap(_.to)(_.from).map { (h, prevs) =>
+        h -> prevs.map(entryIndices(_)).sorted
       }
 
     // new header is succeeded by all the old headers.

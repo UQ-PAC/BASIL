@@ -1,4 +1,4 @@
-import analysis.{LoopDetector, IrreducibleLoops}
+import analysis.{IrreducibleLoops, LoopDetector}
 import ir.{Block, IRLoading, Procedure, Program, dotBlockGraph, dotFlowGraph}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
@@ -340,7 +340,6 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
     val loopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
     loopResult.values.foreach(println(_))
-
 
     analysis.AnalysisPipelineMRA.reducibleLoops(p)
     util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/out2.dot")
