@@ -1,6 +1,6 @@
 package analysis
 
-import _root_.ir.{
+import ir.{
   AssocExpr,
   Assume,
   BinaryExpr,
@@ -17,6 +17,7 @@ import _root_.ir.{
   Program,
   Unreachable
 }
+import util.assertion.*
 
 import scala.annotation.tailrec
 import scala.collection.immutable.ListMap
@@ -75,6 +76,15 @@ class Loop(val header: Block) {
     s"Back edges: $backEdges",
     s"Reentries: $reentries"
   ).mkString("\n")
+
+  def checkLoopValidity(): Boolean = {
+    val edges = reentries.iterator ++ backEdges ++ entryEdges ++ this.edges
+    val missingEdges = edges.filter { case LoopEdge(from, to) =>
+      !from.nextBlocks.iterator.contains(to)
+    }.toList
+
+    missingEdges.isEmpty
+  }
 }
 
 /* Loop detection and classification with respect to being reducible or irreducible. Implements the algorithm
@@ -383,10 +393,16 @@ object NewLoopDetector {
     * suitable for returning to the caller.
     */
     def toBlockLoopInfo(nodes: Set[Block], entries: Set[LoopEdge]) =
-      BlockLoopInfo(b, iloop_header, dfsp_pos_max, entries.filter {
-        // case LoopEdge(from, to) => to == b || !nodes.contains(from)
-        _ => true
-      }, nodes)
+      BlockLoopInfo(
+        b,
+        iloop_header,
+        dfsp_pos_max,
+        entries.filter {
+          // case LoopEdge(from, to) => to == b || !nodes.contains(from)
+          _ => true
+        },
+        nodes
+      )
   }
 
   /**
@@ -407,7 +423,7 @@ object NewLoopDetector {
     val iloop_header: Option[Block],
     val dfsp_pos: Int,
     val entries: Set[LoopEdge],
-    val nodes: Set[Block],
+    val nodes: Set[Block]
   ) {
     val headers = entries.map(_.to)
 
@@ -472,17 +488,16 @@ object NewLoopDetector {
       val loops = loopBlocks.values.toList.sortBy(-_.dfsp_pos_max)
 
       var forest = Map[Block, Set[Block]]()
-      forest = loops.foldLeft(forest) {
-        case (forest, b) => forest ++ Option.when(b.is_header)(b.b -> Set(b.b))
+      forest = loops.foldLeft(forest) { case (forest, b) =>
+        forest ++ Option.when(b.is_header)(b.b -> Set(b.b))
       }
 
       // NOTE: iterates the forest in *bottom-up* topological order. this
       // ensures that node-sets of sub-cycles are fully populated before
       // processing their parent cycle. this avoids us having to compute
       // closures of node-sets.
-      forest = loops.foldLeft(forest) {
-        case (forest, b) =>
-          forest ++ b.iloop_header.map(h => h -> (forest(h) + b.b))
+      forest = loops.foldLeft(forest) { case (forest, b) =>
+        forest ++ b.iloop_header.map(h => h -> (forest(h) + b.b))
       }
       println("forest: " + forest)
 
@@ -490,9 +505,8 @@ object NewLoopDetector {
       // loop header.
       val selfNodes = forest
 
-      forest = loops.foldLeft(forest) {
-        case (forest, b) =>
-          forest ++ b.iloop_header.map(h => h -> (forest(h) ++ forest.getOrElse(b.b, Set())))
+      forest = loops.foldLeft(forest) { case (forest, b) =>
+        forest ++ b.iloop_header.map(h => h -> (forest(h) ++ forest.getOrElse(b.b, Set())))
       }
 
       // we need to hoist possible re-entries into the outermost loop
@@ -505,11 +519,12 @@ object NewLoopDetector {
 
         val (thisLoopEntries, toHoist) = (loop.possibleReentries ++ loopHoistedEntries).partitionMap {
           case edge @ LoopEdge(_, to) if to == loop.b => Left(edge)
-          case edge @ LoopEdge(from, to) => loop.iloop_header.map(h => (h, forest(h))) match {
-            case None => Left(edge)
-            case Some((_, outerNodes)) if outerNodes.contains(from) => Left(edge)
-            case Some((h, _)) => Right(edge)
-          }
+          case edge @ LoopEdge(from, to) =>
+            loop.iloop_header.map(h => (h, forest(h))) match {
+              case None => Left(edge)
+              case Some((_, outerNodes)) if outerNodes.contains(from) => Left(edge)
+              case Some((h, _)) => Right(edge)
+            }
         }
 
         val simpleEntries = if (loop.is_header) {
@@ -647,8 +662,8 @@ object NewLoopDetector {
               // if continuing, then the new header does not appear in the current ancestors
               // to the b0 node. in such cases, the new header is presumed to be its own
               // subcycle and the *subcycle* should be declared irreducible.
-              if (continue) {
-              } else {
+              if (continue) {}
+              else {
                 // h0.entries = h0.entries + LoopEdge(b0.b, b.b)
               }
             }
@@ -804,6 +819,10 @@ object LoopTransform {
 
   def new_llvm_transform_loop(loop: Loop): Option[IrreducibleTransformInfo] = {
     if (loop.reducible) return None
+    debugAssert(
+      loop.checkLoopValidity(),
+      "loop data structure contains edges which no longer exist. is it out of date?"
+    )
 
     // From LLVM: https://llvm.org/doxygen/FixIrreducible_8cpp_source.html
     //

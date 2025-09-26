@@ -173,7 +173,14 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
     assertLoopDetector(p.mainProcedure) {
       ListMap("b" -> "a", "c" -> "b", "d" -> "c")
-    } { ListMap("a" -> Set("a", "d"), "b" -> Set("b"), "c" -> Set("c")) }
+    } { ListMap("a" -> Set("a", "d"), "b" -> Set("b", "d"), "c" -> Set("c", "d")) }
+
+    analysis.AnalysisPipelineMRA.reducibleLoops(p)
+
+    val newLoopResult = NewLoopDetector.identify_loops(p.mainProcedure).get
+    newLoopResult.values.foreach(println(_))
+
+    assert(newLoopResult.values.forall(!_.isIrreducible()))
   }
 
   test("multiple entries - irreducible") {
@@ -333,12 +340,15 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     loopResult.values.foreach(println(_))
 
     util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/in2.dot")
-    val result =
-      LoopTransform.new_llvm_transform_loop(loopResult.values.filter(_.isIrreducible()).flatMap(_.toLoop()).head).get
 
-    util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/out2.dot")
+    analysis.AnalysisPipelineMRA.reducibleLoops(p)
 
-    println("\nAFTER\n")
+    // val result =
+    //   LoopTransform.new_llvm_transform_loop(loopResult.values.filter(_.isIrreducible()).flatMap(_.toLoop()).head).get
+    //
+    // util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/out2.dot")
+    //
+    // println("\nAFTER\n")
 
     val newLoopResult = NewLoopDetector.identify_loops(p.mainProcedure).get
     newLoopResult.values.foreach(println(_))
