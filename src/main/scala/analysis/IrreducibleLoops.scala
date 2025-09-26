@@ -519,7 +519,7 @@ object NewLoopDetector {
           Set()
         }
 
-        hoistedEntries += loop.b -> (thisLoopEntries ++ simpleEntries ++ toHoist)
+        hoistedEntries += loop.b -> (thisLoopEntries ++ simpleEntries)
         loop.iloop_header match {
           case Some(h) => hoistedEntries += h -> toHoist
           case None => assert(toHoist.isEmpty, "attempting to hoist entries but there is no parent loop!")
