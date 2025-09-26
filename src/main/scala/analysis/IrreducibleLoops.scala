@@ -393,16 +393,7 @@ object NewLoopDetector {
     * suitable for returning to the caller.
     */
     def toBlockLoopInfo(nodes: Set[Block], entries: Set[LoopEdge]) =
-      BlockLoopInfo(
-        b,
-        iloop_header,
-        dfsp_pos_max,
-        entries.filter {
-          // case LoopEdge(from, to) => to == b || !nodes.contains(from)
-          _ => true
-        },
-        nodes
-      )
+      BlockLoopInfo( b, iloop_header, dfsp_pos_max, entries, nodes)
   }
 
   /**
@@ -417,6 +408,15 @@ object NewLoopDetector {
   * {b}`, where `V` is the set of vertices (blocks).
   *
   * Constructed from a [[BlockLoopState]] with [[BlockLoopState#toBlockLoopInfo]].
+  *
+  * @param b the affected block.
+  * @param iloop_header if the block is within a loop, this will be
+  * TODO: jfidosajfoidsafjdoisajfoidsajfoidajfiodsa
+  *                     when reaching the new header. this variable stores an integer index.
+  * @param entryIndices map of entry blocks (i.e., blocks preceding headers) to their
+  *                     integer index.
+  * @param precedingIndices map of (old) header blocks to the entry indices which precede
+  *                         that header.
   */
   case class BlockLoopInfo(
     val b: Block,
@@ -430,26 +430,21 @@ object NewLoopDetector {
     def isIrreducible() = headers.size > 1
     def isCycle() = headers.nonEmpty
 
+    /** Converts the [[BlockLoopInfo]] into a [[Loop]] by inspecting the current
+     *  block edges in Basil IR CFG. As such, the result of this method will be
+     *  invalid after transforms are applied to the affected blocks.
+     */
     def toLoop(): Option[Loop] = {
       if (!isCycle()) return None
 
       val loop = Loop(b)
 
-// class Loop(val header: Block) {
-//   val reentries: mutable.Set[LoopEdge] = mutable.Set() // Edges to loop from outside that are not to the header
-//   val backEdges: mutable.Set[LoopEdge] = mutable.Set() // Edges from inside loop to the header
-//   val entryEdges: mutable.Set[LoopEdge] = mutable.Set() // Edges into the header node
-//
-//   val nodes: mutable.Set[Block] = mutable.Set() // G_l
-//   val edges: mutable.Set[LoopEdge] = mutable.Set() // G_e
-//   var reducible: Boolean = true // Assume reducible by default
       loop.reentries ++= (headers - b).flatMap(h => (h.prevBlocks.toSet -- nodes).map(LoopEdge(_, h)))
       loop.backEdges ++= (Set(b) & headers).flatMap(h => (h.prevBlocks.toSet & nodes).map(LoopEdge(_, h)))
       loop.entryEdges ++= (Set(b) & headers).flatMap(h => (h.prevBlocks.toSet -- nodes).map(LoopEdge(_, h)))
       loop.nodes ++= nodes
       loop.edges ++= nodes.flatMap(n => (n.nextBlocks.toSet & nodes).map(LoopEdge(n, _)))
       loop.reducible = loop.reentries.isEmpty
-      println("YYY" + headers)
       Some(loop)
     }
   }
@@ -499,7 +494,6 @@ object NewLoopDetector {
       forest = loops.foldLeft(forest) { case (forest, b) =>
         forest ++ b.iloop_header.map(h => h -> (forest(h) + b.b))
       }
-      println("forest: " + forest)
 
       // map of headers to internal blocks which have that as their innermost
       // loop header.
@@ -509,14 +503,17 @@ object NewLoopDetector {
         forest ++ b.iloop_header.map(h => h -> (forest(h) ++ forest.getOrElse(b.b, Set())))
       }
 
-      // we need to hoist possible re-entries into the outermost loop
-      // which is a parent of edge.from which does not contain edge.to
+      // we need to hoist possible re-entries up to and including
+      // the outermost loop which is a parent of edge.from which does
+      // not contain edge.to
       val hoistedEntries = loops.foldLeft(Map[Block, Set[LoopEdge]]()) { (acc, loop) =>
         var hoistedEntries = acc
 
         val loopHoistedEntries = hoistedEntries.getOrElse(loop.b, Set())
         hoistedEntries -= loop.b
 
+        // slice the re-entry edges into those which will be hoisted and those which
+        // will not. hoisted edges will also be applied to the containing loop.
         val (thisLoopEntries, toHoist) = (loop.possibleReentries ++ loopHoistedEntries).partitionMap {
           case edge @ LoopEdge(_, to) if to == loop.b => Left(edge)
           case edge @ LoopEdge(from, to) =>
@@ -527,6 +524,7 @@ object NewLoopDetector {
             }
         }
 
+        // add normal entries to the header which are not stored
         val simpleEntries = if (loop.is_header) {
           val nodes = forest(loop.b)
           (loop.b.prevBlocks.toSet -- nodes).map(LoopEdge(_, loop.b))
@@ -541,7 +539,6 @@ object NewLoopDetector {
         }
         hoistedEntries
       }
-      println(hoistedEntries)
 
       val newLoops = loops.map { x =>
         x.b -> x.toBlockLoopInfo(forest.getOrElse(x.b, Set()), hoistedEntries.getOrElse(x.b, Set()))
@@ -623,7 +620,7 @@ object NewLoopDetector {
            */
         } else {
           if (b.dfsp_pos > 0) {
-            println("mark as loop header: " + b + " from " + b0)
+            // println("mark as loop header: " + b + " from " + b0)
             b.is_header = true
             tag_lhead(b0, Some(b))
           } else if (b.iloop_header.isEmpty) {
@@ -633,7 +630,7 @@ object NewLoopDetector {
             if (h.dfsp_pos > 0) {
               tag_lhead(b0, Some(h))
             } else {
-              println(s"IRRED: mark $b0 as re-entry into $b. irreducible.")
+              // println(s"IRRED: mark $b0 as re-entry into $b. irreducible.")
 
               val h0 = h
 
@@ -649,23 +646,13 @@ object NewLoopDetector {
                   tag_lhead(b0, Some(h))
                   continue = false
                 }
-                // println("irred h: " + h)
-                // h.headers = h.headers + b.b
-                // h.entries = h.entries + LoopEdge(b0.b, b.b)
               }
-              println("continue: " + continue)
+              // println("continue: " + continue)
 
-              println("h0: " + h0)
-              println("h: " + h)
-              println("b0: " + b0)
-              println("b: " + b)
-              // if continuing, then the new header does not appear in the current ancestors
-              // to the b0 node. in such cases, the new header is presumed to be its own
-              // subcycle and the *subcycle* should be declared irreducible.
-              if (continue) {}
-              else {
-                // h0.entries = h0.entries + LoopEdge(b0.b, b.b)
-              }
+              // println("h0: " + h0)
+              // println("h: " + h)
+              // println("b0: " + b0)
+              // println("b: " + b)
             }
           }
         }
@@ -712,8 +699,8 @@ object LoopTransform {
    */
   def llvm_transform(loops: Iterable[Loop]): Iterable[Loop] = {
     loops.map { l =>
-      println("transforming loop with header: " + l.header)
-      println("nodes: " + l.nodes.map(_.label))
+      // println("transforming loop with header: " + l.header)
+      // println("nodes: " + l.nodes.map(_.label))
       if (!l.reducible) {
         llvm_transform_loop(l)
       } else {
