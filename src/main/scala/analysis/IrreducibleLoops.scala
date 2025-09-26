@@ -381,11 +381,10 @@ object NewLoopDetector {
     * Converts the mutable [[BlockLoopState]] into an immutable [[BlockLoopInfo]],
     * suitable for returning to the caller.
     */
-    def toBlockLoopInfo(nodes: Set[Block], selfNodes: Set[Block]) =
+    def toBlockLoopInfo(nodes: Set[Block]) =
       BlockLoopInfo(b, iloop_header, dfsp_pos_max, entries.filter {
-        // case LoopEdge(from, to) => to == b || !nodes.contains(from)
-        _ => true
-      }.map(_.to), nodes, selfNodes)
+        case LoopEdge(from, to) => to == b || !nodes.contains(from)
+      }.map(_.to), nodes)
   }
 
   /**
@@ -406,8 +405,7 @@ object NewLoopDetector {
     val iloop_header: Option[Block],
     val dfsp_pos: Int,
     val headers: Set[Block],
-    val nodes: Set[Block],
-    val selfNodes: Set[Block]
+    val nodes: Set[Block]
   ) {
 
     def isIrreducible() = headers.size > 1
@@ -482,27 +480,14 @@ object NewLoopDetector {
       // closures of node-sets.
       forest = loops.foldLeft(forest) {
         case (forest, BlockLoopState(b, Some(h), _, _, _, _)) =>
-          forest + (h -> (forest(h) + b))
+          println("topological order: " + h + " -> " + b)
+          val updated = h -> (forest(h) + b ++ forest.getOrElse(b, Set()))
+          forest + updated
         case (forest, _) => forest
       }
       println("forest: " + forest)
 
-      val selfNodes = forest
-
-      forest = loops.foldLeft(forest) {
-        case (forest, BlockLoopState(b, Some(h), _, _, _, _)) =>
-          val updated = h -> (forest(h) ++ forest.getOrElse(b, Set()))
-          forest + updated
-        case (forest, _) => forest
-      }
-
-      val blockToSelfHeader = selfNodes.flatMap { (h, selfs) => selfs.map(_ -> h) }
-      println(blockToSelfHeader)
-
-
-      val newLoops = loops.map { x =>
-        x.b -> x.toBlockLoopInfo(forest.getOrElse(x.b, Set()), selfNodes.getOrElse(x.b, Set()))
-      }
+      val newLoops = loops.map(x => x.b -> x.toBlockLoopInfo(forest.getOrElse(x.b, Set())))
 
       // NOTE: reverse order before returning, so outer loops appear first.
       newLoops.reverse.to(ListMap)
@@ -594,9 +579,6 @@ object NewLoopDetector {
 
               val h0 = h
 
-              // WARN: improper assignment of entry edge to the innermost loop.
-              // later, in getLoopInfos, we hoist the entry into the outermost
-              // loop which does not contain the "from" node.
               h.entries = h.entries + LoopEdge(b0.b, b.b)
 
               var continue = true
@@ -608,7 +590,6 @@ object NewLoopDetector {
                 }
                 // println("irred h: " + h)
                 // h.headers = h.headers + b.b
-                // h.entries = h.entries + LoopEdge(b0.b, b.b)
               }
               println("continue: " + continue)
 
