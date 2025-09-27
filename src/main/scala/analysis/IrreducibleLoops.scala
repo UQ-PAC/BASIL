@@ -19,7 +19,6 @@ import ir.{
 import util.assertion.*
 
 import scala.annotation.tailrec
-import scala.collection.mutable
 
 /**
  * Loop identification and irreducible loop transformation.
@@ -117,10 +116,10 @@ object IrreducibleLoops {
    * @param dfsp_pos_max the non-zero value of `dfsp_pos` when it was set. this
    *                     value is maintained even after visiting is finished.
    * @param is_traversed whether visiting this block has _started_.
-   * @param known_headers known headers of the loop headed by this block. if this
-   *                      block heads a loop, this always contains `b`. additionally,
-   *                      it also contains re-entry edges into the _innermost_ loop
-   *                      being re-entered.
+   * @param possible_headers possible headers of the loop headed by this block.
+   *                         if this block heads a loop, this always contains
+   *                         `b`. additionally, it also contains an
+   *                         *over-approximation* of re-entry edges.
    */
   case class BlockLoopState(
     val b: Block,
@@ -128,7 +127,7 @@ object IrreducibleLoops {
     var dfsp_pos: Int,
     var dfsp_pos_max: Int,
     var is_traversed: Boolean,
-    var known_headers: Set[Block]
+    var possible_headers: Set[Block]
   ) {
 
     /**
@@ -150,16 +149,16 @@ object IrreducibleLoops {
     /**
      * Computes [[BlockLoopInfo]] from the temporary [[BlockLoopState]]
      * information. This additionally computes the transitive node-sets for
-     * each loop and propagates re-entry headers upwards to applicable
-     * containing loops to populate the `nodes` and `headers` fields,
-     * respectively.
+     * each loop and filters re-entry headers to only those with external
+     * incoming edges. This is done to populate the `nodes` and `headers`
+     * fields, respectively.
      */
     def computeBlockLoopInfo(blockStates: Map[Block, BlockLoopState]): List[BlockLoopInfo] = {
       // NOTE: loops are in *bottom-up topological order*.
       val allBlocks = blockStates.values.toList.sortBy(-_.dfsp_pos_max)
 
       val headerBlocks = allBlocks.collect {
-        case loop if loop.known_headers.nonEmpty => loop
+        case loop if loop.possible_headers.nonEmpty => loop
       }
 
       var forest: Map[Block, Set[Block]] = headerBlocks.map(b => b.b -> Set(b.b)).toMap
@@ -180,20 +179,13 @@ object IrreducibleLoops {
         forest ++ b.iloop_header.map(h => h -> (forest(h) ++ forest.getOrElse(b.b, Nil)))
       }
 
-      // hoist headers upwards and apply to all containing loops. then, filter
-      // down to only those headers which have an external predecessor.
-      val headers = allBlocks
-        .foldLeft {
-          headerBlocks.map(b => b.b -> b.known_headers).toMap
-        } { (headers, b) =>
-          headers ++ b.iloop_header.map(h => h -> (headers(h) ++ headers.getOrElse(b.b, Nil)))
+      // filter down to only those headers which have an external predecessor.
+      val headers = headerBlocks.map { b =>
+        val nodes = forest(b.b)
+        b.b -> b.possible_headers.filter { x =>
+          x == b.b || x.prevBlocks.exists(!nodes.contains(_))
         }
-        .transform { (h, headers) =>
-          val nodes = forest(h)
-          headers.filter { x =>
-            x == h || x.prevBlocks.exists(!nodes.contains(_))
-          }
-        }
+      }.toMap
 
       val newLoops = allBlocks.map { x =>
         x.toBlockLoopInfo(forest.getOrElse(x.b, Set()), headers.getOrElse(x.b, Set()))
@@ -308,7 +300,7 @@ object IrreducibleLoops {
         } else {
           if (b.dfsp_pos > 0) {
             // println("mark as loop header: " + b + " from " + b0)
-            b.known_headers += b.b
+            b.possible_headers += b.b
             tag_lhead(b0, Some(b))
           } else if (b.iloop_header.isEmpty) {
             // intentionally empty
@@ -321,8 +313,7 @@ object IrreducibleLoops {
 
               val h0 = h
 
-              // NOTE: attaches re-entry into the innermost loop of `b`.
-              h.known_headers += b.b
+              h.possible_headers += b.b
 
               var continue = true
               while (continue && h.iloop_header.isDefined) {
@@ -331,6 +322,7 @@ object IrreducibleLoops {
                   tag_lhead(b0, Some(h))
                   continue = false
                 }
+                h.possible_headers += b.b
               }
               // println("continue: " + continue)
 

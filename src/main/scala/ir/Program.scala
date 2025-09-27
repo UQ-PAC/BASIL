@@ -1,6 +1,6 @@
 package ir
 
-import analysis.{Loop, MergedRegion}
+import analysis.MergedRegion
 import boogie.*
 import translating.PrettyPrinter.*
 import util.assertion.*
@@ -640,8 +640,9 @@ class Block private (
   def isReturn: Boolean = parent.returnBlock.contains(this)
   def isEntry: Boolean = parent.entryBlock.contains(this)
 
-  var inLoop: Set[Loop] = Set()
-  def isLoopHeader() = inLoop.exists(x => x.header == this)
+  var inLoop: Set[Nothing] = Set()
+  // def isLoopHeader() = inLoop.exists(x => x.header == this)
+  def isLoopHeader() = true
   def isLoopParticipant() = inLoop.nonEmpty
 
   def jump: Jump = _jump
