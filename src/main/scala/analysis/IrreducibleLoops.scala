@@ -238,7 +238,7 @@ object IrreducibleLoops {
       val selfNodes = forest
 
       forest = loops.foldLeft(forest) { case (forest, b) =>
-        forest ++ b.iloop_header.map(h => h -> (forest(h) ++ forest.getOrElse(b.b, Nil)))
+        forest ++ b.iloop_header.map(h => h -> (forest(h) ++ forest.getOrElse(b.b, Set())))
       }
 
       // we need to hoist possible re-entries up to and including
@@ -272,12 +272,11 @@ object IrreducibleLoops {
 
         hoistedEntries += loop.b -> (thisLoopEntries ++ simpleEntries ++ toHoist)
         loop.iloop_header match {
-          case Some(h) => hoistedEntries += h -> (toHoist ++ hoistedEntries.getOrElse(h, Nil))
+          case Some(h) => hoistedEntries += h -> toHoist
           case None => assert(toHoist.isEmpty, "attempting to hoist entries but there is no parent loop!")
         }
         hoistedEntries
       }
-      // println("HOIST" + hoistedEntries.filter(_._2.nonEmpty))
 
       val newLoops = loops.map { x =>
         x.toBlockLoopInfo(forest.getOrElse(x.b, Set()), hoistedEntries.getOrElse(x.b, Set()).map(_.to))
