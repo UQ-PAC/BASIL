@@ -118,7 +118,7 @@ object IrreducibleLoops {
   * potential headers.
   *
   * This class is constructed from a [[BlockLoopState]] with
-  * [[BlockLoopState#toBlockLoopInfo]].
+  * [[BlockLoopState.computeBlockLoopInfo]].
   *
   * @param b the block which this loop information concerns.
   * @param iloop_header if `b` is within a loop, this records the distinguished
@@ -185,6 +185,19 @@ object IrreducibleLoops {
    * Temporary mutable state for block information within [[TraverseLoops]].
    * Converted to an immutable [[BlockLoopInfo]] once the traversal is complete
    * and the information is finalised.
+   *
+   * @param b block the state is relevant to
+   * @param iloop_header if set, header of innermost loop containing this block
+   * @param dfsp_pos if non-zero, index of this block in the current depth-first
+   *                 shortest-path. if zero, block is not visited yet or visiting
+   *                 the block has finished.
+   * @param dfsp_pos_max the non-zero value of `dfsp_pos` when it was set. this
+   *                     value is maintained even after visiting is finished.
+   * @param is_traversed whether visiting this block has _started_.
+   * @param known_headers known headers of the loop headed by this block. if this
+   *                      block heads a loop, this always contains `b`. additionally,
+   *                      it also contains re-entry edges into the _innermost_ loop
+   *                      being re-entered.
    */
   case class BlockLoopState(
     val b: Block,
@@ -192,12 +205,14 @@ object IrreducibleLoops {
     var dfsp_pos: Int,
     var dfsp_pos_max: Int,
     var is_traversed: Boolean,
-    var headers: Set[Block]
+    var known_headers: Set[Block]
   ) {
 
     /**
     * Converts the mutable [[BlockLoopState]] into an immutable [[BlockLoopInfo]],
-    * suitable for returning to the caller.
+    * suitable for returning to the caller. Requires additional information which
+    * has to be computed by considering multiple BlockLoopStates. This is handled
+    * by [[BlockLoopState.computeBlockLoopInfo]].
     */
     def toBlockLoopInfo(nodes: Set[Block], headers: Set[Block]) =
       BlockLoopInfo(b, iloop_header, dfsp_pos_max, headers, nodes)
@@ -209,15 +224,22 @@ object IrreducibleLoops {
    */
   object BlockLoopState {
 
+    /**
+     * Computes [[BlockLoopInfo]] from the temporary [[BlockLoopState]]
+     * information. This additionally computes the transitive node-sets for
+     * each loop and propagates re-entry headers upwards to applicable
+     * containing loops to populate the `nodes` and `headers` fields,
+     * respectively.
+     */
     def computeBlockLoopInfo(blockStates: Map[Block, BlockLoopState]): List[BlockLoopInfo] = {
       // NOTE: loops are in *bottom-up topological order*.
       val allBlocks = blockStates.values.toList.sortBy(-_.dfsp_pos_max)
 
       val headerBlocks = allBlocks.collect {
-        case loop if loop.headers.nonEmpty => loop
+        case loop if loop.known_headers.nonEmpty => loop
       }
 
-      var forest:Map[Block, Set[Block]] = headerBlocks.map(b => b.b -> Set(b.b)).toMap
+      var forest: Map[Block, Set[Block]] = headerBlocks.map(b => b.b -> Set(b.b)).toMap
 
       // NOTE: iterates the forest in *bottom-up* topological order. this
       // ensures that node-sets of sub-cycles are fully populated before
@@ -232,14 +254,23 @@ object IrreducibleLoops {
       val selfNodes = forest
 
       forest = allBlocks.foldLeft(forest) { case (forest, b) =>
-        forest ++ b.iloop_header.map(h => h -> (forest(h) ++ forest.getOrElse(b.b, Set())))
+        forest ++ b.iloop_header.map(h => h -> (forest(h) ++ forest.getOrElse(b.b, Nil)))
       }
 
-      val headers = headerBlocks.foldLeft {
-        headerBlocks.map(b => b.b -> b.headers).toMap
-      } { (headers, b) =>
-        headers ++ b.iloop_header.map(h => h -> (headers(h) ++ b.headers))
-      }
+      // hoist headers upwards and apply to all containing loops. then, filter
+      // down to only those headers which have an external predecessor.
+      val headers = allBlocks
+        .foldLeft {
+          headerBlocks.map(b => b.b -> b.known_headers).toMap
+        } { (headers, b) =>
+          headers ++ b.iloop_header.map(h => h -> (headers(h) ++ headers.getOrElse(b.b, Nil)))
+        }
+        .transform { (h, headers) =>
+          val nodes = forest(h)
+          headers.filter { x =>
+            x == h || x.prevBlocks.exists(!nodes.contains(_))
+          }
+        }
 
       val newLoops = allBlocks.map { x =>
         x.toBlockLoopInfo(forest.getOrElse(x.b, Set()), headers.getOrElse(x.b, Set()))
@@ -268,15 +299,22 @@ object IrreducibleLoops {
 
     import scala.language.implicitConversions
 
+    /**
+     * Implicit conversion to allow accessing members of [[BlockLoopState]] via
+     * `.` on [[Block]] values. This lets us write code which looks closer to
+     * the algorithm in the paper.
+     */
     given Conversion[Block, BlockLoopState] with
       def apply(b: Block) = loopBlocks(b)
 
     /** Main entry point for the loop identification algorithm. Calls
      *  [[trav_loops_tailrec]] with the appropriate arguments. Returns a
-     *  [[scala.collection.immutable.ListMap]] of [[BlockLoopInfo]] if
-     *  successful, or `None` if the procedure has no entry block. The returned
-     *  `ListMap` will be in topological order - outer cycles occur _before_
-     *  their subcycles.
+     *  list of [[BlockLoopInfo]] if successful, or `None` if the procedure has
+     *  no entry block. The returned list will be in topological order - outer
+     *  cycles appear _before_ their subcycles.
+     *
+     *  This method should be called at most once on each [[TraverseLoops]]
+     *  object.
      */
     def traverse_loops() = {
       require(!used, "cannot call traverse_loops twice")
@@ -331,8 +369,9 @@ object IrreducibleLoops {
           tag_lhead(b0, nh)
           (b0, dfsp_pos, it, rest)
 
-        case (Right(_), Nil) =>
-          throw new Exception("trav_loops_tailrec: stack underflow")
+        // if there is nothing remaining in the stack, this is the outer-most
+        // call. simply return.
+        case (Right(nh), Nil) => return nh
       }
 
       while (it.hasNext) {
@@ -347,7 +386,7 @@ object IrreducibleLoops {
         } else {
           if (b.dfsp_pos > 0) {
             // println("mark as loop header: " + b + " from " + b0)
-            b.headers += b.b
+            b.known_headers += b.b
             tag_lhead(b0, Some(b))
           } else if (b.iloop_header.isEmpty) {
             // intentionally empty
@@ -360,7 +399,8 @@ object IrreducibleLoops {
 
               val h0 = h
 
-              h.headers += b.b
+              // NOTE: attaches re-entry into the innermost loop of `b`.
+              h.known_headers += b.b
 
               var continue = true
               while (continue && h.iloop_header.isDefined) {
@@ -382,13 +422,12 @@ object IrreducibleLoops {
       }
       b0.dfsp_pos = 0
       val result = b0.iloop_header.map(loopBlocks(_))
-      continuations match {
-        case Nil => result
-        case _ :: _ => trav_loops_tailrec(Right(result), continuations)
-      }
+      trav_loops_tailrec(Right(result), continuations)
     }
 
-    /** Helper function described in the paper and called by [[trav_loops_tailrec]]. */
+    /** Helper function described in the paper and called by [[trav_loops_tailrec]].
+     *  Sets `h` as the loop header for the block `b` and all containing loops.
+     */
     def tag_lhead(b: BlockLoopState, h: Option[BlockLoopState]): Unit = h match {
       case Some(h) if b.b ne h.b =>
         var cur1 = b
