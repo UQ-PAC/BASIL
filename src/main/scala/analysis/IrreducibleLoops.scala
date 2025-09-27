@@ -185,21 +185,14 @@ object IrreducibleLoops {
    * Temporary mutable state for block information within [[TraverseLoops]].
    * Converted to an immutable [[BlockLoopInfo]] once the traversal is complete
    * and the information is finalised.
-   *
-   * @param possibleReentries
-   *   re-entry into this loop to a secondary header. note that this is only
-   *   populated for the _innermost_ loop which is re-entered. later, in
-   *   [[BlockLoopState.computeBlockLoopInfo]], this is attached to other
-   *   containing loops as well.
    */
   case class BlockLoopState(
     val b: Block,
     var iloop_header: Option[Block],
-    var is_header: Boolean,
     var dfsp_pos: Int,
     var dfsp_pos_max: Int,
     var is_traversed: Boolean,
-    var possibleReentries: Set[LoopEdge]
+    var headers: Set[Block]
   ) {
 
     /**
@@ -216,20 +209,21 @@ object IrreducibleLoops {
    */
   object BlockLoopState {
 
-    def computeBlockLoopInfo(loopStates: Map[Block, BlockLoopState]): List[BlockLoopInfo] = {
+    def computeBlockLoopInfo(blockStates: Map[Block, BlockLoopState]): List[BlockLoopInfo] = {
       // NOTE: loops are in *bottom-up topological order*.
-      val loops = loopStates.values.toList.sortBy(-_.dfsp_pos_max)
+      val allBlocks = blockStates.values.toList.sortBy(-_.dfsp_pos_max)
 
-      var forest = Map[Block, Set[Block]]()
-      forest = loops.foldLeft(forest) { case (forest, b) =>
-        forest ++ Option.when(b.is_header)(b.b -> Set(b.b))
+      val headerBlocks = allBlocks.collect {
+        case loop if loop.headers.nonEmpty => loop
       }
+
+      var forest:Map[Block, Set[Block]] = headerBlocks.map(b => b.b -> Set(b.b)).toMap
 
       // NOTE: iterates the forest in *bottom-up* topological order. this
       // ensures that node-sets of sub-cycles are fully populated before
       // processing their parent cycle. this avoids us having to compute
       // closures of node-sets.
-      forest = loops.foldLeft(forest) { case (forest, b) =>
+      forest = allBlocks.foldLeft(forest) { case (forest, b) =>
         forest ++ b.iloop_header.map(h => h -> (forest(h) + b.b))
       }
 
@@ -237,49 +231,18 @@ object IrreducibleLoops {
       // loop header.
       val selfNodes = forest
 
-      forest = loops.foldLeft(forest) { case (forest, b) =>
+      forest = allBlocks.foldLeft(forest) { case (forest, b) =>
         forest ++ b.iloop_header.map(h => h -> (forest(h) ++ forest.getOrElse(b.b, Set())))
       }
 
-      // we need to hoist possible re-entries up to and including
-      // the outermost loop which is a parent of edge.from which does
-      // not contain edge.to
-      val hoistedEntries = loops.foldLeft(Map[Block, Set[LoopEdge]]()) { (acc, loop) =>
-        var hoistedEntries = acc
-
-        val loopHoistedEntries = hoistedEntries.getOrElse(loop.b, Set())
-        hoistedEntries -= loop.b
-
-        // slice the re-entry edges into those which will be hoisted and those which
-        // will not. hoisted edges will also be applied to the containing loop.
-        val (thisLoopEntries, toHoist) = (loop.possibleReentries ++ loopHoistedEntries).partitionMap {
-          case edge @ LoopEdge(_, to) if to == loop.b => Left(edge)
-          case edge @ LoopEdge(from, to) =>
-            loop.iloop_header.map(h => (h, forest(h))) match {
-              case None => Left(edge)
-              case Some((_, outerNodes)) if outerNodes.contains(from) => Left(edge)
-              case Some((h, _)) => Right(edge)
-            }
-        }
-
-        // add normal entries to the header which are not stored
-        val simpleEntries = if (loop.is_header) {
-          val nodes = forest(loop.b)
-          (loop.b.prevBlocks.toSet -- nodes).map(LoopEdge(_, loop.b))
-        } else {
-          Set()
-        }
-
-        hoistedEntries += loop.b -> (thisLoopEntries ++ simpleEntries ++ toHoist)
-        loop.iloop_header match {
-          case Some(h) => hoistedEntries += h -> toHoist
-          case None => assert(toHoist.isEmpty, "attempting to hoist entries but there is no parent loop!")
-        }
-        hoistedEntries
+      val headers = headerBlocks.foldLeft {
+        headerBlocks.map(b => b.b -> b.headers).toMap
+      } { (headers, b) =>
+        headers ++ b.iloop_header.map(h => h -> (headers(h) ++ b.headers))
       }
 
-      val newLoops = loops.map { x =>
-        x.toBlockLoopInfo(forest.getOrElse(x.b, Set()), hoistedEntries.getOrElse(x.b, Set()).map(_.to))
+      val newLoops = allBlocks.map { x =>
+        x.toBlockLoopInfo(forest.getOrElse(x.b, Set()), headers.getOrElse(x.b, Set()))
       }
 
       // NOTE: reverse order before returning, so outer loops appear first.
@@ -301,7 +264,7 @@ object IrreducibleLoops {
 
     var used = false
     val loopBlocks: Map[Block, BlockLoopState] =
-      procedure.blocks.map(b => b -> BlockLoopState(b, None, false, 0, 0, false, Set())).toMap
+      procedure.blocks.map(b => b -> BlockLoopState(b, None, 0, 0, false, Set())).toMap
 
     import scala.language.implicitConversions
 
@@ -384,7 +347,7 @@ object IrreducibleLoops {
         } else {
           if (b.dfsp_pos > 0) {
             // println("mark as loop header: " + b + " from " + b0)
-            b.is_header = true
+            b.headers += b.b
             tag_lhead(b0, Some(b))
           } else if (b.iloop_header.isEmpty) {
             // intentionally empty
@@ -397,7 +360,7 @@ object IrreducibleLoops {
 
               val h0 = h
 
-              h.possibleReentries = h.possibleReentries + LoopEdge(b0.b, b.b)
+              h.headers += b.b
 
               var continue = true
               while (continue && h.iloop_header.isDefined) {
