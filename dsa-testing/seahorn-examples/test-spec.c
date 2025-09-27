@@ -7,7 +7,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "include/spec_func.h"
+char *spec_func(const char *s, int c);
 
 char *test_prop(const char *a, char b)
 {
