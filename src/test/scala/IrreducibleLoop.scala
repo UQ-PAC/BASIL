@@ -477,6 +477,35 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     }
   }
 
+  test("triforce") {
+
+    import ir.dsl.*
+    val p = prog(
+      proc("main")(
+        block("S", goto("h1", "h2", "h3")),
+        block("h1", goto("h1", "h2", "h3")),
+        block("h2", goto("h1", "h2", "h3")),
+        block("h3", goto("h1", "h2", "h3", "exit")),
+        block("exit", ret)
+      )
+    )
+
+    var loopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
+    var cycles = loopResult.filter(_.isLoopHeader)
+    cycles.foreach(println)
+    assertResult(2) {
+      cycles.filter(_.isIrreducible).size
+    }
+
+    IrreducibleLoops.transform_all_and_update(p)
+
+    loopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
+    cycles = loopResult.filter(_.isLoopHeader)
+    cycles.foreach(println)
+
+    assert(cycles.filter(_.isIrreducible).isEmpty)
+  }
+
   test("plist_free") {
     val p = ir.parsing.ParseBasilIL.loadILFile("/home/rina/progs/basil/plist-free.il").program
     // p.procedures.foreach { p =>
