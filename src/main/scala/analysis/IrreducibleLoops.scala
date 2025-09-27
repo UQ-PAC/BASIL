@@ -161,26 +161,32 @@ object IrreducibleLoops {
         case loop if loop.possible_headers.nonEmpty => loop
       }
 
-      var forest: Map[Block, Set[Block]] = headerBlocks.map(b => b.b -> Set(b.b)).toMap
+      var forest: Map[Block, Set[Block]] = headerBlocks.iterator.map(b => b.b -> Set(b.b)).toMap
 
       // NOTE: iterates the forest in *bottom-up* topological order. this
       // ensures that node-sets of sub-cycles are fully populated before
       // processing their parent cycle. this avoids us having to compute
       // closures of node-sets.
       forest = allBlocks.foldLeft(forest) { case (forest, b) =>
-        forest ++ b.iloop_header.map(h => h -> (forest(h) + b.b))
+        b.iloop_header match {
+          case Some(h) => forest + (h -> (forest(h) + b.b))
+          case None => forest
+        }
       }
 
       // map of headers to internal blocks which have that as their innermost
       // loop header.
       val selfNodes = forest
 
-      forest = allBlocks.foldLeft(forest) { case (forest, b) =>
-        forest ++ b.iloop_header.map(h => h -> (forest(h) ++ forest.getOrElse(b.b, Nil)))
+      forest = headerBlocks.foldLeft(forest) { case (forest, b) =>
+        b.iloop_header match {
+          case Some(h) => forest + (h -> (forest(h) ++ forest(b.b)))
+          case None => forest
+        }
       }
 
       // filter down to only those headers which have an external predecessor.
-      val headers = headerBlocks.map { b =>
+      val headers = headerBlocks.iterator.map { b =>
         val nodes = forest(b.b)
         b.b -> b.possible_headers.filter { x =>
           x == b.b || x.prevBlocks.exists(!nodes.contains(_))
