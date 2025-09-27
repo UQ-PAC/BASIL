@@ -301,11 +301,10 @@ object IrreducibleLoops {
 
     /**
      * Implicit conversion to allow accessing members of [[BlockLoopState]] via
-     * `.` on [[Block]] values. This lets us write code which looks closer to
+     * `.` on [[ir.Block]] values. This lets us write code which looks closer to
      * the algorithm in the paper.
      */
-    given Conversion[Block, BlockLoopState] with
-      def apply(b: Block) = loopBlocks(b)
+    given Conversion[Block, BlockLoopState] = loopBlocks.apply
 
     /** Main entry point for the loop identification algorithm. Calls
      *  [[trav_loops_tailrec]] with the appropriate arguments. Returns a
