@@ -23,9 +23,14 @@ import scala.annotation.tailrec
 /**
  * Loop identification and irreducible loop transformation.
  *
- * The [[IrreducibleLoops.identify_loops]] method performs loop identification,
- * and results of this can be passed to [[IrreducibleLoops.transform_loop]]
- * to transform an irreducible loop to a reducible one.
+ * The [[IrreducibleLoops.transform_all_and_update]] method is the main entry
+ * point for doing the identification and transformation in one step. This also
+ * handles updating the loop information stored within blocks.
+ *
+ * Alternatively, the [[IrreducibleLoops.identify_loops]] method performs loop
+ * identification, and results of this can be passed to
+ * [[IrreducibleLoops.transform_loop]] to transform an irreducible loop to a
+ * reducible one.
  */
 object IrreducibleLoops {
 
@@ -38,8 +43,15 @@ object IrreducibleLoops {
   def identify_loops(procedure: Procedure): Option[List[BlockLoopInfo]] =
     TraverseLoops(procedure).traverse_loops()
 
-  def identify_loops(prog: Program): List[BlockLoopInfo] =
+  def identify_all_loops(prog: Program): List[BlockLoopInfo] =
     prog.procedures.toList.flatMap(x => identify_loops(x).getOrElse(Nil))
+
+  /**
+   * Identifies loops then stores each block's loop information into the
+   * [[ir.Block#loopInfo]] field of the [[ir.Block]].
+   */
+  def update_block_loop_info(prog: Program) =
+    identify_all_loops(prog).foreach { loop => loop.b.loopInfo = loop }
 
   /** A directed edge between two IR blocks. */
   case class LoopEdge(from: Block, to: Block)
@@ -85,8 +97,9 @@ object IrreducibleLoops {
     val headers: Set[Block],
     val nodes: Set[Block]
   ) {
-    def isIrreducible() = headers.size > 1
-    def isCycle() = headers.nonEmpty
+    val isIrreducible = headers.size > 1
+    val isLoopHeader = headers.nonEmpty
+    val isLoopParticipant = isLoopHeader || iloop_header.isDefined
 
     /** Accesses the Basil IR state to compute the set of entry edges
      *  originating from outside the loop and going towards *any* header of the
@@ -391,17 +404,25 @@ object IrreducibleLoops {
     val precedingIndices: Map[Block, List[Int]]
   )
 
-  def transform_all_loops(prog: Program) =
-    transform_many_loops(identify_loops(prog))
-
-  def transform_many_loops(loops: Iterable[BlockLoopInfo]) = {
-    loops.toList.sortBy(_.dfsp_pos).flatMap { loop =>
-      IrreducibleLoops.transform_loop(loop)
+  /**
+   * This method is the main entry point for doing the identification and
+   * transformation in one step. This also handles updating the loop
+   * information stored within blocks.
+   */
+  def transform_all_and_update(prog: Program) = {
+    prog.procedures.foreach { p =>
+      identify_loops(p).foreach(transform_many_loops)
     }
+    update_block_loop_info(prog)
   }
 
+  def transform_many_loops(loops: Iterable[BlockLoopInfo]) =
+    loops.toList.sortBy(_.dfsp_pos).flatMap {
+      IrreducibleLoops.transform_loop
+    }
+
   def transform_loop(loop: BlockLoopInfo): Option[IrreducibleTransformInfo] = {
-    if (!loop.isIrreducible()) return None
+    if (!loop.isIrreducible) return None
 
     // From LLVM: https://llvm.org/doxygen/FixIrreducible_8cpp_source.html
     //

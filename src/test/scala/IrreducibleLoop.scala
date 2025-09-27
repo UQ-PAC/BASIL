@@ -48,21 +48,23 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     val program: Program = load(ILLoadingConfig(ADTPath, Some(RELFPath)))
     ir.transforms.clearParams(program)
 
-    val foundLoops = IrreducibleLoops.identify_loops(program)
+    val foundLoops = IrreducibleLoops.identify_all_loops(program)
 
     BASILTest.writeToFile(
       dotBlockGraph(program, program.collect { case b: Block => b -> b.toString }.toMap),
       s"${variationPath}_blockgraph-before-reduce.dot"
     )
 
-    foundLoops.filter(_.isCycle()).foreach(l => Logger.debug(s"found loops${System.lineSeparator()}$l"))
+    foundLoops.filter(_.isLoopHeader).foreach(l => Logger.debug(s"found loops${System.lineSeparator()}$l"))
+
+    IrreducibleLoops.transform_all_and_update(program)
 
     BASILTest.writeToFile(
       dotBlockGraph(program, program.collect { case b: Block => b -> b.toString }.toMap),
       s"${variationPath}_blockgraph-after-reduce.dot"
     )
-    val foundLoops2 = IrreducibleLoops.identify_loops(program)
-    assert(foundLoops2.forall(x => !x.isCycle() || x.isIrreducible()))
+    val foundLoops2 = IrreducibleLoops.identify_all_loops(program)
+    assert(foundLoops2.filter(_.isLoopHeader).forall(!_.isIrreducible))
 
   }
 
@@ -148,7 +150,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     val newLoopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
     newLoopResult.foreach(println(_))
 
-    assert(newLoopResult.forall(!_.isIrreducible()))
+    assert(newLoopResult.forall(!_.isIrreducible))
 
     util.writeToFile(dotBlockGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/out3.dot")
   }
@@ -242,7 +244,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     loopResult.foreach(println(_))
     // util.renderDotGraph(dotFlowGraph(p.mainProcedure.blocks.toList, Set()))
 
-    val result = IrreducibleLoops.transform_loop(loopResult.filter(_.isIrreducible()).head).get
+    val result = IrreducibleLoops.transform_loop(loopResult.filter(_.isIrreducible).head).get
     // analysis.AnalysisPipelineMRA.reducibleLoops(p)
 
     val blocks = p.mainProcedure.labelToBlock
@@ -255,7 +257,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     }
 
     assertResult(Nil, "there should be no irreducible loops after transform") {
-      IrreducibleLoops.identify_loops(p.mainProcedure).get.filter(_.isIrreducible())
+      IrreducibleLoops.identify_loops(p.mainProcedure).get.filter(_.isIrreducible)
     }
   }
 
@@ -281,7 +283,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/out2.dot")
 
     // val result =
-    //   IrreducibleLoops.transform_loop(loopResult.filter(_.isIrreducible()).flatMap(_.toLoop()).head).get
+    //   IrreducibleLoops.transform_loop(loopResult.filter(_.isIrreducible).flatMap(_.toLoop()).head).get
     //
     // util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/out2.dot")
     //
@@ -290,7 +292,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     val newLoopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
     newLoopResult.foreach(println(_))
 
-    assert(newLoopResult.forall(!_.isIrreducible()))
+    assert(newLoopResult.forall(!_.isIrreducible))
   }
 
   test("paper fig4a") {
@@ -308,7 +310,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
     val loopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
     assertResult(Nil) {
-      loopResult.filter(_.isCycle()).toList
+      loopResult.filter(_.isLoopHeader).toList
     }
   }
 
@@ -327,7 +329,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
     val loopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
     assertResult(List(Set("b", "b0", "x"))) {
-      loopResult.filter(_.isCycle()).toList.map(_.nodes.map(_.label))
+      loopResult.filter(_.isLoopHeader).toList.map(_.nodes.map(_.label))
     }
   }
 
@@ -347,7 +349,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     )
 
     val loopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
-    val cycles = loopResult.filter(_.isCycle()).toList
+    val cycles = loopResult.filter(_.isLoopHeader).toList
     assertResult(Nil) {
       cycles.map(_.nodes.map(_.label))
     }
@@ -370,7 +372,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     )
 
     val loopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
-    val cycles = loopResult.filter(_.isCycle()).toList
+    val cycles = loopResult.filter(_.isLoopHeader).toList
     assertResult(List(Set("b", "b0", "x", "y", "h", "z"))) {
       cycles.map(_.nodes.map(_.label))
     }
@@ -397,7 +399,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     val loopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
     loopResult.foreach(println(_))
     assertResult(2) {
-      loopResult.filter(_.isIrreducible()).size
+      loopResult.filter(_.isIrreducible).size
     }
 
     analysis.AnalysisPipelineMRA.reducibleLoops(p)
@@ -405,7 +407,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     val newLoopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
     newLoopResult.foreach(println(_))
 
-    assert(newLoopResult.forall(!_.isIrreducible()))
+    assert(newLoopResult.forall(!_.isIrreducible))
   }
 
   test("paper fig6b") {
@@ -427,7 +429,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     val loopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
     loopResult.foreach(println(_))
     assertResult(Nil) {
-      loopResult.filter(_.isIrreducible()).toList
+      loopResult.filter(_.isIrreducible).toList
     }
 
     analysis.AnalysisPipelineMRA.reducibleLoops(p)
@@ -435,7 +437,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     val newLoopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
     newLoopResult.foreach(println(_))
 
-    assert(newLoopResult.forall(!_.isIrreducible()))
+    assert(newLoopResult.forall(!_.isIrreducible))
   }
 
   test("paper fig4e") {
@@ -457,7 +459,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     val blocks = p.mainProcedure.labelToBlock
 
     val loopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
-    val cycles = loopResult.filter(_.isCycle()).map(x => x.b -> x).toMap
+    val cycles = loopResult.filter(_.isLoopHeader).map(x => x.b -> x).toMap
     cycles.foreach(println)
 
     val h1 = cycles(blocks("h1"))
@@ -485,7 +487,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     util.writeToFile(p.pprint, "/home/rina/progs/basil/plist-before.il")
 
     val loops = IrreducibleLoops.identify_loops(p.mainProcedure).get
-    loops.filter(_.isCycle()).foreach { x =>
+    loops.filter(_.isLoopHeader).foreach { x =>
       println()
       println(x)
     }
@@ -503,7 +505,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
       val loops = IrreducibleLoops.identify_loops(p).get
       loops.foreach(println(_))
-      assert(loops.forall(!_.isIrreducible()))
+      assert(loops.forall(!_.isIrreducible))
     }
   }
 

@@ -14,7 +14,7 @@ class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
     program: Program,
     procedure: Procedure
   ): (Map[Block, List[Predicate]], Map[Block, List[Predicate]]) = {
-    IrreducibleLoops.transform_all_loops(program)
+    IrreducibleLoops.transform_all_and_update(program)
 
     FullLoopInvariantGenerator(program).genInvariants(procedure)
   }

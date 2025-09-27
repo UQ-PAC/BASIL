@@ -1,5 +1,6 @@
 package ir
 
+import analysis.IrreducibleLoops.BlockLoopInfo
 import analysis.MergedRegion
 import boogie.*
 import translating.PrettyPrinter.*
@@ -640,10 +641,9 @@ class Block private (
   def isReturn: Boolean = parent.returnBlock.contains(this)
   def isEntry: Boolean = parent.entryBlock.contains(this)
 
-  var inLoop: Set[Nothing] = Set()
-  // def isLoopHeader() = inLoop.exists(x => x.header == this)
-  def isLoopHeader() = true
-  def isLoopParticipant() = inLoop.nonEmpty
+  var loopInfo = BlockLoopInfo(this, None, 0, Set(), Set())
+  def isLoopHeader() = loopInfo.isLoopHeader
+  def isLoopParticipant() = loopInfo.isLoopParticipant
 
   def jump: Jump = _jump
 

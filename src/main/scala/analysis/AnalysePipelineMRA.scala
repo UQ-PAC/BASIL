@@ -26,12 +26,7 @@ object AnalysisPipelineMRA {
   def reducibleLoops(IRProgram: Program) = {
     StaticAnalysisLogger.debug("reducible loops")
 
-    IRProgram.procedures.foreach { procedure =>
-      IrreducibleLoops.identify_loops(procedure) match {
-        case Some(loops) => IrreducibleLoops.transform_many_loops(loops)
-        case None => ()
-      }
-    }
+    IrreducibleLoops.transform_all_and_update(IRProgram)
 
     IRProgram
   }
