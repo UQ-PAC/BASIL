@@ -456,6 +456,8 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       )
     )
 
+    p.mainProcedure.blocks.foreach { b => b.internalShuffleJumps() }
+
     val blocks = p.mainProcedure.labelToBlock
 
     val loopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
@@ -490,6 +492,8 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       )
     )
 
+    p.mainProcedure.blocks.foreach { b => b.internalShuffleJumps() }
+
     var loopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
     var cycles = loopResult.filter(_.isLoopHeader)
     cycles.foreach(println)
@@ -508,6 +512,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
   test("plist_free") {
     val p = ir.parsing.ParseBasilIL.loadILFile("/home/rina/progs/basil/plist-free.il").program
+    p.mainProcedure.blocks.foreach { b => b.internalShuffleJumps() }
     // p.procedures.foreach { p =>
     //   p.blocks.foreach(_.statements.clear())
     //   while (ir.transforms.coalesceBlocks(p)) {}
