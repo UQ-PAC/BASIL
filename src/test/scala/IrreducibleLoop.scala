@@ -240,9 +240,6 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
     val loopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
     loopResult.foreach(println(_))
-    val loops = loopResult.flatMap(_.toLoop())
-
-    loops.foreach(println(_))
     // util.renderDotGraph(dotFlowGraph(p.mainProcedure.blocks.toList, Set()))
 
     val result = IrreducibleLoops.transform_loop(loopResult.filter(_.isIrreducible()).head).get
@@ -491,7 +488,6 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     loops.filter(_.isCycle()).foreach { x =>
       println()
       println(x)
-      println(x.toLoop().get)
     }
 
     util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/in.dot")
@@ -506,7 +502,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       assertResult(Nil, "after loop transform, all blocks should still be reachable")(blocksWithoutPrev)
 
       val loops = IrreducibleLoops.identify_loops(p).get
-      loops.flatMap(_.toLoop()).foreach(println(_))
+      loops.foreach(println(_))
       assert(loops.forall(!_.isIrreducible()))
     }
   }

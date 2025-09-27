@@ -21,64 +21,6 @@ import util.assertion.*
 import scala.annotation.tailrec
 import scala.collection.mutable
 
-private def label(p: Block) = "block." + p.label
-
-/* A connection between to IL nodes, purely for the representation of loops in
- *
- */
-case class LoopEdge(from: Block, to: Block) {
-  override def toString: String = s"(${label(from)}, ${label(to)})"
-}
-
-/**
- * A loop is a strongly-connected component in the block graph.
- */
-class Loop(val header: Block) {
-
-  /** Edges to loop from outside that are not to the header.
-   *  This set is non-empty if and only if the loop is *irreducible*.
-   */
-  val reentries: mutable.Set[LoopEdge] = mutable.Set()
-
-  /** Edges from inside loop to the header. */
-  val backEdges: mutable.Set[LoopEdge] = mutable.Set()
-
-  /** Edges into the header node from outside the loop. */
-  val entryEdges: mutable.Set[LoopEdge] = mutable.Set()
-
-  /** Nodes making up the loop. These form a maximal strongly-connected component. */
-  val nodes: mutable.Set[Block] = mutable.Set() // G_l
-  /** Edges internal to the loop, i.e., between two loop [[nodes]]. */
-  val edges: mutable.Set[LoopEdge] = mutable.Set() // G_e
-  var reducible: Boolean = true // Assume reducible by default
-
-  def addEdge(edge: LoopEdge): Unit = {
-    nodes += edge.from
-    nodes += edge.to
-    edges += edge
-  }
-
-  def name: String = label(header)
-
-  override def toString: String = List(
-    s"\nHeader: ${label(header)}",
-    s"Reducible: $reducible",
-    s"Body: $nodes",
-    s"Entry edges: $entryEdges",
-    s"Back edges: $backEdges",
-    s"Reentries: $reentries"
-  ).mkString("\n")
-
-  def checkLoopValidity(): Boolean = {
-    val edges = reentries.iterator ++ backEdges ++ entryEdges ++ this.edges
-    val missingEdges = edges.filter { case LoopEdge(from, to) =>
-      !from.nextBlocks.iterator.contains(to)
-    }.toList
-
-    missingEdges.isEmpty
-  }
-}
-
 /**
  * Loop identification and irreducible loop transformation.
  *
@@ -99,6 +41,9 @@ object IrreducibleLoops {
 
   def identify_loops(prog: Program): List[BlockLoopInfo] =
     prog.procedures.toList.flatMap(x => identify_loops(x).getOrElse(Nil))
+
+  /** A directed edge between two IR blocks. */
+  case class LoopEdge(from: Block, to: Block)
 
   /**
   * Loop-related information for a particular block `b`. This includes whether
@@ -157,28 +102,6 @@ object IrreducibleLoops {
      */
     def computeBackEdges() =
       headers.flatMap(h => (h.prevBlocks.toSet & nodes).map(LoopEdge(_, h)))
-
-    /** Converts the [[BlockLoopInfo]] into a [[Loop]] by inspecting the
-     *  *current* block edges in the Basil IR CFG. As such, the result of this
-     *  method depends on the current IR state and may become invalidated if
-     *  changes are made to the IR after it is called.
-     *
-     *  If the current [[BlockLoopInfo]] is not the distinguished header of a
-     *  loop, returns None.
-     */
-    def toLoop(): Option[Loop] = {
-      if (!isCycle()) return None
-
-      val loop = Loop(b)
-
-      loop.reentries ++= (headers - b).flatMap(h => (h.prevBlocks.toSet -- nodes).map(LoopEdge(_, h)))
-      loop.backEdges ++= (Set(b) & headers).flatMap(h => (h.prevBlocks.toSet & nodes).map(LoopEdge(_, h)))
-      loop.entryEdges ++= (Set(b) & headers).flatMap(h => (h.prevBlocks.toSet -- nodes).map(LoopEdge(_, h)))
-      loop.nodes ++= nodes
-      loop.edges ++= nodes.flatMap(n => (n.nextBlocks.toSet & nodes).map(LoopEdge(n, _)))
-      loop.reducible = loop.reentries.isEmpty
-      Some(loop)
-    }
   }
 
   /**
