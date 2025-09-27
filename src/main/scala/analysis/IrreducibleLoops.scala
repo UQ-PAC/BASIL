@@ -186,12 +186,13 @@ object IrreducibleLoops {
       }
 
       // filter down to only those headers which have an external predecessor.
-      val headers = headerBlocks.iterator.map { b =>
-        val nodes = forest(b.b)
-        b.b -> b.possible_headers.filter { x =>
-          x == b.b || x.prevBlocks.exists(!nodes.contains(_))
+      val headers = headerBlocks.view.map { b => b.b -> b.possible_headers }.toMap
+      assert {
+        headers.forall { (h, hs) =>
+          val nodes = forest(h)
+          hs.forall(x => x.prevBlocks.exists(!nodes.contains(_)))
         }
-      }.toMap
+      }
 
       val newLoops = allBlocks.map { x =>
         x.toBlockLoopInfo(forest.getOrElse(x.b, Set()), headers.getOrElse(x.b, Set()))
