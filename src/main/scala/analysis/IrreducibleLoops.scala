@@ -321,8 +321,9 @@ object IrreducibleLoops {
                 if (h.dfsp_pos > 0) {
                   tag_lhead(b0, Some(h))
                   continue = false
+                } else {
+                  h.possible_headers += b.b
                 }
-                h.possible_headers += b.b
               }
               // println("continue: " + continue)
 
