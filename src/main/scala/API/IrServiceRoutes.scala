@@ -14,7 +14,10 @@ import org.http4s.circe._
 import io.circe.generic.auto._
 import io.circe.syntax._
 
-import basil.main.Main.{ChooseInput, loadDirectory}  // Note, this could be subject to change to scala, if the package line is uncommented
+import basil.main.Main.{
+  ChooseInput,
+  loadDirectory
+}
 
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
@@ -33,13 +36,11 @@ implicit val statusEncoder: EntityEncoder[IO, AnalysisStatus] = jsonEncoderOf[An
 implicit val directorySelectionDecoder: EntityDecoder[IO, DirectorySelection] = jsonOf[IO, DirectorySelection]
 
 class IrServiceRoutes(
-                       epochStore: IREpochStore,
-                       isReady: Ref[IO, Boolean],
-                       irProcessingSemaphore: Semaphore[IO],
-                       generateIRAsync: (String, Option[String]) => IO[Unit])(
-  implicit asyncIO: Async[IO],
-    loggerFactory: LoggerFactory[IO]
-) {
+  epochStore: IREpochStore,
+  isReady: Ref[IO, Boolean],
+  irProcessingSemaphore: Semaphore[IO],
+  generateIRAsync: (String, Option[String]) => IO[Unit]
+)(implicit asyncIO: Async[IO], loggerFactory: LoggerFactory[IO]) {
 
   private val logger: Logger[IO] = loggerFactory.getLogger(LoggerName(getClass.getName))
 
@@ -49,24 +50,23 @@ class IrServiceRoutes(
    */
   def routes: HttpRoutes[IO] = {
     statusRoute <+>
-    listEpochsRoute <+>
-    getProceduresWithLinesRoute <+>
-    getProceduresRoute <+>
-    getBeforeIrRoute <+>
-    getAfterIrRoute <+>
-    getBeforeCfgRoute <+>
-    getAfterCfgRoute <+>
-    getSpecificBeforeIrRoute <+>
-    getSpecificAfterIrRoute <+>
-    postSelectDirectoryRoute
+      listEpochsRoute <+>
+      getProceduresWithLinesRoute <+>
+      getProceduresRoute <+>
+      getBeforeIrRoute <+>
+      getAfterIrRoute <+>
+      getBeforeCfgRoute <+>
+      getAfterCfgRoute <+>
+      getSpecificBeforeIrRoute <+>
+      getSpecificAfterIrRoute <+>
+      postSelectDirectoryRoute
   }
 
-  private val statusRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case GET -> Root / "status" =>
-      isReady.get.flatMap { ready =>
-        val status = if (ready) "completed" else "running"
-        Ok(AnalysisStatus(status).asJson)
-      }
+  private val statusRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "status" =>
+    isReady.get.flatMap { ready =>
+      val status = if (ready) "completed" else "running"
+      Ok(AnalysisStatus(status).asJson)
+    }
   }
 
   private def ensureReady(action: IO[Response[IO]]): IO[Response[IO]] =
@@ -78,34 +78,35 @@ class IrServiceRoutes(
     }
   // TODO: Add docs and tidy up
   private val postSelectDirectoryRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case req@POST -> Root / "config" / "select-directory" =>
-      // Define the core logic as an IO block
+    case req @ POST -> Root / "config" / "select-directory" =>
       val coreLogic: IO[Response[IO]] = for {
-        selection <- req.as[DirectorySelection] // This handles JSON decoding errors
+        selection <- req.as[DirectorySelection]
 
-        // 2. Call loadDirectory using the imported symbols
-        config <- IO(loadDirectory(ChooseInput.Gtirb, selection.directoryPath)) // TODO: Allow the user to specify whether to use a Gtirb (.gts file or Bap)
+        config <- IO(
+          loadDirectory(ChooseInput.Gtirb, selection.directoryPath)
+        ) // TODO: Allow the user to specify whether to use a Gtirb (.gts file or Bap)
           .handleErrorWith { e =>
             logger.error(e)(s"Failed to load directory: ${selection.directoryPath}. Error: ${e.getMessage}") >>
-              // Throw a custom exception to be caught later
               IO.raiseError(new Exception(s"Configuration failed: ${e.getMessage}"))
           }
 
         _ <- logger.info(s"Successfully loaded config from directory. Input: ${config.inputFile}")
 
-        // 3. Trigger the IR analysis asynchronously with the paths found by loadDirectory
-        fiber <- generateIRAsync(config.inputFile, config.relfFile)  // TODO: I want to remove this, just go straight to the config
+        fiber <- generateIRAsync(
+          config.inputFile,
+          config.relfFile
+        ) // TODO: I want to remove this, just go straight to the config
           .handleErrorWith(e => logger.error(e)("IR analysis failed"))
           .start
 
         _ <- fiber.join // Wait for analysis to complete
 
-        // 4. Return success response
-        resp <- Ok(s"Analysis successfully triggered for directory: ${config.inputFile} / ${config.relfFile.getOrElse("none")}")
+        resp <- Ok(
+          s"Analysis successfully triggered for directory: ${config.inputFile} / ${config.relfFile.getOrElse("none")}"
+        )
 
       } yield resp
       coreLogic.handleErrorWith { e =>
-        // This part now executes in the correct context (IO[Response[IO]])
         logger.warn(s"Request failed: ${e.getMessage}") >>
           BadRequest(e.getMessage)
       }
@@ -119,22 +120,21 @@ class IrServiceRoutes(
    *
    * @return A JSON array of strings, where each string is an epoch name.
    */
-  private val listEpochsRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case GET -> Root / "epochs" =>
-      ensureReady {
-        logger.info(s"Received GET /epochs request.") *>
-          epochStore.epochsRef.get
-            .flatMap { epochs =>
-              val epochNames = epochs.map(_.name).toList
-              val reversedEpochNames = epochNames.reverse
-              logger.info(s"Successfully retrieved and reversed epoch names. Count: ${reversedEpochNames.size}") *>
-                Ok(reversedEpochNames.asJson)
-            }
-            .handleErrorWith { e =>
-              logger.error(e)(s"An error occurred while processing GET /epochs request: ${e.getMessage}") *>
-                InternalServerError("An internal server error occurred while fetching epochs.")
-            }
-      }
+  private val listEpochsRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "epochs" =>
+    ensureReady {
+      logger.info(s"Received GET /epochs request.") *>
+        epochStore.epochsRef.get
+          .flatMap { epochs =>
+            val epochNames = epochs.map(_.name).toList
+            val reversedEpochNames = epochNames.reverse
+            logger.info(s"Successfully retrieved and reversed epoch names. Count: ${reversedEpochNames.size}") *>
+              Ok(reversedEpochNames.asJson)
+          }
+          .handleErrorWith { e =>
+            logger.error(e)(s"An error occurred while processing GET /epochs request: ${e.getMessage}") *>
+              InternalServerError("An internal server error occurred while fetching epochs.")
+          }
+    }
   }
 
   /**
@@ -153,31 +153,36 @@ class IrServiceRoutes(
     case GET -> Root / "ir" / epochName / "procedures_with_lines" =>
       ensureReady {
         logger.info(s"Received GET /ir/$epochName/procedures_with_lines request.") *>
-          epochStore.getEpoch(epochName)
+          epochStore
+            .getEpoch(epochName)
             .flatMap {
               case Some(epoch) =>
                 val fullAfterTransformText = PrettyPrinter.pp_prog(epoch.afterTransform)
                 var currentOffset = 0
 
-                epoch.afterTransform.procedures.toList.traverse { proc =>
-                  val procName = proc.procName
-                  val procPrettyPrint = PrettyPrinter.pp_proc(proc)
+                epoch.afterTransform.procedures.toList
+                  .traverse { proc =>
+                    val procName = proc.procName
+                    val procPrettyPrint = PrettyPrinter.pp_proc(proc)
 
-                  val startIndex = fullAfterTransformText.indexOf(procPrettyPrint, currentOffset)
+                    val startIndex = fullAfterTransformText.indexOf(procPrettyPrint, currentOffset)
 
-                  if (startIndex != -1) {
-                    val startLine = LineCounter.countLines(fullAfterTransformText, startIndex)
-                    currentOffset = startIndex + procPrettyPrint.length
+                    if (startIndex != -1) {
+                      val startLine = LineCounter.countLines(fullAfterTransformText, startIndex)
+                      currentOffset = startIndex + procPrettyPrint.length
 
-                    IO.pure(ProcedureTextLocation(procName, startLine))
-                  } else {
-                    logger.warn(s"Warning: Could not find text for procedure '$procName' " +
-                      s"in the full afterTransform output. Is PrettyPrinter consistent or procedure text unique?") *>
-                      IO.pure(ProcedureTextLocation(procName, -1))
+                      IO.pure(ProcedureTextLocation(procName, startLine))
+                    } else {
+                      logger.warn(
+                        s"Warning: Could not find text for procedure '$procName' " +
+                          s"in the full afterTransform output. Is PrettyPrinter consistent or procedure text unique?"
+                      ) *>
+                        IO.pure(ProcedureTextLocation(procName, -1))
+                    }
                   }
-                }.flatMap { locationsList =>
-                  Ok(locationsList.asJson)
-                }
+                  .flatMap { locationsList =>
+                    Ok(locationsList.asJson)
+                  }
               case None => NotFound(s"Epoch '$epochName' not found.")
             }
       }
@@ -193,18 +198,18 @@ class IrServiceRoutes(
    * @return A JSON array of strings, where each string is a procedure name.
    * @throws NotFound if the specified `epochName` does not exist.
    */
-  private val getProceduresRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case GET -> Root / "procedures" / epochName =>
-      ensureReady {
-        logger.info(s"Received GET /procedures/$epochName request.") *>
-          epochStore.getEpoch(epochName)
-            .flatMap {
-              case Some(epoch) =>
-                val allProcedureNames = epoch.afterTransform.procedures.toList.map(_.procName)
-                Ok(allProcedureNames.asJson)
-              case None => NotFound(s"Epoch '$epochName' not found.")
-            }
-      }
+  private val getProceduresRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "procedures" / epochName =>
+    ensureReady {
+      logger.info(s"Received GET /procedures/$epochName request.") *>
+        epochStore
+          .getEpoch(epochName)
+          .flatMap {
+            case Some(epoch) =>
+              val allProcedureNames = epoch.afterTransform.procedures.toList.map(_.procName)
+              Ok(allProcedureNames.asJson)
+            case None => NotFound(s"Epoch '$epochName' not found.")
+          }
+    }
   }
 
   /**
@@ -217,12 +222,11 @@ class IrServiceRoutes(
    *
    * @return The raw, pretty-printed text of the IR. Returns a `404 Not Found` if the epoch does not exist.
    */
-  private val getBeforeIrRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case GET -> Root / "ir" / epochName / "before" =>
-      ensureReady {
-        logger.info(s"Received GET /ir/$epochName/before request.") *>
-          prettyPrintProgram(epochName, _.beforeTransform)
-      }
+  private val getBeforeIrRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "ir" / epochName / "before" =>
+    ensureReady {
+      logger.info(s"Received GET /ir/$epochName/before request.") *>
+        prettyPrintProgram(epochName, _.beforeTransform)
+    }
   }
 
   /**
@@ -235,12 +239,11 @@ class IrServiceRoutes(
    *
    * @return The raw, pretty-printed text of the IR. Returns a `404 Not Found` if the epoch does not exist.
    */
-  private val getAfterIrRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case GET -> Root / "ir" / epochName / "after" =>
-      ensureReady {
-        logger.info(s"Received GET /ir/$epochName/after request.") *>
-          prettyPrintProgram(epochName, _.afterTransform)
-      }
+  private val getAfterIrRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "ir" / epochName / "after" =>
+    ensureReady {
+      logger.info(s"Received GET /ir/$epochName/after request.") *>
+        prettyPrintProgram(epochName, _.afterTransform)
+    }
   }
 
   /**
@@ -253,27 +256,31 @@ class IrServiceRoutes(
    * @return A JSON object where keys are procedure names and values are their corresponding DOT graph strings.
    * @throws NotFound if the specified `epochName` does not exist or its "before" CFG is not available.
    */
-  private val getBeforeCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case GET -> Root / "cfg" / epochName / "before" =>
-      ensureReady {
-        logger.info(s"Received GET /cfg/$epochName/before request.") *>
-          epochStore.getEpoch(epochName)
-            .flatMap {
-              case Some(epoch) =>
-                logger.info(s"Attempting to generate 'before' CFG dot graph for epoch: $epochName.") *>
-                  IO.delay(generateDotGraphs(epoch.beforeTransform)).flatMap { dotGraph =>
-                    logger.info(s"Successfully generated 'before' CFG dot graph for epoch '$epochName'. Responding with JSON.") *>
-                      Ok(dotGraph.asJson)
-                  }
-              case None =>
-                logger.warn(s"Epoch '$epochName' not found in store for 'before' CFG request. Sending 404.") *>
-                  NotFound(s"Epoch '$epochName' not found or before CFG not available.")
-            }
-            .handleErrorWith { e =>
-              logger.error(e)(s"An error occurred while processing GET /cfg/$epochName/before request: ${e.getMessage}") *>
-                InternalServerError("An internal server error occurred during CFG generation.")
-            }
-      }
+  private val getBeforeCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "cfg" / epochName / "before" =>
+    ensureReady {
+      logger.info(s"Received GET /cfg/$epochName/before request.") *>
+        epochStore
+          .getEpoch(epochName)
+          .flatMap {
+            case Some(epoch) =>
+              logger.info(s"Attempting to generate 'before' CFG dot graph for epoch: $epochName.") *>
+                IO.delay(generateDotGraphs(epoch.beforeTransform)).flatMap { dotGraph =>
+                  logger.info(
+                    s"Successfully generated 'before' CFG dot graph for epoch '$epochName'. Responding with JSON."
+                  ) *>
+                    Ok(dotGraph.asJson)
+                }
+            case None =>
+              logger.warn(s"Epoch '$epochName' not found in store for 'before' CFG request. Sending 404.") *>
+                NotFound(s"Epoch '$epochName' not found or before CFG not available.")
+          }
+          .handleErrorWith { e =>
+            logger.error(e)(
+              s"An error occurred while processing GET /cfg/$epochName/before request: ${e.getMessage}"
+            ) *>
+              InternalServerError("An internal server error occurred during CFG generation.")
+          }
+    }
   }
 
   /**
@@ -286,26 +293,29 @@ class IrServiceRoutes(
    * @return A JSON object where keys are procedure names and values are their corresponding DOT graph strings.
    * @throws NotFound if the specified `epochName` does not exist or its "after" CFG is not available.
    */
-  private val getAfterCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case GET -> Root / "cfg" / epochName / "after" =>
-      ensureReady {
-        logger.info(s"Received GET /cfg/$epochName/after request.") *>
-          epochStore.getEpoch(epochName)
-            .flatMap {
-              case Some(epoch) =>
-                logger.info(s"Attempting to generate 'after' CFG dot graph for epoch: $epochName.") *>
-                  IO.delay(generateDotGraphs(epoch.afterTransform)).flatMap { dotGraph =>
-                    logger.info(s"Successfully generated 'after' CFG dot graph for epoch '$epochName'. Responding with JSON.") *>
-                      Ok(dotGraph.asJson)
-                  }
-              case None =>
-                logger.warn(s"Epoch '$epochName' not found in store for 'after' CFG request. Sending 404.") *>
-                  NotFound(s"Epoch '$epochName' not found or after CFG not available.")
-            }.handleErrorWith { e =>
-              logger.error(e)(s"An error occurred while processing GET /cfg/$epochName/after request: ${e.getMessage}") *>
-                InternalServerError("An internal server error occurred during CFG generation.")
-            }
-      }
+  private val getAfterCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "cfg" / epochName / "after" =>
+    ensureReady {
+      logger.info(s"Received GET /cfg/$epochName/after request.") *>
+        epochStore
+          .getEpoch(epochName)
+          .flatMap {
+            case Some(epoch) =>
+              logger.info(s"Attempting to generate 'after' CFG dot graph for epoch: $epochName.") *>
+                IO.delay(generateDotGraphs(epoch.afterTransform)).flatMap { dotGraph =>
+                  logger.info(
+                    s"Successfully generated 'after' CFG dot graph for epoch '$epochName'. Responding with JSON."
+                  ) *>
+                    Ok(dotGraph.asJson)
+                }
+            case None =>
+              logger.warn(s"Epoch '$epochName' not found in store for 'after' CFG request. Sending 404.") *>
+                NotFound(s"Epoch '$epochName' not found or after CFG not available.")
+          }
+          .handleErrorWith { e =>
+            logger.error(e)(s"An error occurred while processing GET /cfg/$epochName/after request: ${e.getMessage}") *>
+              InternalServerError("An internal server error occurred during CFG generation.")
+          }
+    }
   }
 
   /**
@@ -322,10 +332,13 @@ class IrServiceRoutes(
     case GET -> Root / "ir" / epochName / procedureName / "before" =>
       ensureReady {
         logger.info(s"Received GET /ir/$epochName/$procedureName/before request.") *>
-          epochStore.getEpoch(epochName)
+          epochStore
+            .getEpoch(epochName)
             .flatMap {
               case Some(epoch) =>
-                logger.info(s"Attempting to generate 'after' code for procedure: `$procedureName` and for epoch: `$epochName`") *>
+                logger.info(
+                  s"Attempting to generate 'after' code for procedure: `$procedureName` and for epoch: `$epochName`"
+                ) *>
                   findAndPrettyPrint(epoch.beforeTransform.procedures.toList, procedureName)
               case None =>
                 logger.warn(s"Epoch '$epochName' not found in store for 'before' CFG request. Sending 404.") *>
@@ -352,10 +365,13 @@ class IrServiceRoutes(
     case GET -> Root / "ir" / epochName / procedureName / "after" =>
       ensureReady {
         logger.info(s"Received GET /ir/$epochName/$procedureName/after request.") *>
-          epochStore.getEpoch(epochName)
+          epochStore
+            .getEpoch(epochName)
             .flatMap {
               case Some(epoch) =>
-                logger.info(s"Attempting to generate 'after' code for procedure: `$procedureName` and for epoch: `$epochName`") *>
+                logger.info(
+                  s"Attempting to generate 'after' code for procedure: `$procedureName` and for epoch: `$epochName`"
+                ) *>
                   findAndPrettyPrint(epoch.afterTransform.procedures.toList, procedureName)
               case None => NotFound(s"Epoch '$epochName' not found.")
             }
@@ -367,7 +383,8 @@ class IrServiceRoutes(
   }
 
   private def prettyPrintProgram(epochName: String, getProgram: IREpoch => Program): IO[Response[IO]] = {
-    epochStore.getEpoch(epochName)
+    epochStore
+      .getEpoch(epochName)
       .flatMap {
         case Some(epoch) =>
           logger.debug(s"Found epoch '$epochName'. Attempting to pretty print program.") *>
@@ -377,7 +394,9 @@ class IrServiceRoutes(
               logger.info(s"Successfully pretty-printed program for epoch '$epochName'. Length: ${pretty.length}") *>
                 Ok(s"$pretty")
             }.handleErrorWith { e =>
-              logger.error(e)(s"CRITICAL ERROR: Failed to pretty-print program for epoch '$epochName': ${e.getMessage}") *>
+              logger.error(e)(
+                s"CRITICAL ERROR: Failed to pretty-print program for epoch '$epochName': ${e.getMessage}"
+              ) *>
                 InternalServerError(s"Internal Server Error processing IR for '$epochName': ${e.getMessage}")
             }
         case None =>

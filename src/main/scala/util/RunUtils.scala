@@ -282,11 +282,15 @@ object IRTransform {
 
   /** Initial cleanup before analysis.
     */
-  def doCleanup(ctx: IRContext, doSimplify: Boolean = false, collectedEpochs: Option[ArrayBuffer[IREpoch]] = None): IRContext = {
+  def doCleanup(
+    ctx: IRContext,
+    doSimplify: Boolean = false,
+    collectedEpochs: Option[ArrayBuffer[IREpoch]] = None
+  ): IRContext = {
     // ---  TODO: Make this a lot of small ones here as well START OF NEW EPOCH SECTION: BEFORE INITIAL CLEANUP ---
     val beforeInitialCleanupProgram = IRToDSL.convertProgram(ctx.program).resolve
     // --- END OF BEFORE EPOCH SECTION ---
-    
+
     Logger.info("[!] Removing external function calls")
     // Remove external function references (e.g. @printf)
     val externalNames = ctx.externalFunctions.map(e => e.name)
@@ -333,7 +337,7 @@ object IRTransform {
       buffer += IREpoch("initial_cleanup", beforeInitialCleanupProgram, afterInitialCleanupProgram)
     }
     // --- END OF AFTER EPOCH SECTION ---
-    
+
     ctx
   }
 
@@ -749,11 +753,11 @@ object StaticAnalysis {
 object RunUtils {
 
   private def addEpochSnapshot(
-                                name: String,
-                                beforeState: Program,
-                                afterState: Program,
-                                collectedEpochs: Option[ArrayBuffer[IREpoch]]
-                              ): Unit = {
+    name: String,
+    beforeState: Program,
+    afterState: Program,
+    collectedEpochs: Option[ArrayBuffer[IREpoch]]
+  ): Unit = {
     collectedEpochs.foreach { buffer =>
       buffer += IREpoch(name, beforeState, afterState)
     }
@@ -775,12 +779,16 @@ object RunUtils {
     }
   }
 
-  def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig], collectedEpochs: Option[ArrayBuffer[IREpoch]] = None): Unit = {
+  def doSimplify(
+    ctx: IRContext,
+    config: Option[StaticAnalysisConfig],
+    collectedEpochs: Option[ArrayBuffer[IREpoch]] = None
+  ): Unit = {
     // writeToFile(dotBlockGraph(program, program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
     Logger.info("[!] Running Simplify")
     val timer = PerformanceTimer("Simplify")
     val program = ctx.program
-    
+
     val beforeLoopDetectionProg = IRToDSL.convertProgram(program).resolve
     val foundLoops = LoopDetector.identify_loops(program)
     val newLoops = foundLoops.reducibleTransformIR()
@@ -793,7 +801,12 @@ object RunUtils {
       p.normaliseBlockNames()
     }
     val afterNormaliseBlockNamesProg = IRToDSL.convertProgram(program).resolve
-    addEpochSnapshot("normalise_block_names", beforeNormaliseBlockNamesProg, afterNormaliseBlockNamesProg, collectedEpochs)
+    addEpochSnapshot(
+      "normalise_block_names",
+      beforeNormaliseBlockNamesProg,
+      afterNormaliseBlockNamesProg,
+      collectedEpochs
+    )
 
     ctx.program.sortProceduresRPO()
 
@@ -835,7 +848,7 @@ object RunUtils {
         DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-dsa.il"), pp_prog(program))
       }
     }
-    
+
     val beforeDSATransformProg = IRToDSL.convertProgram(program).resolve
     transforms.OnePassDSA().applyTransform(program)
     val afterDSATransformProg = IRToDSL.convertProgram(program).resolve
@@ -850,7 +863,7 @@ object RunUtils {
     transforms.removeEmptyBlocks(program)
     val afterEmptyBlocksRemovedProg = IRToDSL.convertProgram(ctx.program).resolve
     addEpochSnapshot("remove_empty_blocks", beforeEmptyBlocksRemovedProg, afterEmptyBlocksRemovedProg, collectedEpochs)
-    
+
     // TODO: I still need to add epochs here
     config.foreach {
       _.analysisDotPath.foreach { s =>
@@ -921,12 +934,22 @@ object RunUtils {
       }
     }
     val afterGuardOptimizationsProgram = IRToDSL.convertProgram(program).resolve
-    addEpochSnapshot("guard_optimisations", beforeGuardOptimizationsProgram, afterGuardOptimizationsProgram, collectedEpochs)
+    addEpochSnapshot(
+      "guard_optimisations",
+      beforeGuardOptimizationsProgram,
+      afterGuardOptimizationsProgram,
+      collectedEpochs
+    )
 
     val beforeLiftLinuxAssertFailProg = IRToDSL.convertProgram(ctx.program).resolve
     transforms.liftLinuxAssertFail(ctx)
     val afterLiftLinuxAssertFailProg = IRToDSL.convertProgram(ctx.program).resolve
-    addEpochSnapshot("lift_linux_assert_fail", beforeLiftLinuxAssertFailProg, afterLiftLinuxAssertFailProg, collectedEpochs)
+    addEpochSnapshot(
+      "lift_linux_assert_fail",
+      beforeLiftLinuxAssertFailProg,
+      afterLiftLinuxAssertFailProg,
+      collectedEpochs
+    )
 
     // assert(program.procedures.forall(transforms.rdDSAProperty))
 
@@ -969,7 +992,11 @@ object RunUtils {
     Logger.info("[!] Simplify :: finished")
   }
 
-  def loadAndTranslate(conf: BASILConfig, postLoad: IRContext => Unit = s => (), collectedEpochs: Option[ArrayBuffer[IREpoch]] = None): BASILResult = {
+  def loadAndTranslate(
+    conf: BASILConfig,
+    postLoad: IRContext => Unit = s => (),
+    collectedEpochs: Option[ArrayBuffer[IREpoch]] = None
+  ): BASILResult = {
     Logger.info("[!] Loading Program")
     val q = conf
     var ctx = q.context.getOrElse(IRLoading.load(q.loading))
@@ -986,7 +1013,12 @@ object RunUtils {
     val beforeInlinePLTLaunchpadLoadTransProg = IRToDSL.convertProgram(ctx.program).resolve
     transforms.inlinePLTLaunchpad(ctx.program)
     val afterInlinePLTLaunchpadLoadTransProg = IRToDSL.convertProgram(ctx.program).resolve
-    addEpochSnapshot("inline_plt_launchpad_load_trans", beforeInlinePLTLaunchpadLoadTransProg, afterInlinePLTLaunchpadLoadTransProg, collectedEpochs)
+    addEpochSnapshot(
+      "inline_plt_launchpad_load_trans",
+      beforeInlinePLTLaunchpadLoadTransProg,
+      afterInlinePLTLaunchpadLoadTransProg,
+      collectedEpochs
+    )
 
     assert(ir.invariant.programDiamondForm(ctx.program))
     if (q.loading.trimEarly) {
@@ -995,7 +1027,12 @@ object RunUtils {
       val beforeStripUnreachableFunctionsProg = IRToDSL.convertProgram(ctx.program).resolve
       transforms.stripUnreachableFunctions(ctx.program, q.loading.procedureTrimDepth)
       val afterStripUnreachableFunctionsProg = IRToDSL.convertProgram(ctx.program).resolve
-      addEpochSnapshot("strip_unreachable_functions", beforeStripUnreachableFunctionsProg, afterStripUnreachableFunctionsProg, collectedEpochs)
+      addEpochSnapshot(
+        "strip_unreachable_functions",
+        beforeStripUnreachableFunctionsProg,
+        afterStripUnreachableFunctionsProg,
+        collectedEpochs
+      )
 
       Logger.info(
         s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
@@ -1016,7 +1053,12 @@ object RunUtils {
       val beforeLiftProcCallAbstrProg = IRToDSL.convertProgram(ctx.program).resolve
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
       val afterLiftProcCallAbstrProg = IRToDSL.convertProgram(ctx.program).resolve
-      addEpochSnapshot("lift_procedure_call_abstraction", beforeLiftProcCallAbstrProg, afterLiftProcCallAbstrProg, collectedEpochs)
+      addEpochSnapshot(
+        "lift_procedure_call_abstraction",
+        beforeLiftProcCallAbstrProg,
+        afterLiftProcCallAbstrProg,
+        collectedEpochs
+      )
 
       if (conf.assertCalleeSaved) {
         transforms.CalleePreservedParam.transform(ctx.program)
@@ -1068,7 +1110,12 @@ object RunUtils {
       val beforeLiftProcCallAbstrProg = IRToDSL.convertProgram(ctx.program).resolve
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
       val afterLiftProcCallAbstrProg = IRToDSL.convertProgram(ctx.program).resolve
-      addEpochSnapshot("lift_procedure_call_abstraction_simp", beforeLiftProcCallAbstrProg, afterLiftProcCallAbstrProg, collectedEpochs)
+      addEpochSnapshot(
+        "lift_procedure_call_abstraction_simp",
+        beforeLiftProcCallAbstrProg,
+        afterLiftProcCallAbstrProg,
+        collectedEpochs
+      )
 
       DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
 

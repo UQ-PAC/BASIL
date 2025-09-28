@@ -1093,13 +1093,20 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
         {
           SimplifyLogger
             .debug(s"CopyProp Transform ${p.name} (${p.blocks.size} blocks, expr complexity ${ExprComplexity()(p)})")
-          copypropTransform(p, procFrames, addrToProc, read) // TODO: Possible refactor here. Define a new function that works for each specific TF functionality
+          copypropTransform(
+            p,
+            procFrames,
+            addrToProc,
+            read
+          )
         }
     )
   // Clone after the copyPropTransforms take place here
-  val clonedAfterProgram = IRToDSL.convertProgram(p).resolve // TODO: Tries to read this while still cloning leading to race condition
+  val clonedAfterProgram =
+    IRToDSL.convertProgram(p).resolve
   val epochName = "test_epoch_name"
-  val epochTester = IREpoch(epochName, clonedBeforeProgram, clonedAfterProgram) // Sets up the very first epoch for testing
+  val epochTester =
+    IREpoch(epochName, clonedBeforeProgram, clonedAfterProgram) // Sets up the very first epoch for testing
 //  IREpochStore.addEpoch(epochTester).unsafeRunSync() // testing as line for pipeline
 
   work.foreach((p, job) => {

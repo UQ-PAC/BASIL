@@ -1,4 +1,4 @@
- package basil.main // TODO: IS this okay, I require this
+package basil.main // TODO: IS this okay, I require this
 
 import gtirb.GTIRBReadELF
 import mainargs.{Flag, ParserForClass, arg, main}

@@ -25,7 +25,7 @@ import ir.Procedure
 
 case class IREpoch(name: String, beforeTransform: ir.Program, afterTransform: ir.Program)
 
-class IREpochStore private(val epochsRef: Ref[IO, List[IREpoch]]) {
+class IREpochStore private (val epochsRef: Ref[IO, List[IREpoch]]) {
   def addEpoch(epoch: IREpoch): IO[Unit] =
     epochsRef.update(list => epoch :: list)
 
@@ -44,7 +44,7 @@ object AfterTransformFormatter {
 
   def formatAfterTransform(afterTransform: Any): String = {
     val sb = new StringBuilder()
-    afterTransform.asInstanceOf[ {val procedures: mutable.ArrayBuffer[Procedure]}].procedures.foreach { proc =>
+    afterTransform.asInstanceOf[{ val procedures: mutable.ArrayBuffer[Procedure] }].procedures.foreach { proc =>
       sb.append(translating.PrettyPrinter.pp_proc(proc))
       sb.append("\n\n")
     }
@@ -68,26 +68,35 @@ object ApiServer extends IOApp {
       isReady <- Ref[IO].of(false)
       semaphoreInstance <- Semaphore[IO](1)
       epochStore <- IREpochStore.of
-      irServiceRoutes = new IrServiceRoutes(epochStore, isReady, semaphoreInstance, generateIRAsync(epochStore, semaphoreInstance, isReady)).routes
+      irServiceRoutes = new IrServiceRoutes(
+        epochStore,
+        isReady,
+        semaphoreInstance,
+        generateIRAsync(epochStore, semaphoreInstance, isReady)
+      ).routes
       httpApp = Router("/" -> irServiceRoutes).orNotFound
-      _ <- generateIRAsync(epochStore, semaphoreInstance, isReady)("src/test/correct/secret_write/gcc/secret_write.adt", Some("src/test/correct/secret_write/gcc/secret_write.relf")).start
-      exitCode <- EmberServerBuilder.default[IO]
+      _ <- generateIRAsync(epochStore, semaphoreInstance, isReady)(
+        "src/test/correct/secret_write/gcc/secret_write.adt",
+        Some("src/test/correct/secret_write/gcc/secret_write.relf")
+      ).start
+      exitCode <- EmberServerBuilder
+        .default[IO]
         .withHost(ipv4"0.0.0.0")
         .withPort(port"8080")
         .withHttpApp(httpApp)
         .build
         .use { server =>
           logger.info(s"Server started at http://localhost:8080/") *>
-          IO.never 
+            IO.never
         }
     } yield exitCode
   }
 
   private def generateIRAsync(
-                               epochStore: IREpochStore,
-                               irProcessingSemaphore: Semaphore[IO],
-                               isReady: Ref[IO, Boolean]
-                             )(adt: String, relf: Option[String]): IO[Unit] = {
+    epochStore: IREpochStore,
+    irProcessingSemaphore: Semaphore[IO],
+    isReady: Ref[IO, Boolean]
+  )(adt: String, relf: Option[String]): IO[Unit] = {
 
     irProcessingSemaphore.permit.use { _ =>
       val analysis: IO[Unit] = for {
