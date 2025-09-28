@@ -10,20 +10,7 @@ import '../../../lib/prism-ir.ts';
 import '../../../styles/components/button-selection.css';
 import { ColorSchemeType } from 'diff2html/lib/types';
 import { DiffControls } from './DiffControls.tsx';
-import { API_BASE_URL } from '../../../api';
-
-interface ProcedureLocation {
-  name: string;
-  startLine: number;
-  approxEndLine: number;
-}
-
-interface IREpochData {
-  before: string;
-  after: string;
-  procedures: ProcedureLocation[];
-  epochName: string;
-}
+import { useIrDiffData } from '../../../hooks/useIrDiffData';
 
 interface DiffViewerProps {
   selectedStartEpoch: string | null;
@@ -36,86 +23,17 @@ export function DiffViewer({
   selectedEndEpoch,
   theme,
 }: DiffViewerProps) {
-  const [irData, setIrData] = useState<IREpochData | null>(null);
   const [contextLines, setContextLines] = useState(5);
   const [outputFormat, setOutputFormat] = useState<
     'side-by-side' | 'line-by-line'
   >('side-by-side');
   const [headerElement, setHeaderElement] = useState<HTMLElement | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const diffContainerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!selectedStartEpoch || !selectedEndEpoch) {
-      setIrData(null);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
-    const fetchIRDataForEpoch = async (
-      epochBeforeName: string,
-      epochAfterName: string
-    ) => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const [beforeResponse, afterResponse, proceduresResponse] =
-          await Promise.all([
-            fetch(`${API_BASE_URL}/ir/${epochBeforeName}/before`),
-            fetch(`${API_BASE_URL}/ir/${epochAfterName}/after`),
-            fetch(`${API_BASE_URL}/ir/${epochAfterName}/procedures_with_lines`), // TODO: Procedures just for after atm
-          ]);
-
-        if (!beforeResponse.ok)
-          throw new Error(
-            `HTTP error fetching before IR for ${epochBeforeName}! status: ${beforeResponse.status}`
-          );
-        if (!afterResponse.ok)
-          throw new Error(
-            `HTTP error fetching after IR for ${epochAfterName}! status: ${afterResponse.status}`
-          );
-        if (!proceduresResponse.ok)
-          throw new Error(
-            `HTTP error fetching procedures! status: ${proceduresResponse.status}`
-          );
-
-        const beforeText: string = await beforeResponse.text();
-        const afterText: string = await afterResponse.text();
-        const proceduresData: ProcedureLocation[] =
-          await proceduresResponse.json();
-
-        console.log(
-          `Fetched data for epoch: ${epochBeforeName} and ${epochAfterName}`
-        );
-
-        setIrData({
-          before: beforeText,
-          after: afterText,
-          procedures: proceduresData,
-          epochName:
-            epochBeforeName === epochAfterName
-              ? epochBeforeName
-              : '${epochBeforeName} to ${epochAfterName}',
-        });
-      } catch (err: any) {
-        console.error(
-          `Error fetching analysis data for ${epochBeforeName} and ${epochAfterName}:`,
-          err
-        );
-        setError(
-          `Error fetching data for ${epochBeforeName} and ${epochAfterName}: ${err.message}`
-        );
-        setIrData(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchIRDataForEpoch(selectedStartEpoch, selectedEndEpoch);
-  }, [selectedStartEpoch, selectedEndEpoch]);
+  const { irData, loading, error } = useIrDiffData(
+    selectedStartEpoch,
+    selectedEndEpoch
+  );
 
   const scrollToLine = (lineNumber: number) => {
     if (diffContainerRef.current) {
