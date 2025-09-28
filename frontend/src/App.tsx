@@ -8,9 +8,10 @@ import { ResizableSidebar } from './components/layout/ResizableSidebar.tsx';
 import CfgViewer from './components/viewers/graph/CfgViewer.tsx';
 import CombinedViewer from './components/viewers/CombinedViewer.tsx';
 import SettingsModal from './components/modals/SettingsModal.tsx';
-import { API_BASE_URL } from './api';
 import LoadingModal from './components/modals/LoadingModal.tsx';
 import ErrorModal from './components/modals/ErrorModal.tsx';
+import { getAnalysisStatus, selectDirectory } from './api/analysis.ts';
+import { getEpochNames, getProcedureNames } from './api/data.ts';
 
 const LOCAL_STORAGE_PROCEDURE_KEY = 'cfgViewerSelectedProcedure';
 const LOCAL_STORAGE_THEME_KEY = 'theme';
@@ -81,28 +82,19 @@ function App() {
     let errorOccurred = false;
 
     try {
-      const namesResponse = await fetch(`${API_BASE_URL}/epochs`);
-      if (!namesResponse.ok) {
+      names = await getEpochNames();
+
+      setAllEpochNames(names);
+
+      if (names.length > 0) {
+        setSelectedEpochs(new Set([names[0]]));
+        setLastClickedEpoch(names[0]);
+      } else {
         setPostStatus({
-          message: `HTTP error fetching epoch names! status: ${namesResponse.status}`,
-          type: 'error',
+          message: 'No analysis epochs found.',
+          type: 'warning',
         });
         setDatasetError(true);
-        errorOccurred = true;
-      } else {
-        names = await namesResponse.json();
-        setAllEpochNames(names);
-
-        if (names.length > 0) {
-          setSelectedEpochs(new Set([names[0]]));
-          setLastClickedEpoch(names[0]);
-        } else {
-          setPostStatus({
-            message: 'No analysis epochs found.',
-            type: 'warning',
-          });
-          setDatasetError(true);
-        }
       }
     } catch (err: any) {
       console.error('Error fetching epoch names:', err);
@@ -139,8 +131,8 @@ function App() {
       intervalId = setInterval(async () => {
         if (isPolling) return;
         try {
-          const statusResponse = await fetch(`${API_BASE_URL}/status`);
-          const statusData = await statusResponse.json();
+          const statusData = await getAnalysisStatus();
+
           if (statusData.status === 'completed') {
             // await fetchEpochNames();
             window.location.reload(); // TODO: Maybe there is a smoother approach? But don't worry about it for now
@@ -191,28 +183,7 @@ function App() {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/config/select-directory`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          // Send the full path string to the Scala backend
-          directoryPath: directoryIdentifier,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        setPostStatus({
-          message:
-            errorText || `Backend failed with status: ${response.status}`,
-          type: 'error',
-        });
-        setDatasetLoading(false);
-        setDatasetError(true);
-        return;
-      }
+      await selectDirectory(directoryIdentifier);
 
       setSelectedDataset(directoryIdentifier);
       localStorage.setItem(LOCAL_STORAGE_DATASET_KEY, directoryIdentifier); // TODO: Ensure this is run on the first opening with the previously selected path... Or always redo the old one...?
@@ -250,20 +221,9 @@ function App() {
       setLoadingProcedures(true);
       setProcedureError(null);
       try {
-        // Assume that after procedures always have the same name as before procedures
-        const response = await fetch(
-          `${API_BASE_URL}/procedures/${singleSelectedEndEpoch}`
+        const names: string[] = await getProcedureNames(
+          singleSelectedStartEpoch as string
         );
-        if (!response.ok) {
-          const errorMessage = `HTTP error! status: ${response.status} fetching procedures for ${singleSelectedEndEpoch}`;
-          console.error(errorMessage);
-          setProcedureError(errorMessage);
-          setProcedureNames([]);
-          setSelectedProcedureName(null);
-          setLoadingProcedures(false);
-          return;
-        }
-        const names: string[] = await response.json();
         setProcedureNames(names);
 
         // Check if the previously selected procedure is still valid
@@ -291,11 +251,13 @@ function App() {
       }
     };
 
-    fetchProcedureNames().catch((error) =>
-      console.error(
-        "Unhandled promise rejected from 'fetchProcedureNames': ",
-        error
-      )
+    fetchProcedureNames().catch(
+      (error) =>
+        console.error(
+          "Unhandled promise rejected from 'fetchProcedureNames': ",
+          error
+        )
+      // TODO: Also post an Error. DatabaseError
     );
   }, [singleSelectedEndEpoch, selectedProcedureName, selectedEpochs]);
 
