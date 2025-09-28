@@ -6,7 +6,10 @@ export async function getEpochNames(): Promise<string[]> {
 
   if (!namesResponse.ok) {
     const errorText = await namesResponse.text();
-    throw new Error(errorText || `HTTP error fetching epoch names! Status: ${namesResponse.status}`);
+    throw new Error(
+      errorText ||
+        `HTTP error fetching epoch names! Status: ${namesResponse.status}`
+    );
   }
 
   return namesResponse.json();
@@ -17,7 +20,10 @@ export async function getProcedureNames(epochName: string): Promise<string[]> {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(errorText || `HTTP error fetching procedures for ${epochName}! Status: ${response.status}`);
+    throw new Error(
+      errorText ||
+        `HTTP error fetching procedures for ${epochName}! Status: ${response.status}`
+    );
   }
 
   return response.json();

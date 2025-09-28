@@ -4,7 +4,9 @@ import { Graphviz } from '@hpcc-js/wasm-graphviz'; // TODO: Can this be done off
 
 export function useGraphvizWASM() {
   const [isGraphvizWasmReady, setIsGraphvizWasmReady] = useState(false);
-  const [graphvizWasmError, setGraphvizWasmError] = useState<string | null>(null);
+  const [graphvizWasmError, setGraphvizWasmError] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     Graphviz.load()

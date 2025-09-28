@@ -1,6 +1,11 @@
 // src/hooks/useCfgData.ts
 import { useState, useEffect } from 'react';
-import { type Node, type Edge, useNodesState, useEdgesState } from '@xyflow/react';
+import {
+  type Node,
+  type Edge,
+  useNodesState,
+  useEdgesState,
+} from '@xyflow/react';
 import { getLayoutedElements } from '../utils/graphLayout.ts';
 import { fetchDotString } from '../api/viewer.ts';
 import { type CustomNodeData } from '../components/viewers/graph/CustomNode.tsx';
