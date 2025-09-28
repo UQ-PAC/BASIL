@@ -7,22 +7,21 @@ import {
   useNodesState,
   useEdgesState,
 } from '@xyflow/react';
-import { API_BASE_URL } from '../../api';
-import { Graphviz } from '@hpcc-js/wasm-graphviz';
 import { getLayoutedElements } from '../../utils/graphLayout.ts';
 import { type CustomNodeData } from './graph/CustomNode.tsx';
 import GraphPanel from './graph/GraphPanel.tsx';
+import { fetchDotString, fetchIrCode } from '../../api/viewer.ts';
+import { useGraphvizWASM } from '../../hooks/useGraphvizWASM';
 
 import '../../styles/components/viewers/combined-viewer.css';
 import '../../styles/components/button-selection.css';
 import '../../styles/components/viewers/graph/graph.css';
 import { FIT_VIEW_OPTIONS, ZOOM_CONFIGS } from '../../constants.ts';
 
-declare const Prism: any;
-
 import '../../lib/prism-ir.ts';
 import 'prismjs/plugins/line-numbers/prism-line-numbers.js';
 import 'prismjs/plugins/line-numbers/prism-line-numbers.css';
+declare const Prism: any;
 
 interface DotGraphResponse {
   [procedureName: string]: string;
@@ -51,7 +50,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
   const [irCode, setIrCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [graphError, setGraphError] = useState<string | null>(null);
-  const [isGraphvizWasmReady, setIsGraphvizWasmReady] = useState(false);
+  const { isGraphvizWasmReady, graphvizWasmError } = useGraphvizWASM();
 
   // TODO: Do I need to State for storing both before and after graph data (after coloring)
   const [beforeNodes, setBeforeNodes, onBeforeNodesChange] = useNodesState<
@@ -104,28 +103,6 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
   }, [panelTopOffset]);
 
   useEffect(() => {
-    // TODO: Code dup here
-    Graphviz.load()
-      .then(() => {
-        console.log(
-          'Graphviz WASM initialized successfully in CombinedViewer.'
-        );
-        setIsGraphvizWasmReady(true);
-      })
-      .catch((err: any) => {
-        console.error(
-          'Failed to initialize Graphviz WASM in CombinedViewer:',
-          err
-        );
-        setGraphError(
-          (prev) =>
-            (prev ? prev + '\n' : '') +
-            `Graphviz WASM failed to load: ${err.message}`
-        );
-      });
-  }, []);
-
-  useEffect(() => {
     if (irCodeRef.current && irCode) {
       if (typeof Prism !== 'undefined' && Prism.languages.ir) {
         try {
@@ -147,22 +124,20 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
       return;
     }
 
-    const fetchIrCode = async () => {
+    const fetchIrCodeData = async () => {
       setLoading(true);
       try {
-        const irResponse = await fetch(
-          `${API_BASE_URL}/ir/${
-            displayCfgType === 'before' ? selectedStartEpoch : selectedEndEpoch
-          }/${selectedProcedureName}/${displayCfgType}`
+        const epoch =
+          displayCfgType === 'before' ? selectedStartEpoch : selectedEndEpoch;
+
+        const code = await fetchIrCode(
+          epoch!,
+          selectedProcedureName!,
+          displayCfgType
         );
-        if (!irResponse.ok) {
-          throw new Error(
-            `HTTP error! status: ${irResponse.status} fetching IR`
-          );
-        }
-        const code: string = await irResponse.text();
         setIrCode(code);
       } catch (error) {
+        // TODO: Throw an error maybe to be caught by the App.tsx file
         console.error('Failed to fetch IR code:', error);
         setIrCode(null);
       } finally {
@@ -170,7 +145,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
       }
     };
 
-    fetchIrCode();
+    fetchIrCodeData();
   }, [
     selectedStartEpoch,
     selectedEndEpoch,
@@ -196,30 +171,29 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
     const fetchCfgData = async () => {
       setLoading(true);
       try {
-        const fetchDotString = async (
-          epoch: string,
-          type: 'before' | 'after'
-        ): Promise<string | undefined> => {
-          const response = await fetch(`${API_BASE_URL}/cfg/${epoch}/${type}`);
-          if (!response.ok) {
-            console.error(
-              `HTTP error! status: ${response.status} for ${type} CFG`
-            );
-            return undefined;
-          }
-          const data: DotGraphResponse = await response.json();
-          const lowerSelectedProcedure = selectedProcedureName!.toLowerCase();
-          const matchingProcedureKey = Object.keys(data).find((key) =>
-            key.toLowerCase().includes(lowerSelectedProcedure)
-          );
-          return matchingProcedureKey ? data[matchingProcedureKey] : undefined;
-        };
-
-        const beforeDotString = await fetchDotString(
+        const beforeDotResponse = await fetchDotString(
           selectedStartEpoch!,
           'before'
         );
-        const afterDotString = await fetchDotString(selectedEndEpoch!, 'after');
+        const afterDotResponse = await fetchDotString(
+          selectedEndEpoch!,
+          'after'
+        );
+
+        const lowerSelectedProcedure = selectedProcedureName!.toLowerCase();
+
+        const extractDot = (response: DotGraphResponse | undefined) => {
+          if (!response) return undefined;
+          const matchingProcedureKey = Object.keys(response).find((key) =>
+            key.toLowerCase().includes(lowerSelectedProcedure)
+          );
+          return matchingProcedureKey
+            ? response[matchingProcedureKey]
+            : undefined;
+        };
+
+        const beforeDotString = extractDot(beforeDotResponse);
+        const afterDotString = extractDot(afterDotResponse);
 
         if (beforeDotString) {
           const { nodes, edges } = await getLayoutedElements(
@@ -248,10 +222,14 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
         }
       } catch (e: any) {
         console.error('Error fetching data in CombinedViewer:', e);
-        setGraphError(`Failed to load data: ${e.message}`);
+        setGraphError(
+          (graphvizWasmError ? graphvizWasmError + '\n' : '') +
+            `Failed to load data: ${e.message}`
+        );
         setBeforeNodes([]);
         setBeforeEdges([]);
-        setAfterNodes([]);
+        setAfterEdges([]);
+        setBeforeNodes([]);
         setAfterEdges([]);
       } finally {
         setLoading(false);
@@ -270,6 +248,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
     setBeforeEdges,
     setAfterNodes,
     setAfterEdges,
+    graphvizWasmError,
   ]);
 
   const currentCfgNodes =
@@ -287,10 +266,10 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
     return <div className="combined-viewer-message">Loading data...</div>;
   }
 
-  if (procedureError || graphError) {
+  if (procedureError || graphError || graphvizWasmError) {
     return (
       <div className="combined-viewer-error">
-        Error: {procedureError || graphError}
+        Error: {procedureError || graphError || graphvizWasmError}
       </div>
     );
   }
