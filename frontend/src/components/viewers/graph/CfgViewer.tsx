@@ -1,42 +1,17 @@
 // src/components/CfgViewer.tsx
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  useNodesState,
-  useEdgesState,
-  ReactFlowProvider,
-  MarkerType,
-} from '@xyflow/react';
-import type { Node, Edge } from '@xyflow/react';
+import React from 'react';
+import { ReactFlowProvider } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Graphviz } from '@hpcc-js/wasm-graphviz';
 
-import { API_BASE_URL } from '../../../api';
-import { getLayoutedElements } from '../../../utils/graphLayout.ts';
+import { useGraphvizWASM } from '../../../hooks/useGraphvizWASM';
+import { useCfgData } from '../../../hooks/useCfgData';
 import { FIT_VIEW_OPTIONS, ZOOM_CONFIGS } from '../../../constants.ts';
+import { compareAndColourElements } from '../../../utils/cfgColouring.ts';
 
-import { type CustomNodeData } from './CustomNode.tsx';
 import GraphPanel from './GraphPanel.tsx';
 
 import '../../../styles/components/viewers/cfg-viewer.css';
 import '../../../styles/components/viewers/graph/graph.css';
-
-const NODE_COLORS = {
-  RED: '#FF4D4D',
-  LIGHT_RED: '#FFCCCC', // TODO: Maybe make it yellow?
-  GREEN: '#04d104',
-  LIGHT_GREEN: '#b9f4b9',
-  DEFAULT: '#777',
-};
-
-const EDGE_COLORS = {
-  RED: '#c52222',
-  GREEN: '#0f800f',
-  DEFAULT: '#70e1ed',
-};
-
-interface DotGraphResponse {
-  [procedureName: string]: string;
-}
 
 interface CfgViewerProps {
   selectedStartEpoch: string | null;
@@ -57,340 +32,38 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
   loadingProcedures,
   procedureError,
 }) => {
-  const [beforeNodes, setBeforeNodes, onBeforeNodesChange] = useNodesState<
-    Node<CustomNodeData>
-  >([]);
-  const [beforeEdges, setBeforeEdges, onBeforeEdgesChange] =
-    useEdgesState<Edge>([]);
-  const [afterNodes, setAfterNodes, onAfterNodesChange] = useNodesState<
-    Node<CustomNodeData>
-  >([]);
-  const [afterEdges, setAfterEdges, onAfterEdgesChange] = useEdgesState<Edge>(
-    []
-  );
+  const { isGraphvizWasmReady, graphvizWasmError } = useGraphvizWASM();
 
-  const [loadingGraphs, setLoadingGraphs] = useState(false);
-  const [graphError, setGraphError] = useState<string | null>(null);
-  const [isGraphvizWasmReady, setIsGraphvizWasmReady] = useState(false);
-
-  const [graphRenderKey, setGraphRenderKey] = useState(0);
-
-  // --- Graphviz WASM Initialization ---
-  useEffect(() => {
-    Graphviz.load()
-      .then(() => {
-        console.log('Graphviz WASM initialized successfully.');
-        setIsGraphvizWasmReady(true);
-      })
-      .catch((err: any) => {
-        console.error('Failed to initialize Graphviz WASM:', err);
-        setGraphError(
-          (prev) =>
-            (prev ? prev + '\n' : '') +
-            `Graphviz WASM failed to load: ${err.message}`
-        );
-      });
-  }, []);
-
-  const compareAndColorElements = useCallback(
-    (
-      beforeGraphNodes: Node<CustomNodeData>[],
-      beforeGraphEdges: Edge[],
-      afterGraphNodes: Node<CustomNodeData>[],
-      afterGraphEdges: Edge[]
-    ): {
-      coloredBeforeNodes: Node<CustomNodeData>[];
-      coloredAfterNodes: Node<CustomNodeData>[];
-      coloredBeforeEdges: Edge[];
-      coloredAfterEdges: Edge[];
-    } => {
-      const coloredBeforeNodes: Node<CustomNodeData>[] = [];
-      const coloredAfterNodes: Node<CustomNodeData>[] = [];
-      const coloredBeforeEdges: Edge[] = [];
-      const coloredAfterEdges: Edge[] = [];
-
-      const beforeNodeMap = new Map<string, Node<CustomNodeData>>();
-      beforeGraphNodes.forEach((node) => {
-        const originalId = node.id.replace('before-', '');
-        beforeNodeMap.set(originalId, node);
-      });
-
-      const afterNodeMap = new Map<string, Node<CustomNodeData>>();
-      afterGraphNodes.forEach((node) => {
-        const originalId = node.id.replace('after-', '');
-        afterNodeMap.set(originalId, node);
-      });
-
-      const allOriginalNodeIds = new Set([
-        ...beforeNodeMap.keys(),
-        ...afterNodeMap.keys(),
-      ]);
-
-      allOriginalNodeIds.forEach((originalId) => {
-        const beforeNode = beforeNodeMap.get(originalId);
-        const afterNode = afterNodeMap.get(originalId);
-
-        let beforeColor = NODE_COLORS.DEFAULT;
-        let afterColor = NODE_COLORS.DEFAULT;
-
-        if (beforeNode && afterNode) {
-          const headerEquivalent =
-            beforeNode.data.header === afterNode.data.header;
-          const fullContentEquivalent =
-            beforeNode.data.fullContent === afterNode.data.fullContent;
-
-          if (!headerEquivalent) {
-            beforeColor = NODE_COLORS.LIGHT_RED;
-            afterColor = NODE_COLORS.LIGHT_GREEN;
-          } else if (!fullContentEquivalent) {
-            beforeColor = NODE_COLORS.LIGHT_RED;
-            afterColor = NODE_COLORS.LIGHT_GREEN;
-          } else {
-            beforeColor = NODE_COLORS.DEFAULT; // Both headers and full content equivalent
-            afterColor = NODE_COLORS.DEFAULT;
-          }
-        } else if (beforeNode) {
-          // Node exists only in 'before' graph
-          beforeColor = NODE_COLORS.RED;
-        } else if (afterNode) {
-          // Node exists only in 'after' graph
-          afterColor = NODE_COLORS.GREEN;
-        }
-
-        if (beforeNode) {
-          coloredBeforeNodes.push({
-            ...beforeNode,
-            data: { ...beforeNode.data, nodeBorderColor: beforeColor },
-          });
-        }
-        if (afterNode) {
-          coloredAfterNodes.push({
-            ...afterNode,
-            data: { ...afterNode.data, nodeBorderColor: afterColor },
-          });
-        }
-      });
-
-      const beforeEdgeMap = new Map<string, Edge>();
-      beforeGraphEdges.forEach((edge) => {
-        const originalSource = edge.source.replace('before-', '');
-        const originalTarget = edge.target.replace('before-', '');
-        beforeEdgeMap.set(`${originalSource}-${originalTarget}`, edge);
-      });
-
-      const afterEdgeMap = new Map<string, Edge>();
-      afterGraphEdges.forEach((edge) => {
-        const originalSource = edge.source.replace('after-', '');
-        const originalTarget = edge.target.replace('after-', '');
-        afterEdgeMap.set(`${originalSource}-${originalTarget}`, edge);
-      });
-
-      const allOriginalEdgeKeys = new Set([
-        ...beforeEdgeMap.keys(),
-        ...afterEdgeMap.keys(),
-      ]);
-
-      allOriginalEdgeKeys.forEach((edgeKey) => {
-        const beforeEdge = beforeEdgeMap.get(edgeKey);
-        const afterEdge = afterEdgeMap.get(edgeKey);
-
-        let beforeEdgeColor = EDGE_COLORS.DEFAULT;
-        let afterEdgeColor = EDGE_COLORS.DEFAULT;
-
-        if (beforeEdge && afterEdge) {
-          // Edge exists in both, it's a matched edge
-          beforeEdgeColor = EDGE_COLORS.DEFAULT;
-          afterEdgeColor = EDGE_COLORS.DEFAULT;
-        } else if (beforeEdge) {
-          // Edge exists only in 'before' graph (deleted)
-          beforeEdgeColor = EDGE_COLORS.RED;
-        } else if (afterEdge) {
-          // Edge exists only in 'after' graph (added)
-          afterEdgeColor = EDGE_COLORS.GREEN;
-        }
-
-        if (beforeEdge) {
-          coloredBeforeEdges.push({
-            ...beforeEdge,
-            style: { ...beforeEdge.style, stroke: beforeEdgeColor },
-            markerEnd: { type: MarkerType.ArrowClosed, color: beforeEdgeColor },
-          });
-        }
-        if (afterEdge) {
-          coloredAfterEdges.push({
-            ...afterEdge,
-            style: { ...afterEdge.style, stroke: afterEdgeColor },
-            markerEnd: { type: MarkerType.ArrowClosed, color: afterEdgeColor },
-          });
-        }
-      });
-
-      return {
-        coloredBeforeNodes,
-        coloredAfterNodes,
-        coloredBeforeEdges,
-        coloredAfterEdges,
-      };
-    },
-    []
-  );
-
-  useEffect(() => {
-    const fetchAndRenderCfgs = async () => {
-      if (
-        !isGraphvizWasmReady ||
-        !selectedStartEpoch ||
-        !selectedProcedureName
-      ) {
-        setGraphError(
-          'Graphviz WebAssembly is still loading or failed to initialize.'
-        );
-        setLoadingGraphs(false);
-        return;
-      }
-
-      setLoadingGraphs(true);
-      setGraphError(null);
-      setBeforeNodes([]);
-      setBeforeEdges([]);
-      setAfterNodes([]);
-      setAfterEdges([]);
-
-      try {
-        let beforeDotString: string | undefined;
-        let afterDotString: string | undefined;
-
-        const fetchDotString = async (
-          epoch: string,
-          type: 'before' | 'after'
-        ) => {
-          const response = await fetch(`${API_BASE_URL}/cfg/${epoch}/${type}`);
-          if (!response.ok) {
-            throw new Error(
-              `HTTP error! status: ${response.status} for ${type} CFG`
-            );
-          }
-          const data: DotGraphResponse = await response.json(); // TODO: Save this so that I don't run this every time - calc time saved as well maybe? For Thesis
-
-          if (!selectedProcedureName) {
-            return undefined;
-          }
-
-          const lowerSelectedProcedure = selectedProcedureName.toLowerCase();
-
-          const matchingProcedureKey = Object.keys(data).find((key) =>
-            key.toLowerCase().includes(lowerSelectedProcedure)
-          );
-
-          return matchingProcedureKey ? data[matchingProcedureKey] : undefined;
-        };
-
-        beforeDotString = await fetchDotString(selectedStartEpoch!, 'before');
-        afterDotString = await fetchDotString(selectedEndEpoch!, 'after');
-
-        let processedBeforeNodes: Node<CustomNodeData>[] = [];
-        let processedBeforeEdges: Edge[] = [];
-        let processedAfterNodes: Node<CustomNodeData>[] = [];
-        let processedAfterEdges: Edge[] = [];
-
-        if (beforeDotString) {
-          const { nodes, edges } = await getLayoutedElements(
-            beforeDotString,
-            'before-'
-          );
-          processedBeforeNodes = nodes;
-          processedBeforeEdges = edges;
-          console.log('Final Before Nodes Count:', nodes.length);
-        } else {
-          console.warn(
-            `No 'before' CFG data (DOT) for procedure '${selectedProcedureName}' in epoch '${selectedStartEpoch}'.`
-          );
-          setGraphError(
-            (prev) =>
-              (prev ? prev + '\n' : '') +
-              `No 'before' CFG data for '${selectedProcedureName}'.`
-          );
-        }
-
-        if (afterDotString) {
-          const { nodes, edges } = await getLayoutedElements(
-            afterDotString,
-            'after-'
-          );
-          processedAfterNodes = nodes;
-          processedAfterEdges = edges;
-          console.log('Final After Nodes Count:', nodes.length);
-        } else {
-          console.warn(
-            `No 'after' CFG data (DOT) for procedure '${selectedProcedureName}' in epoch '${selectedEndEpoch}'.`
-          );
-          setGraphError(
-            (prev) =>
-              (prev ? prev + '\n' : '') +
-              `No 'after' CFG data for '${selectedProcedureName}'.`
-          );
-        }
-
-        const {
-          coloredBeforeNodes,
-          coloredAfterNodes,
-          coloredBeforeEdges,
-          coloredAfterEdges,
-        } = compareAndColorElements(
-          processedBeforeNodes,
-          processedBeforeEdges,
-          processedAfterNodes,
-          processedAfterEdges
-        );
-        setBeforeNodes(coloredBeforeNodes);
-        setBeforeEdges(coloredBeforeEdges);
-        setAfterNodes(coloredAfterNodes);
-        setAfterEdges(coloredAfterEdges);
-      } catch (e: any) {
-        console.error('Error fetching or processing CFG data:', e);
-        setGraphError(`Failed to load or render CFG data: ${e.message}`);
-      } finally {
-        setLoadingGraphs(false);
-        setGraphRenderKey((prev) => prev + 1);
-      }
-    };
-
-    if (isGraphvizWasmReady) {
-      fetchAndRenderCfgs().catch((error) =>
-        console.error(
-          "Unhandled promise rejected from 'fetchAndRenderCfgs: ",
-          error
-        )
-      );
-    } else if (
-      !selectedStartEpoch ||
-      !selectedProcedureName ||
-      !selectedEndEpoch
-    ) {
-      setBeforeNodes([]);
-      setBeforeEdges([]);
-      setAfterNodes([]);
-      setAfterEdges([]);
-      setLoadingGraphs(false);
-      setGraphError(null);
-      setGraphRenderKey((prev) => prev + 1);
-    }
-  }, [
+  const {
+    beforeNodes,
+    beforeEdges,
+    afterNodes,
+    afterEdges,
+    loadingGraphs,
+    graphError: dataFetchError,
+    graphRenderKey,
+    onBeforeNodesChange,
+    onBeforeEdgesChange,
+    onAfterNodesChange,
+    onAfterEdgesChange,
+  } = useCfgData(
     selectedStartEpoch,
     selectedEndEpoch,
     selectedProcedureName,
     isGraphvizWasmReady,
-    compareAndColorElements,
-  ]);
+    compareAndColourElements
+  );
+
+  const combinedGraphError = graphvizWasmError || dataFetchError;
 
   if (loadingProcedures || loadingGraphs) {
     return <div className="cfg-viewer-message">Loading CFG data...</div>;
   }
 
-  if (procedureError || graphError) {
+  if (procedureError || combinedGraphError) {
     return (
       <div className="cfg-viewer-error">
-        Error: {procedureError || graphError}
+        Error: {procedureError || combinedGraphError}
       </div>
     );
   }
@@ -455,7 +128,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
           selectedEndEpoch &&
           procedureNames.length === 0 &&
           !loadingGraphs &&
-          !graphError && (
+          !combinedGraphError && (
             <p className="no-procedures-message">
               No procedures found for epoch: '{selectedStartEpoch}' and '
               {selectedEndEpoch}'

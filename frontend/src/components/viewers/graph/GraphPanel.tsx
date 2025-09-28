@@ -56,7 +56,7 @@ const GraphPanel: React.FC<GraphPanelProps> = ({
   const currentEdges = useEdges();
 
   const getMiniMapNodeColor = (node: ReactFlowNode<CustomNodeData>): string => {
-    return node.data.nodeBorderColor || '#E0E0E0';
+    return node.data.nodeBorderColour || '#E0E0E0';
   };
 
   const onReactFlowInit = useCallback(
