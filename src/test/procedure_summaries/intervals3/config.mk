@@ -1,1 +1,0 @@
-ENABLED_COMPILERS = gcc_O2
