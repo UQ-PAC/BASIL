@@ -42,7 +42,7 @@ class ReadUninitialised() {
     if (readUninit.size > 0) {
       val msg = readUninit
         .map { case (s, vars) =>
-          s"   ${vars.mkString(", ")} uninitialised in statement $s"
+          s"   ${vars.mkString(", ")} uninitialised in statement $s in block ${s.parent}"
         }
         .mkString("\n")
       Some(msg)
@@ -69,6 +69,6 @@ class ReadUninitialised() {
 }
 
 def readUninitialised(p: Program): Boolean = {
-  val r = p.procedures.map(ReadUninitialised().readUninitialised)
+  val r = p.procedures.map(p => ReadUninitialised().readUninitialised(p))
   r.forall(x => !x)
 }
