@@ -1,8 +1,7 @@
 import analysis.IrreducibleLoops
-import ir.{Block, IRLoading, Procedure, Program, dotBlockGraph, dotFlowGraph}
+import ir.{Block, IRLoading, Procedure, Program, dotBlockGraph}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
-import translating.PrettyPrinter.pprint
 import translating.{BAPToIR, ReadELFData}
 import util.{ILLoadingConfig, LogLevel, Logger}
 
@@ -151,8 +150,6 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     newLoopResult.foreach(println(_))
 
     assert(newLoopResult.forall(!_.isIrreducible))
-
-    util.writeToFile(dotBlockGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/out3.dot")
   }
 
   test("multiple entries - irreducible") {
@@ -280,14 +277,6 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     loopResult.foreach(println(_))
 
     analysis.AnalysisPipelineMRA.reducibleLoops(p)
-    util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/out2.dot")
-
-    // val result =
-    //   IrreducibleLoops.transform_loop(loopResult.filter(_.isIrreducible).flatMap(_.toLoop()).head).get
-    //
-    // util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/out2.dot")
-    //
-    // println("\nAFTER\n")
 
     val newLoopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
     newLoopResult.foreach(println(_))
@@ -511,14 +500,13 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
   }
 
   test("plist_free") {
-    val p = ir.parsing.ParseBasilIL.loadILFile("/home/rina/progs/basil/plist-free.il").program
+    val testFile = s"${BASILTest.rootDirectory}/src/test/irreducible_loops/plist-free.il"
+    val p = ir.parsing.ParseBasilIL.loadILFile(testFile).program
     p.mainProcedure.blocks.foreach { b => b.internalShuffleJumps() }
     // p.procedures.foreach { p =>
     //   p.blocks.foreach(_.statements.clear())
     //   while (ir.transforms.coalesceBlocks(p)) {}
     // }
-
-    util.writeToFile(p.pprint, "/home/rina/progs/basil/plist-before.il")
 
     val loops = IrreducibleLoops.identify_loops(p.mainProcedure).get
     loops.filter(_.isLoopHeader).foreach { x =>
@@ -526,11 +514,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
       println(x)
     }
 
-    util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/in.dot")
     analysis.AnalysisPipelineMRA.reducibleLoops(p)
-    util.writeToFile(dotFlowGraph(p.mainProcedure.blocks.toList, Set()), "/home/rina/progs/basil/out.dot")
-
-    util.writeToFile(p.pprint, "/home/rina/progs/basil/plist-after.il")
 
     println("AFTER TRANSFORM")
     p.procedures.filter(_.entryBlock.isDefined).foreach { p =>
