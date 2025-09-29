@@ -172,7 +172,7 @@ object IrreducibleLoops {
     * has to be computed by considering multiple BlockLoopStates. This is handled
     * by [[BlockLoopState.computeBlockLoopInfo]].
     */
-    def toBlockLoopInfo(nodes: Set[Block], headers: Set[Block]) =
+    def toBlockLoopInfo(nodes: Set[Block]) =
       BlockLoopInfo(b, iloop_header, dfsp_pos_max, headers, nodes)
   }
 
@@ -185,9 +185,7 @@ object IrreducibleLoops {
     /**
      * Computes [[BlockLoopInfo]] from the temporary [[BlockLoopState]]
      * information. This additionally computes the transitive node-sets for
-     * each loop and filters re-entry headers to only those with external
-     * incoming edges. This is done to populate the `nodes` and `headers`
-     * fields, respectively.
+     * each loop to populate the `nodes` field.
      */
     def computeBlockLoopInfo(blockStates: Map[Block, BlockLoopState]): List[BlockLoopInfo] = {
       // NOTE: loops are in *bottom-up topological order*.
@@ -221,17 +219,15 @@ object IrreducibleLoops {
         }
       }
 
-      // filter down to only those headers which have an external predecessor.
-      val headers = headerBlocks.view.map { b => b.b -> b.headers }.toMap
       assert {
-        headers.forall { (h, hs) =>
-          val nodes = forest(h)
-          hs.forall(x => x.prevBlocks.exists(!nodes.contains(_)))
+        headerBlocks.forall { b =>
+          val nodes = forest(b.b)
+          b.headers.forall(x => x.prevBlocks.exists(!nodes.contains(_)))
         }
       }
 
       val newLoops = allBlocks.map { x =>
-        x.toBlockLoopInfo(forest.getOrElse(x.b, Set()), headers.getOrElse(x.b, Set()))
+        x.toBlockLoopInfo(forest.getOrElse(x.b, Set()))
       }
 
       // NOTE: reverse order before returning, so outer loops appear first.
@@ -239,6 +235,8 @@ object IrreducibleLoops {
     }
 
   }
+
+  def f(x: Int, y: Int = x) = 2
 
   /** Performs the DFS-based loop analysis as described in [1]. Each instance of
    *  this should be used at most once. The [[identify_loops]]
