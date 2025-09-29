@@ -236,8 +236,6 @@ object IrreducibleLoops {
 
   }
 
-  def f(x: Int, y: Int = x) = 2
-
   /** Performs the DFS-based loop analysis as described in [1]. Each instance of
    *  this should be used at most once. The [[identify_loops]]
    *  function will construct this class for you and call the appropriate methods.
