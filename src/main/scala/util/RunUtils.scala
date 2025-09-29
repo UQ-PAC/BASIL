@@ -248,17 +248,3 @@ def writeToFile(content: String, fileName: String): Unit = {
   pw.write(content)
   pw.close()
 }
-
-def renderDotGraph(dotContent: String): Unit = {
-  import scala.sys.process.*
-
-  val dotInput = new java.io.ByteArrayInputStream(dotContent.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-  val out = java.io.File.createTempFile("basil-dot-", ".svg")
-  val cmd = Seq("dot", "-Tsvg") #< dotInput #> out
-  val exitCode = cmd.!<
-  if (exitCode != 0) {
-    Logger.warn("invoking dot: " + cmd)
-  }
-
-  Seq("xdg-open", out.getCanonicalPath()).!
-}
