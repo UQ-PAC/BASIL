@@ -272,18 +272,21 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   val (res, nctx) = parameters(config, ctx)
   config = res
   config = assumePreservedParams(config, p)
+  assert(ir.invariant.readUninitialised(ctx.program))
   transforms.applyRPO(p)
   config = simplifyCFGValidated(config, p)
+  assert(ir.invariant.readUninitialised(ctx.program))
   transforms.applyRPO(p)
   config = dynamicSingleAssignment(config, p)
+  assert(ir.invariant.readUninitialised(ctx.program))
   transforms.applyRPO(p)
   config = copyProp(config, p)
 
+  assert(ir.invariant.readUninitialised(ctx.program))
   transforms.applyRPO(p)
   config = guardCleanup(config, p)
 
   assert(ir.invariant.readUninitialised(ctx.program))
-
   counter = ir.transforms.CountGuardStatements()
   val _ = visit_prog(counter, p)
   counter.reportToLog("after")
