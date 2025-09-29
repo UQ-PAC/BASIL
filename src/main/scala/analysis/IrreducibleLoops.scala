@@ -42,7 +42,8 @@ import scala.annotation.tailrec
  * traversal order and a CFG may have multiple valid loop-nesting trees.
  * In particular, certain nodes are chosen to be primary headers based
  * on this order. An irreducible loop, by definition, will have multiple
- * potential headers.
+ * potential headers. We call the chosen header the _primary_ header
+ * and any possible irreducible headers are called _secondary_ headers.
  *
  * For an overview of loop concepts and terminology, see LLVM's [Loop][]
  * and [Cycle][] pages. Note that we do not closely follow the terminology
@@ -151,10 +152,10 @@ object IrreducibleLoops {
    * @param dfsp_pos_max the non-zero value of `dfsp_pos` when it was set. this
    *                     value is maintained even after visiting is finished.
    * @param is_traversed whether visiting this block has _started_.
-   * @param possible_headers possible headers of the loop headed by this block.
-   *                         if this block heads a loop, this always contains
-   *                         `b`. additionally, it also contains an
-   *                         *over-approximation* of re-entry edges.
+   * @param headers headers of the loop headed by this block. if this block
+   *                heads a loop, this always contains `b` as the primary
+   *                header. for irreducible loops, it also contains secondary
+   *                headers.
    */
   case class BlockLoopState(
     val b: Block,
@@ -162,7 +163,7 @@ object IrreducibleLoops {
     var dfsp_pos: Int,
     var dfsp_pos_max: Int,
     var is_traversed: Boolean,
-    var possible_headers: Set[Block]
+    var headers: Set[Block]
   ) {
 
     /**
@@ -193,7 +194,7 @@ object IrreducibleLoops {
       val allBlocks = blockStates.values.toList.sortBy(-_.dfsp_pos_max)
 
       val headerBlocks = allBlocks.collect {
-        case loop if loop.possible_headers.nonEmpty => loop
+        case loop if loop.headers.nonEmpty => loop
       }
 
       var forest: Map[Block, Set[Block]] = headerBlocks.iterator.map(b => b.b -> Set(b.b)).toMap
@@ -221,7 +222,7 @@ object IrreducibleLoops {
       }
 
       // filter down to only those headers which have an external predecessor.
-      val headers = headerBlocks.view.map { b => b.b -> b.possible_headers }.toMap
+      val headers = headerBlocks.view.map { b => b.b -> b.headers }.toMap
       assert {
         headers.forall { (h, hs) =>
           val nodes = forest(h)
@@ -342,7 +343,7 @@ object IrreducibleLoops {
         } else {
           if (b.dfsp_pos > 0) {
             // println("mark as loop header: " + b + " from " + b0)
-            b.possible_headers += b.b
+            b.headers += b.b
             tag_lhead(b0, Some(b))
           } else if (b.iloop_header.isEmpty) {
             // intentionally empty
@@ -355,7 +356,7 @@ object IrreducibleLoops {
 
               val h0 = h
 
-              h.possible_headers += b.b
+              h.headers += b.b
 
               var continue = true
               while (continue && h.iloop_header.isDefined) {
@@ -364,7 +365,7 @@ object IrreducibleLoops {
                   tag_lhead(b0, Some(h))
                   continue = false
                 } else {
-                  h.possible_headers += b.b
+                  h.headers += b.b
                 }
               }
               // println("continue: " + continue)
@@ -472,7 +473,7 @@ object IrreducibleLoops {
 
     val backEdges = loop.computeBackEdges()
 
-    // internal edges to the first header are also redirected through the new header.
+    // internal edges to the primary header are also redirected through the new header.
     // note this excludes internal edges to alternative headers.
     val backEdgesToFirstHeader: Set[LoopEdge] = backEdges.filter(_.to == header)
 
@@ -517,7 +518,7 @@ object IrreducibleLoops {
       entry.statements.append(LocalAssign(fromVariable, IntLiteral(BigInt(i))))
     }
 
-    // for predecessors of the primary old header, replace their gotos with the new header.
+    // for predecessors of the old primary header, replace their gotos with the new header.
     (externalEntries.iterator ++ backEdgesToFirstHeader).foreach { case edge @ LoopEdge(from, to) =>
       from.jump match {
         case goto: GoTo => goto.replaceTarget(to, newHeader)
