@@ -12,6 +12,7 @@ import cilvisitor.{visit_proc, visit_prog}
  */
 
 def simplifyCFG(p: Program) = {
+  p.procedures.foreach(transforms.RemoveUnreachableBlocks.apply)
   for (p <- p.procedures) {
     while (transforms.coalesceBlocks(p)) {}
     transforms.removeEmptyBlocks(p)
@@ -280,10 +281,6 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
 
   transforms.applyRPO(p)
   config = guardCleanup(config, p)
-
-  // import translating.PrettyPrinter.pprint
-  // util.writeToFile(ctx.program.pprint, "/tmp/blah.il")
-  assert(ir.invariant.readUninitialised(ctx.program))
 
   counter = ir.transforms.CountGuardStatements()
   val _ = visit_prog(counter, p)
