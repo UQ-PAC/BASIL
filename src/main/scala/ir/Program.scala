@@ -641,9 +641,9 @@ class Block private (
   def isReturn: Boolean = parent.returnBlock.contains(this)
   def isEntry: Boolean = parent.entryBlock.contains(this)
 
-  var loopInfo = BlockLoopInfo(this, None, 0, Set(), Set())
-  def isLoopHeader() = loopInfo.isLoopHeader
-  def isLoopParticipant() = loopInfo.isLoopParticipant
+  var loopInfo: Option[BlockLoopInfo] = None
+  def isLoopHeader() = loopInfo.fold(false)(_.isLoopHeader)
+  def isLoopParticipant() = loopInfo.fold(false)(_.isLoopParticipant)
 
   def jump: Jump = _jump
 

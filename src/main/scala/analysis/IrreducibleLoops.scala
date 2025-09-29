@@ -31,6 +31,28 @@ import scala.annotation.tailrec
  * identification, and results of this can be passed to
  * [[IrreducibleLoops.transform_loop]] to transform an irreducible loop to a
  * reducible one.
+ *
+ * The loop analysis produces a loop-nesting *forest* where nested sub-loops are
+ * children of containing loops. A *sub-loop* of a loop is defined as a
+ * strongly-connected component in the graph `V - {h}` where `V` is the set of
+ * vertices (blocks) and `h` is the header of the parent loop. Examples of this
+ * can be found in [the paper].
+ *
+ * Note that the loop-nesting tree is based on an arbitrary depth-first
+ * traversal order and a CFG may have multiple valid loop-nesting trees.
+ * In particular, certain nodes are chosen to be primary headers based
+ * on this order. An irreducible loop, by definition, will have multiple
+ * potential headers.
+ *
+ * For an overview of loop concepts and terminology, see LLVM's [Loop][]
+ * and [Cycle][] pages. Note that we do not closely follow the terminology
+ * of LLVM. For instance, we call both irreducible and reducible loops as
+ * "loops", whereas LLVM only uses loop for *reducible* loops and uses cycle
+ * for reducible or irreducible.
+ *
+ * [the paper]: http://dx.doi.org/10.1007/978-3-540-74061-2_11
+ * [Loop]: https://llvm.org/docs/LoopTerminology.html
+ * [Cycle]: https://llvm.org/docs/CycleTerminology.html
  */
 object IrreducibleLoops {
 
@@ -51,33 +73,24 @@ object IrreducibleLoops {
    * [[ir.Block#loopInfo]] field of the [[ir.Block]].
    */
   def update_block_loop_info(prog: Program) =
-    identify_all_loops(prog).foreach { loop => loop.b.loopInfo = loop }
+    val loops = identify_all_loops(prog)
+    loops.foreach { loop => loop.b.loopInfo = Some(loop) }
+    loops
 
   /** A directed edge between two IR blocks. */
   case class LoopEdge(from: Block, to: Block)
 
   /**
   * Loop-related information for a particular block `b`. This includes whether
-  * `b` participates in any loops, and whether `b` is a distinguished header
+  * `b` participates in any loops, and whether `b` is a primary header
   * for a loop. This information is passed to [[transform_loop]] to transform
   * irreducible loops.
-  *
-  * The loop analysis produces a loop-nesting *tree* where nested sub-loops are
-  * children of containing loops. A *sub-loop* of a loop is defined as a
-  * strongly-connected component in the graph `V - {h}` where `V` is the set of
-  * vertices (blocks) and `h` is the header of the parent loop.
-  *
-  * Note that the loop-nesting tree is based on an arbitrary depth-first
-  * traversal order and a CFG may have multiple valid loop-nesting trees.
-  * In particular, certain nodes are chosen to be distinguished headers based
-  * on this order. An irreducible loop, by definition, will have multiple
-  * potential headers.
   *
   * This class is constructed from a [[BlockLoopState]] with
   * [[BlockLoopState.computeBlockLoopInfo]].
   *
   * @param b the block which this loop information concerns.
-  * @param iloop_header if `b` is within a loop, this records the distinguished
+  * @param iloop_header if `b` is within a loop, this records the primary
   *                     header of the innermost loop containing `b`. otherwise,
   *                     it is None.
   * @param dfsp_pos visit order index of `b` within the depth-first traversal.
@@ -97,8 +110,17 @@ object IrreducibleLoops {
     val headers: Set[Block],
     val nodes: Set[Block]
   ) {
+
+    /** Whether the block is an irreducible loop's header. */
     val isIrreducible = headers.size > 1
+
+    /** Whether the block is a reducible loop's header. */
+    val isReducible = headers.size == 1
+
+    /** Whether the block is a primary loop header. */
     val isLoopHeader = headers.nonEmpty
+
+    /** Whether the block participates in any loop. */
     val isLoopParticipant = isLoopHeader || iloop_header.isDefined
 
     /** Accesses the Basil IR state to compute the set of entry edges
@@ -413,7 +435,8 @@ object IrreducibleLoops {
     prog.procedures.foreach { p =>
       identify_loops(p).foreach(transform_many_loops)
     }
-    update_block_loop_info(prog)
+    val newLoops = update_block_loop_info(prog)
+    assert(newLoops.forall(!_.isIrreducible))
   }
 
   def transform_many_loops(loops: Iterable[BlockLoopInfo]) =
@@ -494,7 +517,7 @@ object IrreducibleLoops {
       entry.statements.append(LocalAssign(fromVariable, IntLiteral(BigInt(i))))
     }
 
-    // for predecessors of the distinguished old header, replace their gotos with the new header.
+    // for predecessors of the primary old header, replace their gotos with the new header.
     (externalEntries.iterator ++ backEdgesToFirstHeader).foreach { case edge @ LoopEdge(from, to) =>
       from.jump match {
         case goto: GoTo => goto.replaceTarget(to, newHeader)
