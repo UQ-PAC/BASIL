@@ -146,10 +146,14 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
 
     analysis.AnalysisPipelineMRA.reducibleLoops(p)
 
+    println("AFTER")
+
     val newLoopResult = IrreducibleLoops.identify_loops(p.mainProcedure).get
     newLoopResult.foreach(println(_))
 
     assert(newLoopResult.forall(!_.isIrreducible))
+
+    // util.writeToFile(dotBlockGraph(p.mainProcedure.blocks.toList, Set()), "/tmp/fig3.dot")
   }
 
   test("multiple entries - irreducible") {
