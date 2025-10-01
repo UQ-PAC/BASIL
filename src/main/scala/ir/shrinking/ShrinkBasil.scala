@@ -1,6 +1,25 @@
 package ir.shrinking
 
+import scala.annotation.tailrec
+
 import ir.Program
+
+
+def roundRobin[T](its: Iterator[Iterator[T]]): Iterator[T] = {
+  if (its.isEmpty) {
+    return Iterator()
+  }
+
+  val (it1, it2) = its.collect {
+    case it if it.hasNext => it.splitAt(1)
+  }.duplicate
+
+  val heads = it1.map(_._1)
+  val tails = it2.map(_._2)
+
+  heads.flatten ++ roundRobin(tails)
+}
+
 
 /**
  * This is HARD.
@@ -10,16 +29,25 @@ import ir.Program
  * effects on the effectiveness of the shrinking.
  */
 
-class ShrinkBasil(val width: Int, val shrinkers: Iterable[Shrinker[Program]]) {
+class ShrinkBasil[T](val width: Int, val shrinkers: Iterable[Shrinker[T]]) {
 
-  final def shrink(predicate: Program => Boolean)(p: Program): Iterable[Program] = {
+  @tailrec
+  final def shrink(predicate: T => Boolean)(programs: Iterable[T], depth: Int): List[T] = {
+    println("" + depth + " " + programs)
+    if (depth >= 100)
+      throw new Exception("fdjsiaofdsa")
 
-    val shrunk =
-      shrinkers.iterator.map(s => s.shrink(p).iterator.filter(predicate).toList).transpose.toList
-        // .transpose
-        // .flatten
-        // .take(width)
+    val shrunk = for {
+      p <- programs.iterator
+      shrinker <- shrinkers.iterator
+    } yield (shrinker.shrink(p).iterator.filter(predicate))
 
-    (shrink(predicate)(shrunk) ++ programs).take(width)
+    val newPrograms = roundRobin(shrunk).take(width)
+
+    if (newPrograms.nonEmpty) {
+      shrink(predicate)((newPrograms ++: programs).take(width), depth + 1)
+    } else {
+      programs.toList
+    }
   }
 }
