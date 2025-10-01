@@ -31,23 +31,33 @@ def roundRobin[T](its: Iterator[Iterator[T]]): Iterator[T] = {
 
 class ShrinkBasil[T](val width: Int, val shrinkers: Iterable[Shrinker[T]]) {
 
+  final def shrink(predicate: T => Boolean)(program: T): List[T] =
+    shrink(predicate)(List(program), Vector(), 0)
+
+  /**
+   * This does a kind of stack-constrained DFS traversal.
+   *
+   * We need to keep the suffix separate because we do not want to repeatedly
+   * shrink values once they are added to the suffix.
+   */
   @tailrec
-  final def shrink(predicate: T => Boolean)(programs: Iterable[T], depth: Int): List[T] = {
-    println("" + depth + " " + programs)
+  final def shrink(predicate: T => Boolean)(programs: List[T], suffix: Vector[T], depth: Int): List[T] = {
+    // println("" + depth + " " + programs)
     if (depth >= 100)
       throw new Exception("fdjsiaofdsa")
 
     val shrunk = for {
       p <- programs.iterator
       shrinker <- shrinkers.iterator
-    } yield (shrinker.shrink(p).iterator.filter(predicate))
+    } yield (shrinker.shrink(p).iterator.filter(predicate).take(width))
 
-    val newPrograms = roundRobin(shrunk).take(width)
+    val newPrograms = roundRobin(shrunk).take(width).toList
+    val newSuffix = (newPrograms ++: suffix).take(width)
 
     if (newPrograms.nonEmpty) {
-      shrink(predicate)((newPrograms ++: programs).take(width), depth + 1)
+      shrink(predicate)(newPrograms, newSuffix, depth + 1)
     } else {
-      programs.toList
+      newSuffix.toList
     }
   }
 }
