@@ -68,6 +68,7 @@ class ShrinkerTest extends AnyFunSuite with CaptureOutput {
 
   test("irred loop bug") {
     val p = ParseBasilIL.loadILFile("/home/rina/progs/basil/plist-before.il").program
+
     val s = ShrinkBasil(10, List(
       Shrinker.one(clone.andThen(stripAllStatements)).ifChanged(countStatements),
       Shrinker.option(clone.andThen(p => Option.when(coalesceBlocks(p))(p)))

@@ -49,7 +49,7 @@ class ShrinkBasil[T](val width: Int, val shrinkers: Iterable[Shrinker[T]]) {
     val shrunk = for {
       p <- programs.iterator
       shrinker <- shrinkers.iterator
-    } yield (shrinker.shrink(p).iterator.filter(predicate).take(width))
+    } yield (shrinker.shrink(p).iterator.filter(predicate))
 
     val newPrograms = roundRobin(shrunk).take(width).toList
     val newSuffix = (newPrograms ++: suffix).take(width)
