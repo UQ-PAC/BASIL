@@ -219,11 +219,11 @@ object IrreducibleLoops {
         }
       }
 
-      assert {
-        headerBlocks.forall { b =>
-          val nodes = forest(b.b)
-          b.headers.forall(x => x.prevBlocks.exists(!nodes.contains(_)))
-        }
+      headerBlocks.foreach { b =>
+        val nodes = forest(b.b)
+        val badHeaders = b.headers.filterNot(x => x.prevBlocks.exists(!nodes.contains(_)))
+
+        assert(badHeaders.isEmpty, s"loop has invalid headers. loop: ${b}. bad headers: ${badHeaders}")
       }
 
       val newLoops = allBlocks.map { x =>
@@ -273,6 +273,8 @@ object IrreducibleLoops {
       require(!used, "cannot call traverse_loops twice")
       used = true
       procedure.entryBlock.map { entry =>
+        require(entry.prevBlocks.isEmpty, "loop analysis requires a procedure entry block with no predecessors")
+
         val _ = this.trav_loops_tailrec(Left((loopBlocks(entry), 1)), Nil)
         BlockLoopState.computeBlockLoopInfo(loopBlocks)
       }
