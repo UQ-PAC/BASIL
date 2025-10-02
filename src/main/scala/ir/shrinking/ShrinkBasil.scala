@@ -38,7 +38,7 @@ class ShrinkBasil[T](val width: Int, val shrinkers: Iterable[Shrinker[T]]) {
    */
   @tailrec
   final def shrink(predicate: T => Boolean)(programs: List[T], suffix: Vector[T], depth: Int): List[T] = {
-    // println("" + depth + " " + programs)
+    println("" + depth + " " + programs.size)
     if (depth >= 100)
       throw new Exception("fdjsiaofdsa")
 

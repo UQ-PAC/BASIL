@@ -398,13 +398,28 @@ object LoopTransform {
     newLoop.edges ++= body
 
     P_e.foreach { originalEdge =>
-      originalEdge.from.replaceJump(GoTo(List(N)))
+      val jump = originalEdge.from.jump match {
+        case g : GoTo => {
+          g.removeTarget(originalEdge.to)
+          g.addTarget(N)
+        }
+        case _ => ??? /* impossible */
+      }
       newLoop.addEdge(LoopEdge(originalEdge.from, N))
       newLoop.addEdge(LoopEdge(N, originalEdge.to))
     }
 
     P_b.foreach { originalEdge =>
-      originalEdge.from.replaceJump(GoTo(List(N)))
+      // originalEdge.from.replaceJump(GoTo(List(N)))
+
+      val jump = originalEdge.from.jump match {
+        case g : GoTo => {
+          g.removeTarget(originalEdge.to)
+          g.addTarget(N)
+        }
+        case _ => ??? /* impossible */
+      }
+
       val toEdge = LoopEdge(originalEdge.from, N)
 
       newLoop.addEdge(toEdge)

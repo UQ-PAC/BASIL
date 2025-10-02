@@ -9,6 +9,7 @@ import ir.shrinking.*
 import ir.transforms.{RemoveUnreachableBlocks, simplifyCFG}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.CaptureOutput
+import translating.PrettyPrinter.pprint
 
 @test_util.tags.UnitTest
 class ShrinkerTest extends AnyFunSuite with CaptureOutput {
@@ -105,16 +106,23 @@ class ShrinkerTest extends AnyFunSuite with CaptureOutput {
   }
 
   def testIrredLoopBug(p: Program) = {
+    val loops = LoopDetector.identify_loops(p)
+
+    loops.irreducibleLoops.nonEmpty &&
     p.mainProcedure.blocks.filterNot(Some(_) == p.mainProcedure.entryBlock).forall(_.prevBlocks.nonEmpty) && {
 
-      val clone = ir.dsl.IRToDSL.convertProgram(p).resolve
+      val clone = shrinkerTest.clone(p)
       // println()
       // LoopDetector.identify_loops(clone).loops.foreach { (h,loop) =>
       //   println(s"${h}: ${loop}, Nodes: ${loop.nodes}, Reentries: ${loop.reentries}")
       // }
       analysis.AnalysisPipelineMRA.reducibleLoops(clone)
+      println(clone.pprint)
 
-      clone.mainProcedure.blocks.filterNot(Some(_) == clone.mainProcedure.entryBlock).exists(_.prevBlocks.isEmpty)
+      val loops = LoopDetector.identify_loops(clone)
+
+      // clone.mainProcedure.blocks.filterNot(Some(_) == clone.mainProcedure.entryBlock).exists(_.prevBlocks.isEmpty)
+      loops.irreducibleLoops.nonEmpty
     }
   }
 
@@ -140,8 +148,23 @@ class ShrinkerTest extends AnyFunSuite with CaptureOutput {
 
     val reduced = s.shrink(testIrredLoopBug)(p)
 
-    println(reduced)
+    // println(reduced)
     println(reduced.map(p => (countBlocks(p), countStatements(p))))
+
+    println()
+    LoopDetector.identify_loops(reduced.head).loops.foreach { (h,loop) =>
+      println(s"${h}: ${loop}, Nodes: ${loop.nodes}, Reentries: ${loop.reentries}")
+    }
+
+    println(reduced.head.pprint)
+    println("SHRUNK AFTER")
+
+    analysis.AnalysisPipelineMRA.reducibleLoops(reduced.head)
+    LoopDetector.identify_loops(reduced.head).loops.foreach { (h,loop) =>
+      println(s"${h}: ${loop}, Nodes: ${loop.nodes}, Reentries: ${loop.reentries}")
+    }
+    println(reduced.head.pprint)
+
   }
 
 }
