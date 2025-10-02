@@ -156,6 +156,9 @@ class ShrinkerTest extends AnyFunSuite with CaptureOutput {
       println(s"${h}: ${loop}, Nodes: ${loop.nodes}, Reentries: ${loop.reentries}")
     }
 
+
+    // util.writeToFile(ir.dotFlowGraph(reduced.head.mainProcedure.blocks.toList, Set()), "/tmp/x.dot")
+
     println(reduced.head.pprint)
     println("SHRUNK AFTER")
 
@@ -164,6 +167,7 @@ class ShrinkerTest extends AnyFunSuite with CaptureOutput {
       println(s"${h}: ${loop}, Nodes: ${loop.nodes}, Reentries: ${loop.reentries}")
     }
     println(reduced.head.pprint)
+    // util.writeToFile(ir.dotFlowGraph(reduced.head.mainProcedure.blocks.toList, Set()), "/tmp/y.dot")
 
   }
 
