@@ -2,9 +2,6 @@ package ir.shrinking
 
 import scala.annotation.tailrec
 
-import ir.Program
-
-
 def roundRobin[T](its: Iterator[Iterator[T]]): Iterator[T] = {
   if (its.isEmpty) {
     return Iterator()
@@ -19,7 +16,6 @@ def roundRobin[T](its: Iterator[Iterator[T]]): Iterator[T] = {
 
   heads.flatten ++ roundRobin(tails)
 }
-
 
 /**
  * This is HARD.
