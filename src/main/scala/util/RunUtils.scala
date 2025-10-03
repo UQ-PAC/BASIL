@@ -143,10 +143,13 @@ object RunUtils {
       val dsaResults = IntervalDSA(ctx, conf.dsaConfig.get).dsa()
       dsaContext = Some(dsaResults)
 
-      if q.memoryTransform && conf.dsaConfig.get.phase == DSAPhase.TD then // need more than prereq
+      if (q.memoryTransform && conf.dsaConfig.get.phase == DSAPhase.TD) { // need more than prereq
         val memTransferTimer = PerformanceTimer("Mem Transfer Timer", INFO)
         visit_prog(MemoryTransform(dsaResults.topDown, dsaResults.globals), ctx.program)
         memTransferTimer.checkPoint("Performed Memory Transform")
+      }
+      
+      Logger.writeToFile(File("main_dsg.dot"), dsaResults.local(ctx.program.mainProcedure).toDot)
     }
 
     if q.summariseProcedures then
