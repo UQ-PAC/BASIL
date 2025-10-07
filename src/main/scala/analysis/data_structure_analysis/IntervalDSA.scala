@@ -1542,3 +1542,54 @@ def isGlobal(address: Int, irContext: IRContext): Boolean = {
   ) || irContext.globalOffsets.exists((g1, g2) => g1 == address || g2 == address) || irContext.externalFunctions
     .exists(g => address == g.offset)
 }
+
+/**
+  * Returns a map from each procedure p to a tuple (n, c) containing the maximum node density n and the maximum cell
+  * density c in p's DSG. If a procedure p has no accesses, p maps to (-1, -1).
+  */
+def getDensities(dsaCtx: DSAContext): Map[Procedure, (Double, Double)] = {
+  var ret = Map.empty[Procedure, (Double, Double)]
+  // for each procedure 'proc' with DSG 'dsg', find the max node and cell density w.r.t. accesses in this procedure
+  for ((proc, dsg) <- dsaCtx.topDown) {
+    // these three values will be used to derive the density metrics
+    var maxNodeAccesses = 0 // maximum number of accesses to a particular node
+    var maxCellAccesses = 0 // maximum number of accesses to a particular cell
+    var numberOfAccesses = 0 // total number of accesses in the procedure 'proc'
+    // for each node in 'dsg', compute its number of accesses and the accesses for each of its cells
+    for (node <- dsg.collect()(0)) {
+      var nodeAccesses = 0 // we will compute this by summing the accesses to each of its cells
+      // for each cell, sum its accesses
+      for (cell <- node.cells) {
+        var cellAccesses = 0
+        // iterate through each access in the procedure and count up the ones that correspond to this cell
+        // ??? unsure if we should be iterating through the memory accesses of all procedures
+        dsaCtx.constraints(proc).foreach {
+          case mac: MemoryAccessConstraint[_] =>
+            for (cellAccessed <- dsg.exprToCells(mac.index)) { // note: the size of this set should be 0 or 1 here
+              if cellAccessed == cell then cellAccesses += 1 // ??? unsure about using '==' for equality check
+            }
+          case _ =>
+        }
+        nodeAccesses += cellAccesses
+        if cellAccesses > maxCellAccesses then maxCellAccesses = cellAccesses
+      }
+      if nodeAccesses > maxNodeAccesses then maxNodeAccesses = nodeAccesses
+      numberOfAccesses += nodeAccesses
+    }
+    if (numberOfAccesses == 0) {
+      ret += (proc -> (-1.0, -1.0))
+    } else {
+      ret += (proc -> (maxNodeAccesses.toDouble / numberOfAccesses, maxCellAccesses.toDouble / numberOfAccesses))
+    }
+  }
+  ret
+}
+
+def densitiesToCsv(densities: Map[Procedure, (Double, Double)]): String = {
+  val header = "Procedure Name,Max Node Density,Max Cell Density"
+  val rows = densities.map {
+    case (proc, (nodeDensity, cellDensity)) => s"${proc.procName},$nodeDensity,$cellDensity"
+  }.mkString("\n")
+
+  s"$header\n$rows"
+}

@@ -149,7 +149,16 @@ object RunUtils {
         memTransferTimer.checkPoint("Performed Memory Transform")
       }
       
-      Logger.writeToFile(File("main_dsg.dot"), dsaResults.local(ctx.program.mainProcedure).toDot)
+      // write DSG of main procedure to file
+      Logger.writeToFile(File("main_dsg.dot"), dsaResults.topDown(ctx.program.mainProcedure).toDot)
+      Logger.writeToFile(File("densities.csv"), densitiesToCsv(getDensities(dsaResults)))
+
+      // print metrics
+      for ((proc, densities) <- getDensities(dsaResults)) {
+        Logger.println(
+          "Max densities of " + proc.procName + ": (" + densities(0).toString + ", " + densities(1).toString + ")"
+        )
+      }
     }
 
     if q.summariseProcedures then

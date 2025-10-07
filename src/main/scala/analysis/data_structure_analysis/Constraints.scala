@@ -37,7 +37,7 @@ case class AssignmentConstraint(pos: Statement, ar1: Expr, ar2: Expr) extends Bi
   override val arg2: ConstraintArg = ConstraintArg(ar2)
 }
 
-sealed trait MemoryAccessConstraint[T <: MemoryStore | MemoryLoad](pos: T, index: Expr, value: Expr, val size: Int)
+sealed trait MemoryAccessConstraint[T <: MemoryStore | MemoryLoad](pos: T, val index: Expr, value: Expr, val size: Int)
     extends BinaryConstraint {
   val label: String = labelToPC(pos.label)
   override def source: T = pos
