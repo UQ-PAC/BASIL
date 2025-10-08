@@ -158,9 +158,10 @@ object RunUtils {
       //     "Max densities of " + proc.procName + ": (" + densities(0).toString + ", " + densities(1).toString + ")"
       //   )
       // }
-      val densities: (Double, Double) = getBroadDensities(dsaResults)
-      Logger.println("Max node density: " + densities(0))
-      Logger.println("Max cell density: " + densities(1))
+      // val densities: (Double, Double) = getBroadDensities(dsaResults)
+      // Logger.println("Max node density: " + densities(0))
+      // Logger.println("Max cell density: " + densities(1))
+      Logger.println(getDensityMetrics(dsaResults).toString)
     }
 
     if q.summariseProcedures then
