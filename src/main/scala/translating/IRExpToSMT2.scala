@@ -3,6 +3,7 @@ package translating
 import ir.*
 import ir.cilvisitor.*
 
+import util.Logger
 import java.io.{BufferedWriter, File, FileWriter, Writer}
 
 trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
