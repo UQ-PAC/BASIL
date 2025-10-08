@@ -1586,7 +1586,8 @@ case class DensityMetrics(
     "\n\n--- Maximum Node Density -------------------------------------------------------\n" +
     maxNodeDensity.toString +
     "\n\n--- Maximum Cell Density -------------------------------------------------------\n" +
-    maxCellDensity.toString
+    maxCellDensity.toString +
+    "\n\n--------------------------------------------------------------------------------\n"
   }
 
 def getDensityMetrics(dsaCtx: DSAContext, ignoredProcs: Set[Procedure] = Set.empty): DensityMetrics = DensityMetrics(

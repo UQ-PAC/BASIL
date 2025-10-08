@@ -140,7 +140,10 @@ object RunUtils {
     var dsaContext: Option[DSAContext] = None
     if (conf.dsaConfig.isDefined) {
       updateWithCallSCC(ctx.program)
+      val startTime = System.currentTimeMillis()
       val dsaResults = IntervalDSA(ctx, conf.dsaConfig.get).dsa()
+      val endTime = System.currentTimeMillis()
+      val dsaTimePerformance = endTime - startTime
       dsaContext = Some(dsaResults)
 
       if (q.memoryTransform && conf.dsaConfig.get.phase == DSAPhase.TD) { // need more than prereq
@@ -155,6 +158,7 @@ object RunUtils {
       val ignoredProcNames = Set("_start", "__libc_start_main")
       val ignoredProcs = ctx.program.procedures.filter{ proc => ignoredProcNames.contains(proc.procName) }.toSet
       Logger.println(getDensityMetrics(dsaResults, ignoredProcs).toString)
+      Logger.println(s"Time to run DSA: ${dsaTimePerformance}ms")
     }
 
     if q.summariseProcedures then
