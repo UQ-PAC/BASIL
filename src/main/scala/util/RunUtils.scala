@@ -151,17 +151,10 @@ object RunUtils {
       
       // write DSG of main procedure to file
       Logger.writeToFile(File("main_dsg.dot"), dsaResults.topDown(ctx.program.mainProcedure).toDot)
-      // Logger.writeToFile(File("densities.csv"), densitiesToCsv(getDensities(dsaResults)))
-      // print metrics
-      // for ((proc, densities) <- getDensities(dsaResults)) {
-      //   Logger.println(
-      //     "Max densities of " + proc.procName + ": (" + densities(0).toString + ", " + densities(1).toString + ")"
-      //   )
-      // }
-      // val densities: (Double, Double) = getBroadDensities(dsaResults)
-      // Logger.println("Max node density: " + densities(0))
-      // Logger.println("Max cell density: " + densities(1))
-      Logger.println(getDensityMetrics(dsaResults).toString)
+      // print dsa info
+      val ignoredProcNames = Set("_start", "__libc_start_main")
+      val ignoredProcs = ctx.program.procedures.filter{ proc => ignoredProcNames.contains(proc.procName) }.toSet
+      Logger.println(getDensityMetrics(dsaResults, ignoredProcs).toString)
     }
 
     if q.summariseProcedures then

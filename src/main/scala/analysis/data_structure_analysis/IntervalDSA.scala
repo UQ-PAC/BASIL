@@ -1556,96 +1556,112 @@ case class DensityMetrics(
   maxCellAccesses: Int,
   maxNodeDensity: Double,
   maxCellDensity: Double,
-  numberOfAccesses: Int
+  numberOfAccesses: Int,
+  memoryAccesses: Set[MemoryAccessConstraint[_]]
 ) {
   override def toString(): String =
-    "--- Nodes by Procedure ---------------------------------------------------------\n" +
-    procToNodes.map((proc, nodes) => s"${proc.name} -> ${nodes.map(_.id.toString).mkString(", ")}").mkString("\n") +
-    "\n\n--- All Nodes ------------------------------------------------------------------\n" +
-    allNodes.map(_.id.toString).mkString(", ") +
+    "=== NODE INFORMATION ===========================================================" +
     "\n\n--- Node Count -----------------------------------------------------------------\n" +
     nodeCount.toString +
+    "\n\n--- All Nodes ------------------------------------------------------------------\n" +
+    allNodes.map(_.toString).mkString("\n") +
+    "\n\n--- Nodes by Procedure ---------------------------------------------------------\n" +
+    procToNodes.map((proc, nodes) => s"${proc.procName} -> ${nodes.map(_.id.toString).mkString(", ")}").mkString("\n") +
+    "\n\n--- Cells by Node --------------------------------------------------------------\n" +
+    nodeToCells.map((n, c) => s"${n.id.toString} -> ${c.map(_.toString).mkString("\n       ")}").mkString("\n") +
+    "\n\n=== ACCESS INFORMATION =========================================================" +
+    "\n\n--- Number of Accesses ---------------------------------------------------------\n" +
+    numberOfAccesses.toString +
+    "\n\n--- All Accesses ---------------------------------------------------------------\n" +
+    memoryAccesses.map(_.toString).mkString("\n") +
     "\n\n--- Accesses by Node -----------------------------------------------------------\n" +
     nodeToAccesses.map((n, a) => s"${n.id.toString} -> ${a.map(_.toString).mkString(", ")}").mkString("\n") +
-    "\n\n--- Cells by Node --------------------------------------------------------------\n" +
-    nodeToCells.map((n, c) => s"${n.id.toString} -> ${c.map(_.toString).mkString(", ")}").mkString("\n") +
     "\n\n--- Accesses by Cell -----------------------------------------------------------\n" +
     cellToAccesses.map((c, a) => s"${c.toString} -> ${a.map(_.toString).mkString(", ")}").mkString("\n") +
     "\n\n--- Maximum Accesses to a Single Node ------------------------------------------\n" +
     maxNodeAccesses.toString +
     "\n\n--- Maximum Accesses to a Single Cell ------------------------------------------\n" +
     maxCellAccesses.toString +
+    "\n\n=== DENSITY INFORMATION ========================================================" +
     "\n\n--- Maximum Node Density -------------------------------------------------------\n" +
     maxNodeDensity.toString +
     "\n\n--- Maximum Cell Density -------------------------------------------------------\n" +
-    maxCellDensity.toString +
-    "\n\n--- Number of Accesses ---------------------------------------------------------\n" +
-    numberOfAccesses.toString
+    maxCellDensity.toString
   }
 
-def getDensityMetrics(dsaCtx: DSAContext): DensityMetrics = DensityMetrics(
-  getProcToNodes(dsaCtx),
-  getAllNodes(dsaCtx),
-  getNodeCount(dsaCtx),
-  getNodeToAccesses(dsaCtx),
-  getNodeToCells(dsaCtx),
-  getCellToAccesses(dsaCtx),
-  getMaxNodeAccesses(dsaCtx),
-  getMaxCellAccesses(dsaCtx),
-  getMaxNodeDensity(dsaCtx),
-  getMaxCellDensity(dsaCtx),
-  getNumberOfAccesses(dsaCtx)
+def getDensityMetrics(dsaCtx: DSAContext, ignoredProcs: Set[Procedure] = Set.empty): DensityMetrics = DensityMetrics(
+  getProcToNodes(dsaCtx, ignoredProcs),
+  getAllNodes(dsaCtx, ignoredProcs),
+  getNodeCount(dsaCtx, ignoredProcs),
+  getNodeToAccesses(dsaCtx, ignoredProcs),
+  getNodeToCells(dsaCtx, ignoredProcs),
+  getCellToAccesses(dsaCtx, ignoredProcs),
+  getMaxNodeAccesses(dsaCtx, ignoredProcs),
+  getMaxCellAccesses(dsaCtx, ignoredProcs),
+  getMaxNodeDensity(dsaCtx, ignoredProcs),
+  getMaxCellDensity(dsaCtx, ignoredProcs),
+  getNumberOfAccesses(dsaCtx, ignoredProcs),
+  getMemoryAccesses(dsaCtx, ignoredProcs)
 )
 
-def getProcToNodes(dsaCtx: DSAContext): Map[Procedure, Set[IntervalNode]] =
-  dsaCtx.topDown.mapValues(_.collect()(0)).toMap
+def relevantDsgs(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]): Map[Procedure, IntervalGraph] =
+  dsaCtx.topDown.filter{ case (proc, _) => !ignoredProcs.contains(proc) }
 
-def getAllNodes(dsaCtx: DSAContext): Set[IntervalNode] =
-  dsaCtx.topDown.values.flatMap(_.collect()(0)).toSet
+def relevantConstraints(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]): Map[Procedure, Set[Constraint]] =
+  dsaCtx.constraints.filter{ case (proc, _) => !ignoredProcs.contains(proc) }
 
-def getNodeCount(dsaCtx: DSAContext): Int =
-  getAllNodes(dsaCtx: DSAContext).size
+def getProcToNodes(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]): Map[Procedure, Set[IntervalNode]] =
+  relevantDsgs(dsaCtx, ignoredProcs).mapValues(_.collect()(0)).toMap
 
-def getMemoryAccesses(dsaCtx: DSAContext): Set[MemoryAccessConstraint[_]] =
-  dsaCtx.constraints.values.flatten.toSet.collect { case m: MemoryAccessConstraint[_] => m }
+def getAllNodes(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]): Set[IntervalNode] =
+  relevantDsgs(dsaCtx, ignoredProcs).values.flatMap(_.collect()(0)).toSet
 
-def getAccessesToNode(dsaCtx: DSAContext, dsg: IntervalGraph, node: IntervalNode): Set[MemoryAccessConstraint[_]] =
-  getMemoryAccesses(dsaCtx).filter(m => !(dsg.exprToCells(m.index).map(dsg.find) & node.cells.toSet).isEmpty)
+def getNodeCount(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]): Int =
+  getAllNodes(dsaCtx, ignoredProcs).size
 
-def getAccessesToCell(dsaCtx: DSAContext, dsg: IntervalGraph, cell: IntervalCell): Set[MemoryAccessConstraint[_]] =
-  getMemoryAccesses(dsaCtx).filter(m => dsg.exprToCells(m.index).map(dsg.find).contains(cell))
+def getMemoryAccesses(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]): Set[MemoryAccessConstraint[_]] =
+  relevantConstraints(dsaCtx, ignoredProcs).values.flatten.toSet.collect { case m: MemoryAccessConstraint[_] => m }
+
+def getAccessesToNode(dsaCtx: DSAContext, dsg: IntervalGraph, node: IntervalNode, ignoredProcs: Set[Procedure]): Set[MemoryAccessConstraint[_]] =
+  getMemoryAccesses(dsaCtx, ignoredProcs).filter(m => !(dsg.exprToCells(m.index).map(dsg.find) & node.cells.toSet).isEmpty)
+
+def getAccessesToCell(dsaCtx: DSAContext, dsg: IntervalGraph, cell: IntervalCell, ignoredProcs: Set[Procedure]): Set[MemoryAccessConstraint[_]] =
+  getMemoryAccesses(dsaCtx, ignoredProcs).filter(m => dsg.exprToCells(m.index).map(dsg.find).contains(cell))
 
 def zipMaps[A, B](map1: Map[A, Set[B]], map2: Map[A, Set[B]]) =
   map2.foldLeft(map1) { case (acc, (k, v)) => acc + (k -> acc.get(k).fold(v)(_ ++ v)) }
 
-def getNodeToAccesses(dsaCtx: DSAContext): Map[IntervalNode, Set[MemoryAccessConstraint[_]]] =
-  dsaCtx.topDown.values.map(dsg =>
-    dsg.collect()(0).map(node => node -> getAccessesToNode(dsaCtx, dsg, node)).toMap
+def getNodeToAccesses(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]): Map[IntervalNode, Set[MemoryAccessConstraint[_]]] =
+  relevantDsgs(dsaCtx, ignoredProcs).values.map(dsg =>
+    dsg.collect()(0).map(node => node -> getAccessesToNode(dsaCtx, dsg, node, ignoredProcs)).toMap
   ).foldLeft(Map.empty[IntervalNode, Set[MemoryAccessConstraint[_]]]) {
     (map1, map2) => zipMaps(map1, map2)
   }
 
-def getNodeToCells(dsaCtx: DSAContext): Map[IntervalNode, Set[IntervalCell]] =
-  getAllNodes(dsaCtx: DSAContext).map(node => node -> node.cells.toSet).toMap
+def getNodeToCells(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]): Map[IntervalNode, Set[IntervalCell]] =
+  getAllNodes(dsaCtx, ignoredProcs).map(node => node -> node.cells.toSet).toMap
 
-def getCellToAccesses(dsaCtx: DSAContext): Map[IntervalCell, Set[MemoryAccessConstraint[_]]] =
-  dsaCtx.topDown.values.map(dsg =>
-    dsg.collect()(0).flatMap(_.cells).map(cell => cell -> getAccessesToCell(dsaCtx, dsg, cell)).toMap
+def getCellToAccesses(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]): Map[IntervalCell, Set[MemoryAccessConstraint[_]]] =
+  relevantDsgs(dsaCtx, ignoredProcs).values.map(dsg =>
+    dsg.collect()(0).flatMap(_.cells).map(cell => cell -> getAccessesToCell(dsaCtx, dsg, cell, ignoredProcs)).toMap
   ).foldLeft(Map.empty[IntervalCell, Set[MemoryAccessConstraint[_]]]) {
     (map1, map2) => zipMaps(map1, map2)
   }
 
-def getMaxNodeAccesses(dsaCtx: DSAContext): Int =
-  getNodeToAccesses(dsaCtx).values.map(_.size).foldLeft(0)(math.max)
+def getMaxNodeAccesses(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]): Int =
+  getNodeToAccesses(dsaCtx, ignoredProcs).values.map(_.size).foldLeft(0)(math.max)
 
-def getMaxCellAccesses(dsaCtx: DSAContext): Int =
-  getCellToAccesses(dsaCtx).values.map(_.size).foldLeft(0)(math.max)
+def getMaxCellAccesses(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]): Int =
+  getCellToAccesses(dsaCtx, ignoredProcs).values.map(_.size).foldLeft(0)(math.max)
 
-def getMaxNodeDensity(dsaCtx: DSAContext): Double = getMaxNodeAccesses(dsaCtx).toDouble / getNumberOfAccesses(dsaCtx)
+def getMaxNodeDensity(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]): Double =
+  getMaxNodeAccesses(dsaCtx, ignoredProcs).toDouble / getNumberOfAccesses(dsaCtx, ignoredProcs)
 
-def getMaxCellDensity(dsaCtx: DSAContext): Double = getMaxCellAccesses(dsaCtx).toDouble / getNumberOfAccesses(dsaCtx)
+def getMaxCellDensity(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]): Double =
+  getMaxCellAccesses(dsaCtx, ignoredProcs).toDouble / getNumberOfAccesses(dsaCtx, ignoredProcs)
 
-def getNumberOfAccesses(dsaCtx: DSAContext): Int = getMemoryAccesses(dsaCtx).size
+def getNumberOfAccesses(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]): Int =
+  getMemoryAccesses(dsaCtx, ignoredProcs).size
 
 // --- old metrics ---
 
