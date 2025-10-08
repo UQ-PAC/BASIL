@@ -157,8 +157,8 @@ object RunUtils {
       // print dsa info
       val ignoredProcNames = Set("_start", "__libc_start_main")
       val ignoredProcs = ctx.program.procedures.filter{ proc => ignoredProcNames.contains(proc.procName) }.toSet
-      Logger.println(getDensityMetrics(dsaResults, ignoredProcs).toString)
-      Logger.println(s"Time to run DSA: ${dsaTimePerformance}ms")
+      Logger.writeToFile(File("dsa_stats.txt"),
+        s"${getDensityMetrics(dsaResults, ignoredProcs).toString}\n\nTime to run DSA: ${dsaTimePerformance}ms")
     }
 
     if q.summariseProcedures then

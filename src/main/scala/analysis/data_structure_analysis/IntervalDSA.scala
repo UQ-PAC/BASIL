@@ -1568,7 +1568,7 @@ case class DensityMetrics(
     "\n\n--- Nodes by Procedure ---------------------------------------------------------\n" +
     procToNodes.map((proc, nodes) => s"${proc.procName} -> ${nodes.map(_.id.toString).mkString(", ")}").mkString("\n") +
     "\n\n--- Cells by Node --------------------------------------------------------------\n" +
-    nodeToCells.map((n, c) => s"${n.id.toString} -> ${c.map(_.toString).mkString("\n       ")}").mkString("\n") +
+    nodeToCells.map((n, c) => s"${n.id.toString} -> ${c.map(_.toString).mkString(",\n       ")}").mkString("\n") +
     "\n\n=== ACCESS INFORMATION =========================================================" +
     "\n\n--- Number of Accesses ---------------------------------------------------------\n" +
     numberOfAccesses.toString +
@@ -1587,7 +1587,7 @@ case class DensityMetrics(
     maxNodeDensity.toString +
     "\n\n--- Maximum Cell Density -------------------------------------------------------\n" +
     maxCellDensity.toString +
-    "\n\n--------------------------------------------------------------------------------\n"
+    "\n\n--------------------------------------------------------------------------------"
   }
 
 def getDensityMetrics(dsaCtx: DSAContext, ignoredProcs: Set[Procedure] = Set.empty): DensityMetrics = DensityMetrics(
