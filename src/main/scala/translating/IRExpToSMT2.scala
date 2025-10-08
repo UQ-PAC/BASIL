@@ -461,6 +461,9 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
           )
         )
       }
+      case _ =>
+        Logger.warn(s"Undeclared uninterp emitted : ${x.name}")
+        None
     }
   }
 

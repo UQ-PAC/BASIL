@@ -5,6 +5,7 @@ import util.{Logger, SimplifyMode}
 
 import java.io.File
 
+import java.io.{BufferedWriter, File, FileWriter}
 import cilvisitor.{visit_proc, visit_prog}
 
 /**
@@ -317,6 +318,11 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
     }).mkString("\n")
     Logger.writeToFile(File(p + "/stats.csv"), csv)
   })
+
+  Logger.info("[!] Simplify :: Writing simplification validation")
+  val w = BufferedWriter(FileWriter("rewrites.smt2"))
+  ir.eval.SimplifyValidation.makeValidation(w)
+  w.close()
 
   // ir.transforms.genStackAllocationSpec(p)
 
