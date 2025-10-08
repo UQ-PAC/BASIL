@@ -1543,6 +1543,36 @@ def isGlobal(address: Int, irContext: IRContext): Boolean = {
     .exists(g => address == g.offset)
 }
 
+def getBroadDensities(dsaCtx: DSAContext): (Double, Double) = {
+  var maxNodeAccesses = 0
+  var maxCellAccesses = 0
+  
+  // get all memory access constraints in the program
+  val memoryAccesses: Set[MemoryAccessConstraint[_]] = dsaCtx.constraints.values.flatten.toSet.collect {
+    case m: MemoryAccessConstraint[_] => m
+  }
+  if memoryAccesses.size == 0 then return (-1, -1)
+  
+  for (dsg <- dsaCtx.topDown.values) {
+    for (node <- dsg.collect()(0)) {
+      var nodeAccesses = 0
+      for (cell <- node.cells) {
+        var cellAccesses = 0
+        for (m <- memoryAccesses) {
+          for (cellAccessed <- dsg.exprToCells(m.index)) {
+            if cellAccessed == cell then cellAccesses += 1
+          }
+        }
+        nodeAccesses += cellAccesses
+        if cellAccesses > maxCellAccesses then maxCellAccesses = cellAccesses
+      }
+      if nodeAccesses > maxNodeAccesses then maxNodeAccesses = nodeAccesses
+    }
+  }
+  
+  return (maxNodeAccesses.toDouble / memoryAccesses.size, maxCellAccesses.toDouble / memoryAccesses.size)
+}
+
 /**
   * Returns a map from each procedure p to a tuple (n, c) containing the maximum node density n and the maximum cell
   * density c in p's DSG. If a procedure p has no accesses, p maps to (-1, -1).
@@ -1554,7 +1584,10 @@ def getDensities(dsaCtx: DSAContext): Map[Procedure, (Double, Double)] = {
     // these three values will be used to derive the density metrics
     var maxNodeAccesses = 0 // maximum number of accesses to a particular node
     var maxCellAccesses = 0 // maximum number of accesses to a particular cell
-    var numberOfAccesses = 0 // total number of accesses in the procedure 'proc'
+    // get the memory accesses in this procedure
+    val memoryAccesses: Set[MemoryAccessConstraint[_]] = dsaCtx.constraints(proc).collect {
+      case m: MemoryAccessConstraint[_] => m
+    }
     // for each node in 'dsg', compute its number of accesses and the accesses for each of its cells
     for (node <- dsg.collect()(0)) {
       var nodeAccesses = 0 // we will compute this by summing the accesses to each of its cells
@@ -1563,23 +1596,20 @@ def getDensities(dsaCtx: DSAContext): Map[Procedure, (Double, Double)] = {
         var cellAccesses = 0
         // iterate through each access in the procedure and count up the ones that correspond to this cell
         // ??? unsure if we should be iterating through the memory accesses of all procedures
-        dsaCtx.constraints(proc).foreach {
-          case mac: MemoryAccessConstraint[_] =>
-            for (cellAccessed <- dsg.exprToCells(mac.index)) { // note: the size of this set should be 0 or 1 here
-              if cellAccessed == cell then cellAccesses += 1 // ??? unsure about using '==' for equality check
-            }
-          case _ =>
+        for (m <- memoryAccesses) {
+          for (cellAccessed <- dsg.exprToCells(m.index)) { // note: the size of this set should be 0 or 1 here
+            if cellAccessed == cell then cellAccesses += 1 // ??? unsure about using '==' for equality check
+          }
         }
         nodeAccesses += cellAccesses
         if cellAccesses > maxCellAccesses then maxCellAccesses = cellAccesses
       }
       if nodeAccesses > maxNodeAccesses then maxNodeAccesses = nodeAccesses
-      numberOfAccesses += nodeAccesses
     }
-    if (numberOfAccesses == 0) {
+    if (memoryAccesses.size == 0) {
       ret += (proc -> (-1.0, -1.0))
     } else {
-      ret += (proc -> (maxNodeAccesses.toDouble / numberOfAccesses, maxCellAccesses.toDouble / numberOfAccesses))
+      ret += (proc -> (maxNodeAccesses.toDouble / memoryAccesses.size, maxCellAccesses.toDouble / memoryAccesses.size))
     }
   }
   ret
