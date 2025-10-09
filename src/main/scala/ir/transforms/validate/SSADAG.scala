@@ -146,6 +146,8 @@ object SSADAG {
           .get(b.label)
           .forall(_.contains(v))
 
+      val ite = false
+
       if (b.prevBlocks.nonEmpty) then {
         val defines: Seq[Variable] =
           (b.prevBlocks.toSeq.flatMap(b => stRename.get(b).toSeq.flatMap(_.map(_._1).filter(live)))).toSet.toSeq
@@ -168,7 +170,14 @@ object SSADAG {
               }
             }
 
-            val phiscond = Seq(LocalAssign(fresh, mkIte(grouped.toList), Some(phiLabel)))
+            val phiscond = if (ite) {
+              Seq(LocalAssign(fresh, mkIte(grouped.toList), Some(phiLabel)))
+            } else {
+              val cond = boolAnd(grouped.map {
+                case (cond, lhs) => BinaryExpr(BoolIMPLIES, cond, polyEqual(lhs, fresh))
+              })
+              Seq(Assume(cond, Some(phiLabel), Some(phiLabel)))
+            }
 
             // phis += grouped.length
             b.statements.prependAll(phiscond)
