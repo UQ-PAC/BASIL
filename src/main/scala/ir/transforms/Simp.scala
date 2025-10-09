@@ -669,6 +669,8 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
     DoChildren()
   }
 
+  var replaced = Map[Variable, Expr]()
+
   def substitute(pos: Command)(v: Variable): Option[Expr] = {
     if (goodSubst(v)) {
       val res = defs.get(v).getOrElse(Set())
@@ -691,6 +693,7 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
             if (validate) {
               debugAssert(propOK(rhs))
             }
+            replaced = replaced + (v -> rhs)
             Some(rhs)
           }
           case o => {

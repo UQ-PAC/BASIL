@@ -127,7 +127,8 @@ class SideEffectStatementOfStatement(callParams: Map[String, CallParamMapping]) 
    */
   def unapply(e: Statement): Option[SideEffectStatement] = e match {
     case a @ Assume(e, _, _, true) => {
-      Some(SideEffectStatement(a, s"Leak_${typeHint(e.getType)}", List(traceOut), List(traceOut, (Field("arg") -> e))))
+      //Some(SideEffectStatement(a, s"Leak_${typeHint(e.getType)}", List(traceOut), List(traceOut, (Field("arg") -> e))))
+      None
     }
     case call @ DirectCall(tgt, lhs, rhs, _) =>
       val params = callParams(tgt.name)
@@ -222,7 +223,7 @@ object Ackermann {
   }
 
   /**
-   * Check compatibility of two side effects and emit the lists (lhs, rhs) such that 
+   * Check compatibility of two side effects and emit the lists (lhs, rhs) such that
    *
    *  `(\forall (si, ti)  \in lhs si == ti) ==> (\forall (so, to) \in rhs . so == to)`
    *

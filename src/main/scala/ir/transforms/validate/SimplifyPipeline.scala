@@ -3,9 +3,8 @@ import ir.*
 import util.SMT.SatResult
 import util.{Logger, SimplifyMode}
 
-import java.io.File
-
 import java.io.{BufferedWriter, File, FileWriter}
+
 import cilvisitor.{visit_proc, visit_prog}
 
 /**
@@ -202,11 +201,14 @@ def parameters(config: TVJob, ctx: IRContext) = {
 
 def guardCleanupTransforms(p: Program) = {
   def simplifyGuards(prog: Program) = {
-    for (p <- prog.procedures) {
-      transforms.fixupGuards(p)
-      val gvis = transforms.GuardVisitor()
-      visit_proc(gvis, p)
-    }
+    (prog.procedures
+      .map(p =>
+        transforms.fixupGuards(p)
+        val gvis = transforms.GuardVisitor(true)
+        visit_proc(gvis, p)
+        p.name -> gvis.replaced
+      ))
+      .toMap
   }
 
   def deadAssignmentElimination(prog: Program) = {
@@ -215,7 +217,8 @@ def guardCleanupTransforms(p: Program) = {
   }
 
   p.procedures.foreach(ir.eval.AlgebraicSimplifications(_))
-  simplifyGuards(p)
+  val guardProp = simplifyGuards(p)
+  println(guardProp)
   p.procedures.foreach(p => {
     ir.eval.AlgebraicSimplifications(p)
     ir.eval.AssumeConditionSimplifications(p)
@@ -225,10 +228,11 @@ def guardCleanupTransforms(p: Program) = {
   deadAssignmentElimination(p)
   simplifyCFG(p)
   transforms.removeDuplicateGuard(p)
+  guardProp
 }
 
 def guardCleanup(config: TVJob, p: Program) = {
-  TranslationValidator.forTransform("GuardCleanup", guardCleanupTransforms)(p, config)
+  TranslationValidator.forTransform("GuardCleanup", guardCleanupTransforms, copypropInvariant)(p, config)
 }
 
 def nop(config: TVJob, p: Program) = {
@@ -253,7 +257,7 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   val p = ctx.program
   var config = mode match {
     case SimplifyMode.ValidatedSimplify(verifyMode, filePrefix, dryRun) =>
-      TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = false, dryRun = dryRun)
+      TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = true, dryRun = dryRun)
     case _ => TVJob(None, None)
   }
 

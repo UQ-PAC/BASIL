@@ -57,7 +57,7 @@ case class TVJob(
   results: List[TVResult] = List(),
   debugDumpAlways: Boolean = false,
   /* minimum number of statements in source and target combined to trigger case analysis */
-  splitLargeProceduresThreshold: Option[Int] = Some(60),
+  splitLargeProceduresThreshold: Option[Int] = None,
   dryRun: Boolean = false
 ) {
 
@@ -144,7 +144,7 @@ enum FormalParam {
 }
 
 /**
- * Describe renaming for a function call parameter list, map from variable to the (formal, actual) pair, 
+ * Describe renaming for a function call parameter list, map from variable to the (formal, actual) pair,
  * if actual is Some() it is invariant at any call site.
  */
 type ParameterRenamingFun = (Variable | Memory) => (Variable, Option[Expr])
@@ -334,7 +334,7 @@ object TranslationValidator {
   /**
    * Convert an invariant to a guarded invariant for a specific cut point as described by the invariant.
    *
-   * renaming functions provide the expression rewriting for 
+   * renaming functions provide the expression rewriting for
    *  - the ssa index of varibales at exit block
    *  - variable renaming for source/target program
    *
@@ -434,7 +434,7 @@ object TranslationValidator {
    *
    * f1 : a <-> Option[b]
    * f2 : b <-> Option[a]
-   *  
+   *
    *  => F : a <-> b
    *
    *
@@ -489,7 +489,7 @@ object TranslationValidator {
 
   /**
   * We re-infer the function signature of all target program procedures based on the transform
-  * described by [[renaming]], and the [[Frame]] of the source. 
+  * described by [[renaming]], and the [[Frame]] of the source.
   *
   *   **this describes all the observable effects of a procedure and forms invariant we validate**
   *
@@ -497,17 +497,17 @@ object TranslationValidator {
   * to the signature we infer here.
   *
   * We use this to describe the entry and exit invariant for every procedure, so if it is too weak
-  * then the verification of the procedure will fail. 
+  * then the verification of the procedure will fail.
   *
   * If it is too strong the ackermann instantiation of the call will fail; and verification should
-  * fail at the call-site. 
+  * fail at the call-site.
   *
   * This means it is possible to drop parameters (read-global-variables or actual parameters)
   * as long as they aren't needed in the verification of the procedure.
   *
   * Because we at minimum make the global trace variable part of the function signature, a malicious
   * transform should only be able to verify by deleting all functionality if it was origionally a
-  * pure function. Assuming we ensure invariants are not valid or false. 
+  * pure function. Assuming we ensure invariants are not valid or false.
   *
   */
   def getFunctionSigsRenaming(
@@ -563,14 +563,14 @@ object TranslationValidator {
   }
 
   /**
-   * Set invariant defining a correspondence between variables in the source and target programs. 
+   * Set invariant defining a correspondence between variables in the source and target programs.
    *
    * @param renamingTgtSrc provides an optional corresponding source-program expression for a target porgam
    *    variable. E.g. representing a substitution performed by a transform at a given block label.
    *
    *
-   *  In this case if there is no v such that renamingTgtSrc(tv) -> v \in s and 
-   *    renamingSrcTgt(v) = tv \in t then it means there is no correspondence. 
+   *  In this case if there is no v such that renamingTgtSrc(tv) -> v \in s and
+   *    renamingSrcTgt(v) = tv \in t then it means there is no correspondence.
    *  In isolation None means there is no information.
    *
    *
@@ -634,9 +634,12 @@ object TranslationValidator {
         val srcLives = sourceInfo.liveVars.get(srcCut).toSet.flatten
         val tgtLives = targetInfo.liveVars.get(tgtCut).toSet.flatten
 
+        val tgtDefines = targetInfo.defines(tgtCut)
+        val srcDefines = sourceInfo.defines(srcCut)
+
         val invSrc = srcLives.map(s => s -> renamingSrcTgt(sourceInfo.name, Some(srcCut))(s)).flatMap {
           case (l, r) => {
-            r.filter(_.variables.forall(v => tgtLives.contains(v))).map { case e =>
+            r.filter(_.variables.forall(v => tgtDefines.contains(v) || tgtLives.contains(v))).map { case e =>
               CompatArg(toVariable(l), toVariable(e))
             }
           }
@@ -644,7 +647,7 @@ object TranslationValidator {
 
         val invTgt = tgtLives.map(s => s -> renamingTgtSrc(sourceInfo.name, Some(tgtCut))(s)).flatMap {
           case (l, r) => {
-            r.filter(_.variables.forall(v => srcLives.contains(v))).map { case e =>
+            r.filter(_.variables.forall(v => srcDefines.contains(v) || srcLives.contains(v))).map { case e =>
               CompatArg(toVariable(e), toVariable(l))
             }
           }
@@ -1041,7 +1044,7 @@ object TranslationValidator {
     val solver = config.verify.map(solver => util.SMT.SMTSolver(Some(1000), solver))
     val prover = solver.map(_.getProver(true))
 
-    b.addCommand("set-logic", "QF_UFBV")
+    // b.addCommand("set-logic", "QF_UFBV")
 
     var count = 0
 
@@ -1060,15 +1063,15 @@ object TranslationValidator {
         .map(cutSym => BinaryExpr(EQ, cutSym, TransitionSystem.programCounterVar))
     )
 
-    b.addAssert(
-      exprInSource(sourceInfo.renameSSA(sourceInfo.cuts.cutLabelBlockInTr("EXIT").label, pcPost)),
-      Some("PCDomainPostSource")
-    )
+    //b.addAssert(
+    //  exprInSource(sourceInfo.renameSSA(sourceInfo.cuts.cutLabelBlockInTr("EXIT").label, pcPost)),
+    //  Some("PCDomainPostSource")
+    //)
 
-    b.addAssert(
-      exprInTarget(targetInfo.renameSSA(sourceInfo.cuts.cutLabelBlockInTr("EXIT").label, pcPost)),
-      Some("PCDomainPostTarget")
-    )
+    //b.addAssert(
+    //  exprInTarget(targetInfo.renameSSA(sourceInfo.cuts.cutLabelBlockInTr("EXIT").label, pcPost)),
+    //  Some("PCDomainPostTarget")
+    //)
 
     count = 0
     for (e <- preInv) {
@@ -1205,10 +1208,10 @@ object TranslationValidator {
   }
 
   /**
-   * Generate an SMT query for the product program, 
+   * Generate an SMT query for the product program,
    *
-   * @param invariant.renamingSrcTgt 
-   *  function describing the transform as mapping from variable -> expression at a given block in the resulting program, 
+   * @param invariant.renamingSrcTgt
+   *  function describing the transform as mapping from variable -> expression at a given block in the resulting program,
    *  using a lambda Option[BlockId] => Variable | Memory => Option[Expr]
    *
    * @param filePrefix
