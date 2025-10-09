@@ -17,6 +17,7 @@ import org.sosy_lab.java_smt.api.{
   ProverEnvironment,
   SolverContext
 }
+import util.functional.Snoc
 
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.{SeqHasAsJava, SetHasAsJava}
@@ -290,6 +291,21 @@ class FormulaConverter(formulaManager: FormulaManager) {
   // Convert IR expressions
 
   def convertExpr(e: Expr): Formula = {
+    val () = e match {
+      case FApplyExpr("ite", iteParams, retType, true) =>
+        val itePairs = iteParams.map(convertExpr).grouped(2).toList
+        return itePairs match {
+          // NOTE: treats the last value in the ite (cond, value) pair list as
+          // being an infallible fallback value.
+          case Snoc(init, Seq(_, lastValue)) =>
+            init.foldRight(lastValue) { case (Seq(cond, value), rest) =>
+              booleanFormulaManager.ifThenElse(cond.asInstanceOf[BooleanFormula], value, rest)
+            }
+          case _ => throw new Exception("unrecognised ite argument structure in: " + e)
+        }
+      case _ => ()
+    }
+
     e.getType match {
       case BoolType => convertBoolExpr(e)
       case _: BitVecType => convertBVExpr(e)
@@ -301,12 +317,12 @@ class FormulaConverter(formulaManager: FormulaManager) {
         }
       case _ => throw Exception(s"unsupported expr type ${e.getType}: $e")
     }
-
   }
 
   def convertBoolExpr(e: Expr): BooleanFormula = {
     assert(e.getType == BoolType)
     e match {
+      case FApplyExpr("ite", _, _, _) => convertExpr(e).asInstanceOf[BooleanFormula]
       case TrueLiteral => booleanFormulaManager.makeTrue()
       case FalseLiteral => booleanFormulaManager.makeFalse()
       case AssocExpr(BoolAND, args) => booleanFormulaManager.and(args.map(convertBoolExpr).asJava)
@@ -341,13 +357,14 @@ class FormulaConverter(formulaManager: FormulaManager) {
         }
       case v: Variable => booleanFormulaManager.makeVariable(v.name)
       case r: OldExpr => ???
-      case e => throw Exception(s"Non boolean expression was attempted to be converted: ${e.getClass.getSimpleName()}")
+      case e => throw Exception(s"Non boolean expression was attempted to be converted: $e")
     }
   }
 
   def convertBVExpr(e: Expr): BitvectorFormula = {
     assert(e.getType.isInstanceOf[BitVecType])
     e match {
+      case FApplyExpr("ite", _, _, _) => convertExpr(e).asInstanceOf[BitvectorFormula]
       case BitVecLiteral(value, size) => bitvectorFormulaManager.makeBitvector(size, value.bigInteger)
       case Extract(end, start, arg) => bitvectorFormulaManager.extract(convertBVExpr(arg), end - 1, start)
       case Repeat(repeats, arg) => {

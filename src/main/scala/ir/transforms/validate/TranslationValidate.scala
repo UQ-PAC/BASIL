@@ -1063,15 +1063,15 @@ object TranslationValidator {
         .map(cutSym => BinaryExpr(EQ, cutSym, TransitionSystem.programCounterVar))
     )
 
-    //b.addAssert(
+    // b.addAssert(
     //  exprInSource(sourceInfo.renameSSA(sourceInfo.cuts.cutLabelBlockInTr("EXIT").label, pcPost)),
     //  Some("PCDomainPostSource")
-    //)
+    // )
 
-    //b.addAssert(
+    // b.addAssert(
     //  exprInTarget(targetInfo.renameSSA(sourceInfo.cuts.cutLabelBlockInTr("EXIT").label, pcPost)),
     //  Some("PCDomainPostTarget")
-    //)
+    // )
 
     count = 0
     for (e <- preInv) {

@@ -146,7 +146,7 @@ object SSADAG {
           .get(b.label)
           .forall(_.contains(v))
 
-      val ite = false
+      val ite = true
 
       if (b.prevBlocks.nonEmpty) then {
         val defines: Seq[Variable] =
@@ -173,8 +173,8 @@ object SSADAG {
             val phiscond = if (ite) {
               Seq(LocalAssign(fresh, mkIte(grouped.toList), Some(phiLabel)))
             } else {
-              val cond = boolAnd(grouped.map {
-                case (cond, lhs) => BinaryExpr(BoolIMPLIES, cond, polyEqual(lhs, fresh))
+              val cond = boolAnd(grouped.map { case (cond, lhs) =>
+                BinaryExpr(BoolIMPLIES, cond, polyEqual(lhs, fresh))
               })
               Seq(Assume(cond, Some(phiLabel), Some(phiLabel)))
             }
