@@ -144,7 +144,7 @@ object Lifter {
         }
       }
       sp = sp + 32
-      ins.foreach(s => s.comment = s.comment.orElse(Some("op: " + op)))
+      ins.foreach(s => s.comment = s.comment.orElse(Some("op: " + "0x%x".format(op))))
       ins
     }
   }

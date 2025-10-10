@@ -723,11 +723,16 @@ class GTIRBToIR(
   ): (Option[Call], Jump) = {
     // TODO add assertion that target register is low
     val label = handlePCAssign(block)
+    val targetRegister = getPCTarget(block)
 
     val withinProcedureTargets = targets.collect { case t: Block if procedure.blocks.contains(t) => t }
 
     if (withinProcedureTargets.size == targets.size) {
       // all target blocks are within the calling procedure
+      for (target <- targets) {
+        val assume = Assume(BinaryExpr(EQ, targetRegister, BitVecLiteral(target.address.get, 64)))
+        target.statements.prepend(assume)
+      }
       (None, GoTo(targets, label))
     } else if (withinProcedureTargets.nonEmpty) {
       // TODO - only some target blocks are within the calling procedure - unclear how to handle
@@ -748,7 +753,6 @@ class GTIRBToIR(
     } else {
       // indirect jump targeting multiple blocks outside this procedure
       val newBlocks = ArrayBuffer[Block]()
-      val targetRegister = getPCTarget(block)
 
       for (targetBlock <- targets) {
         if (!targetBlock.isEntry) {

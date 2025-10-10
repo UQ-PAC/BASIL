@@ -42,7 +42,7 @@ def catchAntlrParseErrors[T](body: => T) = {
             $sourceName%s:$line%d:${col + 1}%d (truncated)
             $line%4d | $lineText
                    ${" " * col}^ unexpected token
-            """.stripIndent.stripLeading
+            """.strip.stripLeading
           }
         case o => Failure(new Exception())
       }
