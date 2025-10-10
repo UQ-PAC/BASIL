@@ -990,7 +990,6 @@ object TranslationValidator {
         invariant.renamingSrcTgt
       )
 
-    println(concreteInvariant.toList)
     val preInv = (concreteInvariant.map(
       invToPredicateInState(
         e => sourceInfo.renameSSA(sourceInfo.cuts.cutLabelBlockInTr("ENTRY").label, e),
@@ -1015,7 +1014,6 @@ object TranslationValidator {
         )
       )
       .map(_.body)
-    println("primed " + primedInv)
 
     visit_proc(afterRenamer, source)
     visit_proc(beforeRenamer, target)

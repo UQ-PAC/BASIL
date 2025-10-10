@@ -228,11 +228,11 @@ def guardCleanupTransforms(p: Program) = {
   deadAssignmentElimination(p)
   simplifyCFG(p)
   transforms.removeDuplicateGuard(p)
-  guardProp
+  //guardProp
 }
 
 def guardCleanup(config: TVJob, p: Program) = {
-  TranslationValidator.forTransform("GuardCleanup", guardCleanupTransforms, copypropInvariant)(p, config)
+  TranslationValidator.forTransform("GuardCleanup", guardCleanupTransforms)(p, config)
 }
 
 def nop(config: TVJob, p: Program) = {
