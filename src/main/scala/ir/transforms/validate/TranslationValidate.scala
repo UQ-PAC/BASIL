@@ -149,21 +149,6 @@ enum FormalParam {
  */
 type ParameterRenamingFun = (Variable | Memory) => (Variable, Option[Expr])
 
-def boolAnd(exps: Iterable[Expr]) =
-  val l = exps.toList
-  l.size match {
-    case 0 => TrueLiteral
-    case 1 => l.head
-    case _ => AssocExpr(BoolAND, l)
-  }
-
-def boolOr(exps: Iterable[Expr]) =
-  val l = exps.toList
-  l.size match {
-    case 0 => FalseLiteral
-    case 1 => l.head
-    case _ => AssocExpr(BoolOR, l)
-  }
 
 def polyEqual(e1: Expr, e2: Expr) = {
   (e1.getType, e2.getType) match {

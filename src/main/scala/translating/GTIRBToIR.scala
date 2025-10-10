@@ -726,6 +726,8 @@ class GTIRBToIR(
     val targetRegister = getPCTarget(block)
 
     val withinProcedureTargets = targets.collect { case t: Block if procedure.blocks.contains(t) => t }
+    val assertion = boolOr(targets.map
+      (target => BinaryExpr(EQ, targetRegister, BitVecLiteral(target.address.get, 64))))
 
     if (withinProcedureTargets.size == targets.size) {
       // all target blocks are within the calling procedure
@@ -733,6 +735,7 @@ class GTIRBToIR(
         val assume = Assume(BinaryExpr(EQ, targetRegister, BitVecLiteral(target.address.get, 64)))
         target.statements.prepend(assume)
       }
+      block.statements.append(Assert(assertion))
       (None, GoTo(targets, label))
     } else if (withinProcedureTargets.nonEmpty) {
       // TODO - only some target blocks are within the calling procedure - unclear how to handle
@@ -765,11 +768,13 @@ class GTIRBToIR(
         val resolvedCall = DirectCall(target)
 
         val assume = Assume(BinaryExpr(EQ, targetRegister, BitVecLiteral(target.address.get, 64)))
+
         val label = block.label + "_" + target.name
         // unreachable because R30 is not set and any returns will need to be manually resolved through later analysis
         newBlocks.append(Block(label, None, ArrayBuffer(assume, resolvedCall), Unreachable()))
       }
       handlePCAssign(block)
+      block.statements.append(Assert(assertion))
       procedure.addBlocks(newBlocks)
       (None, GoTo(newBlocks))
     }
@@ -808,6 +813,9 @@ class GTIRBToIR(
     }
     handlePCAssign(block)
     procedure.addBlocks(newBlocks)
+    val assertion = boolOr(indirectCallTargets.map(target => BinaryExpr(EQ, targetRegister, 
+      BitVecLiteral(entranceUUIDtoProcedure(target.targetUuid).address.get, 64))))
+    block.statements.append(Assert(assertion))
     GoTo(newBlocks)
   }
 
