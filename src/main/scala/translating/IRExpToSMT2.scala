@@ -418,7 +418,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
         mkIte(cases.toList)
       }
       case _ => {
-        list(sym(name), Sexp.Slist(args.toList))
+        list(sym(name) :: args.toList : _*)
       }
     }
   }
