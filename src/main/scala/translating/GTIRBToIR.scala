@@ -726,8 +726,7 @@ class GTIRBToIR(
     val targetRegister = getPCTarget(block)
 
     val withinProcedureTargets = targets.collect { case t: Block if procedure.blocks.contains(t) => t }
-    val assertion = boolOr(targets.map
-      (target => BinaryExpr(EQ, targetRegister, BitVecLiteral(target.address.get, 64))))
+    val assertion = boolOr(targets.map(target => BinaryExpr(EQ, targetRegister, BitVecLiteral(target.address.get, 64))))
 
     if (withinProcedureTargets.size == targets.size) {
       // all target blocks are within the calling procedure
@@ -813,8 +812,11 @@ class GTIRBToIR(
     }
     handlePCAssign(block)
     procedure.addBlocks(newBlocks)
-    val assertion = boolOr(indirectCallTargets.map(target => BinaryExpr(EQ, targetRegister, 
-      BitVecLiteral(entranceUUIDtoProcedure(target.targetUuid).address.get, 64))))
+    val assertion = boolOr(
+      indirectCallTargets.map(target =>
+        BinaryExpr(EQ, targetRegister, BitVecLiteral(entranceUUIDtoProcedure(target.targetUuid).address.get, 64))
+      )
+    )
     block.statements.append(Assert(assertion))
     GoTo(newBlocks)
   }

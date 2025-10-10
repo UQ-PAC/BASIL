@@ -57,7 +57,7 @@ case class TVJob(
   results: List[TVResult] = List(),
   debugDumpAlways: Boolean = false,
   /* minimum number of statements in source and target combined to trigger case analysis */
-  splitLargeProceduresThreshold: Option[Int] = None,
+  splitLargeProceduresThreshold: Option[Int] = Some(60),
   dryRun: Boolean = false
 ) {
 
@@ -148,7 +148,6 @@ enum FormalParam {
  * if actual is Some() it is invariant at any call site.
  */
 type ParameterRenamingFun = (Variable | Memory) => (Variable, Option[Expr])
-
 
 def polyEqual(e1: Expr, e2: Expr) = {
   (e1.getType, e2.getType) match {
@@ -991,6 +990,7 @@ object TranslationValidator {
         invariant.renamingSrcTgt
       )
 
+    println(concreteInvariant.toList)
     val preInv = (concreteInvariant.map(
       invToPredicateInState(
         e => sourceInfo.renameSSA(sourceInfo.cuts.cutLabelBlockInTr("ENTRY").label, e),
@@ -1015,6 +1015,7 @@ object TranslationValidator {
         )
       )
       .map(_.body)
+    println("primed " + primedInv)
 
     visit_proc(afterRenamer, source)
     visit_proc(beforeRenamer, target)
@@ -1041,22 +1042,6 @@ object TranslationValidator {
     val cutR = sourceInfo.cutRestict.foreach(cutLabel => {
       b.addAssert(exprInSource(BinaryExpr(EQ, PCMan.PCSym(cutLabel), TransitionSystem.programCounterVar)))
     })
-
-    val pcPost = boolOr(
-      (targetInfo.cutBlockLabels.keys ++ sourceInfo.cutBlockLabels.keys)
-        .map(cutLabel => PCMan.PCSym(cutLabel))
-        .map(cutSym => BinaryExpr(EQ, cutSym, TransitionSystem.programCounterVar))
-    )
-
-    // b.addAssert(
-    //  exprInSource(sourceInfo.renameSSA(sourceInfo.cuts.cutLabelBlockInTr("EXIT").label, pcPost)),
-    //  Some("PCDomainPostSource")
-    // )
-
-    // b.addAssert(
-    //  exprInTarget(targetInfo.renameSSA(sourceInfo.cuts.cutLabelBlockInTr("EXIT").label, pcPost)),
-    //  Some("PCDomainPostTarget")
-    // )
 
     count = 0
     for (e <- preInv) {
@@ -1106,6 +1091,27 @@ object TranslationValidator {
     val pinv = UnaryExpr(BoolNOT, BinaryExpr(BoolOR, sourceAssumeFail, AssocExpr(BoolAND, primedInv.toList)))
     npe.map(_.statements.append(Assert(pinv, Some("InvPrimed"))))
     b.addAssert(pinv, Some("InvPrimed"))
+
+    val requ = Seq("ASSUMEFAIL", "ASSERTFAIL", "ENTRY", "EXIT")
+    val pcPost = boolOr(
+      (targetInfo.cutBlockLabels.keys ++ sourceInfo.cutBlockLabels.keys ++ requ).toSet.toList
+        .map(cutLabel => PCMan.PCSym(cutLabel))
+        .map(cutSym => BinaryExpr(EQ, cutSym, TransitionSystem.programCounterVar))
+    )
+
+    val s = exprInSource(
+      sourceInfo.renameSSA(sourceInfo.cuts.cutLabelBlockInTr("EXIT").label.stripPrefix("source__"), pcPost)
+    )
+    b.addAssert(s, Some("PCDomainPostSource"))
+
+    // val rn = renameSrcSSA((BinaryExpr(EQ, TransitionSystem.programCounterVar, PCMan.PCSym(cutLabel))))
+    b.addAssert(
+      exprInTarget(
+        targetInfo.renameSSA(targetInfo.cuts.cutLabelBlockInTr("EXIT").label.stripPrefix("target__"), pcPost)
+      ),
+      Some("PCDomainPostTarget")
+    )
+
     prover.map(_.addConstraint(pinv))
     timer.checkPoint("extract prog")
 
