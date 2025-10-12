@@ -155,12 +155,10 @@ object RunUtils {
       // write DSG of main procedure to file
       Logger.writeToFile(File("main_dsg.dot"), dsaResults.topDown(ctx.program.mainProcedure).toDot)
       // print dsa info
-      // fixme
-      // val ignoredProcNames = Set("_start", "__libc_start_main")
-      val ignoredProcNames = Set.empty[String]
+      val ignoredProcNames = Set("_start", "__libc_start_main")
       val ignoredProcs = ctx.program.procedures.filter{ proc => ignoredProcNames.contains(proc.procName) }.toSet
       Logger.writeToFile(File("dsa_stats.txt"),
-        s"${getDensityMetrics(dsaResults, ignoredProcs).toString}\n\nTime to run DSA: ${dsaTimePerformance}ms")
+        s"${getDsaProgramMetrics(dsaResults, ignoredProcs).toString}\n\nTime to run DSA: ${dsaTimePerformance}ms")
     }
 
     if q.summariseProcedures then
