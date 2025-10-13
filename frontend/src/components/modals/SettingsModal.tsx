@@ -1,3 +1,4 @@
+// src/components/modals/SettingsModal.tsx
 import '../../styles/components/modals/modal-base.css';
 
 interface SettingsModalProps {

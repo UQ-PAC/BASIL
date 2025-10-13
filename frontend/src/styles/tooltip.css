@@ -1,0 +1,36 @@
+/* src/styles/tooltip.css */
+.tooltip-container {
+    position: relative;
+    display: inline-flex;
+}
+
+.tooltip-content {
+    position: absolute;
+    z-index: 50;
+    bottom: 100%;
+    left: 50%;
+
+    background-color: var(--background-color);
+    color: var(--text-color);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--modal-border-color);
+
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+
+    pointer-events: none;
+    display: block;
+    white-space: preserve-spaces;
+    max-width: 300px;
+    width: max-content;
+
+}
+
+.tooltip-content.visible {
+    opacity: 0.95;
+    transform: translateX(-50%) translateY(-10px);
+}

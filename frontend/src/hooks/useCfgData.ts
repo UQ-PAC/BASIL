@@ -8,7 +8,9 @@ import {
 } from '@xyflow/react';
 import { getLayoutedElements } from '../utils/graphLayout.ts';
 import { fetchDotString } from '../api/viewer.ts';
+import { compareAndColourElements } from '../utils/cfgColouring.ts';
 import { type CustomNodeData } from '../components/viewers/graph/CustomNode.tsx';
+import { useGraphvizWASM } from './useGraphvizWASM.ts';
 
 interface CfgDataHookResult {
   beforeNodes: Node<CustomNodeData>[];
@@ -27,20 +29,10 @@ interface CfgDataHookResult {
 export function useCfgData(
   selectedStartEpoch: string | null,
   selectedEndEpoch: string | null,
-  selectedProcedureName: string | null,
-  isGraphvizWasmReady: boolean,
-  compareAndcolourElements: (
-    beforeNodes: Node<CustomNodeData>[],
-    beforeEdges: Edge[],
-    afterNodes: Node<CustomNodeData>[],
-    afterEdges: Edge[]
-  ) => {
-    colouredBeforeNodes: Node<CustomNodeData>[];
-    colouredAfterNodes: Node<CustomNodeData>[];
-    colouredBeforeEdges: Edge[];
-    colouredAfterEdges: Edge[];
-  }
+  selectedProcedureName: string | null
 ): CfgDataHookResult {
+  const { isGraphvizWasmReady, graphvizWasmError } = useGraphvizWASM();
+
   const [beforeNodes, setBeforeNodes, onBeforeNodesChange] = useNodesState<
     Node<CustomNodeData>
   >([]);
@@ -58,6 +50,11 @@ export function useCfgData(
   const [graphRenderKey, setGraphRenderKey] = useState(0);
 
   useEffect(() => {
+    if (graphvizWasmError) {
+      setGraphError(graphvizWasmError);
+      setLoadingGraphs(false);
+      return;
+    }
     if (
       !isGraphvizWasmReady ||
       !selectedStartEpoch ||
@@ -115,7 +112,7 @@ export function useCfgData(
           colouredAfterNodes,
           colouredBeforeEdges,
           colouredAfterEdges,
-        } = compareAndcolourElements(
+        } = compareAndColourElements(
           processedBeforeNodes,
           processedBeforeEdges,
           processedAfterNodes,
@@ -145,7 +142,6 @@ export function useCfgData(
     selectedEndEpoch,
     selectedProcedureName,
     isGraphvizWasmReady,
-    compareAndcolourElements,
   ]);
 
   return {
@@ -154,7 +150,7 @@ export function useCfgData(
     afterNodes,
     afterEdges,
     loadingGraphs,
-    graphError,
+    graphError: graphvizWasmError || graphError,
     graphRenderKey,
     onBeforeNodesChange,
     onBeforeEdgesChange,

@@ -1,12 +1,10 @@
-// src/components/CfgViewer.tsx
+// src/components/viewers/graph/CfgViewer.tsx
 import React from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import { useGraphvizWASM } from '../../../hooks/useGraphvizWASM';
 import { useCfgData } from '../../../hooks/useCfgData';
 import { FIT_VIEW_OPTIONS, ZOOM_CONFIGS } from '../../../constants.ts';
-import { compareAndColourElements } from '../../../utils/cfgColouring.ts';
 
 import GraphPanel from './GraphPanel.tsx';
 
@@ -32,29 +30,19 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
   loadingProcedures,
   procedureError,
 }) => {
-  const { isGraphvizWasmReady, graphvizWasmError } = useGraphvizWASM();
-
   const {
     beforeNodes,
     beforeEdges,
     afterNodes,
     afterEdges,
     loadingGraphs,
-    graphError: dataFetchError,
+    graphError: combinedGraphError,
     graphRenderKey,
     onBeforeNodesChange,
     onBeforeEdgesChange,
     onAfterNodesChange,
     onAfterEdgesChange,
-  } = useCfgData(
-    selectedStartEpoch,
-    selectedEndEpoch,
-    selectedProcedureName,
-    isGraphvizWasmReady,
-    compareAndColourElements
-  );
-
-  const combinedGraphError = graphvizWasmError || dataFetchError;
+  } = useCfgData(selectedStartEpoch, selectedEndEpoch, selectedProcedureName);
 
   if (loadingProcedures || loadingGraphs) {
     return <div className="cfg-viewer-message">Loading CFG data...</div>;

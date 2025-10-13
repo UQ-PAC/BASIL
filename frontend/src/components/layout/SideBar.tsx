@@ -8,7 +8,7 @@ interface SidebarProps {
   onEpochSelect: (epochName: string, event: React.MouseEvent) => void;
   loading: boolean;
   selectedDataset: string | null;
-  onDirectorySelect: () => Promise<void>;
+  onDirectorySelect: () => void;
   datasetLoading: boolean;
 }
 

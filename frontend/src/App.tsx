@@ -10,6 +10,7 @@ import CombinedViewer from './components/viewers/CombinedViewer.tsx';
 import SettingsModal from './components/modals/SettingsModal.tsx';
 import LoadingModal from './components/modals/LoadingModal.tsx';
 import ErrorModal from './components/modals/ErrorModal.tsx';
+import ConfigurationModal from './components/modals/ConfigurationModal.tsx';
 import { getAnalysisStatus, selectDirectory } from './api/analysis.ts';
 import { getEpochNames, getProcedureNames } from './api/data.ts';
 
@@ -38,6 +39,7 @@ function App() {
   const [lastClickedEpoch, setLastClickedEpoch] = useState<string | null>(null);
   const [loadingEpochs, setLoadingEpochs] = useState(true);
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
     const savedTheme = localStorage.getItem(LOCAL_STORAGE_THEME_KEY);
@@ -166,27 +168,20 @@ function App() {
     };
   }, [isAnalysisRunning, fetchEpochNames]);
 
-  // Add this function inside your App component, near your other handlers
-  const onDirectorySelect = async () => {
+  const submitDirectoryPath = async (directoryIdentifier: string) => {
+    if (!directoryIdentifier || !directoryIdentifier.trim()) {
+      console.log('Directory path input empty.');
+      return;
+    }
+
     setDatasetError(false);
     setDatasetLoading(true);
 
     try {
-      const directoryIdentifier = prompt(
-        // TODO: Potentially custom make this for better error handling and info hints
-        'Please enter the FULL, absolute path to the directory (e.g., /Users/user/folder/BASIL/src/test/correct/arrays_simple/clang/arrays_simple.gts:'
-      );
-
-      if (!directoryIdentifier) {
-        console.log('Directory path input cancelled or empty.');
-        setDatasetLoading(false);
-        return;
-      }
-
       await selectDirectory(directoryIdentifier);
 
       setSelectedDataset(directoryIdentifier);
-      localStorage.setItem(LOCAL_STORAGE_DATASET_KEY, directoryIdentifier); // TODO: Ensure this is run on the first opening with the previously selected path... Or always redo the old one...?
+      localStorage.setItem(LOCAL_STORAGE_DATASET_KEY, directoryIdentifier);
 
       console.info(`Successfully processed directory: ${directoryIdentifier}`);
       setIsAnalysisRunning(true); // This calls the loading modal
@@ -200,6 +195,10 @@ function App() {
     } finally {
       setDatasetLoading(false);
     }
+  };
+
+  const onDirectorySelect = () => {
+    setIsConfigModalOpen(true);
   };
 
   const singleSelectedStartEpoch =
@@ -395,6 +394,12 @@ function App() {
         isOpen={datasetError}
         postStatus={postStatus}
         onClose={handleCloseErrorModal}
+      />
+      <ConfigurationModal
+        isOpen={isConfigModalOpen}
+        onClose={() => setIsConfigModalOpen(false)}
+        onSubmit={submitDirectoryPath}
+        initialPath={selectedDataset}
       />
     </div>
   );

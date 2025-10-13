@@ -20,9 +20,12 @@
 
   /* Modal styles */
   --modal-header-background-color: #313d53;
-  --border-color: #777;
+  --modal-border-color: #777;
   --modal-close-button: #b8b8b8;
   --spinner-icon: #fff;
+  --modal-input-label-color: #a5b4fc;
+  --modal-input-background-color: #374151;
+  --modal-input-border-color: #4f46e5;
 
   /* Sidebar styles */
   --sidebar-header-color: #f0f0f0;
@@ -62,7 +65,7 @@
   --combined-ir-code-panel-background-color: #000;
   --combined-ir-code-panel-border-color: #555;
 
-  /* Colour scheme */
+  /* Code Colour scheme */
   --token-keyword-color: #569cd6;
   --token-variable-color: #9cdcfe;
   --token-label-color: #ffcc66;
@@ -85,9 +88,12 @@
 
   /* Modal styles */
   --modal-header-background-color: #f5f5f5;
-  --border-color: #ccc;
+  --modal-border-color: #888888;
   --modal-close-button: #040404;
   --spinner-icon: #000;
+  --modal-input-label-color: #4338ca;
+  --modal-input-background-color: #efefef;
+  --modal-input-border-color: #a5b4fc;
 
   /* Sidebar styles */
   --sidebar-header-color: #333;
@@ -127,7 +133,7 @@
   --combined-ir-code-panel-background-color: #fff;
   --combined-ir-code-panel-border-color: #ddd;
 
-  /* Color Scheme */
+  /* Code Color Scheme */
   --token-keyword-color: #005cc5;
   --token-variable-color: #e36209;
   --token-label-color: #e69900;

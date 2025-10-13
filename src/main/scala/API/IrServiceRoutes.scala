@@ -76,7 +76,18 @@ class IrServiceRoutes(
         logger.warn("IR data is still initializing. Please try again shortly.") *>
           ServiceUnavailable("IR data is still initializing. Please try again shortly.")
     }
-  // TODO: Add docs and tidy up
+
+  /**
+   * **Endpoint:** `POST /config/select-directory`
+   *
+   * Configures the backend by attempting to load a binary analysis **directory** based on the provided path.
+   * The request is expected to contain a JSON object with the directory path. This function performs the configuration
+   * loading and currently **triggers an asynchronous Intermediate Representation (IR) generation process**.
+   *
+   * @param req The request containing a JSON body of type [[DirectorySelection]], which must include the `directoryPath`.
+   * @return An `Ok` response with a status message if configuration and analysis trigger succeed,
+   *         or a `BadRequest` with an error message if configuration loading or analysis fails.
+   */
   private val postSelectDirectoryRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
     case req @ POST -> Root / "config" / "select-directory" =>
       val coreLogic: IO[Response[IO]] = for {
@@ -84,7 +95,7 @@ class IrServiceRoutes(
 
         config <- IO(
           loadDirectory(ChooseInput.Gtirb, selection.directoryPath)
-        ) // TODO: Allow the user to specify whether to use a Gtirb (.gts file or Bap)
+        )
           .handleErrorWith { e =>
             logger.error(e)(s"Failed to load directory: ${selection.directoryPath}. Error: ${e.getMessage}") >>
               IO.raiseError(new Exception(s"Configuration failed: ${e.getMessage}"))
