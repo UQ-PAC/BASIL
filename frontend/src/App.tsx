@@ -1,5 +1,5 @@
 // App.tsx
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import './App.css';
 import { DiffViewer } from './components/viewers/diff/DiffViewer.tsx';
 import { Header } from './components/layout/Header.tsx';
@@ -18,11 +18,24 @@ const LOCAL_STORAGE_PROCEDURE_KEY = 'cfgViewerSelectedProcedure';
 const LOCAL_STORAGE_THEME_KEY = 'theme';
 const LOCAL_STORAGE_DATASET_KEY = 'selectedDataset';
 const LOCAL_STORAGE_VIEW_MODE_KEY = 'selectedViewMode';
+const DEFAULT_DATASET_PLACEHOLDER =
+  'src/test/correct/secret_write/gcc/secret_write';
+const DATA_BASE_LOADED = 'dataBaseLoaded';
 
 const ViewMode = {
   IR: 'IR',
   CFG: 'CFG',
   IR_CFG: 'IR/CFG',
+};
+
+const initialiseState = () => {
+  try {
+    const storedValue = localStorage.getItem(DATA_BASE_LOADED);
+    return storedValue === 'true';
+  } catch (error) {
+    console.error('Error reading from localStorage:', error);
+    return true; // TODO: Throw an error instead - atm soft pass
+  }
 };
 
 function App() {
@@ -34,6 +47,8 @@ function App() {
         | 'IR/CFG') || 'IR'
     );
   });
+  const [isDatabaseLoaded, setIsDatabaseLoaded] =
+    useState<boolean>(initialiseState);
   const [allEpochNames, setAllEpochNames] = useState<string[]>([]);
   const [selectedEpochs, setSelectedEpochs] = useState<Set<string>>(new Set());
   const [lastClickedEpoch, setLastClickedEpoch] = useState<string | null>(null);
@@ -48,11 +63,12 @@ function App() {
 
   const [selectedDataset, setSelectedDataset] = useState<string>(() => {
     const savedDataset = localStorage.getItem(LOCAL_STORAGE_DATASET_KEY);
-    return savedDataset || 'dataBaseNameExample'; // TODO: Change to default data config file
+    return savedDataset || DEFAULT_DATASET_PLACEHOLDER;
   });
   const [postStatus, setPostStatus] = useState({ message: '', type: '' });
   const [datasetLoading, setDatasetLoading] = useState(true);
   const [datasetError, setDatasetError] = useState<boolean>(false);
+  const isAutoReloadingRef = useRef(false);
 
   const [procedureNames, setProcedureNames] = useState<string[]>([]);
   const [loadingProcedures, setLoadingProcedures] = useState(false);
@@ -79,6 +95,18 @@ function App() {
   }, [viewMode]);
 
   const fetchEpochNames = useCallback(async () => {
+    if (!isDatabaseLoaded && selectedEpochs.size === 0) {
+      console.log('fetchEpochNames skipped: isDatabaseLoaded is false.');
+      return;
+    }
+
+    if (isAutoReloadingRef.current) {
+      console.log(
+        'fetchEpochNames skipped: Auto-reload process already active.'
+      );
+      return;
+    }
+
     setLoadingEpochs(true);
     let names: string[];
     let errorOccurred = false;
@@ -99,13 +127,23 @@ function App() {
         setDatasetError(true);
       }
     } catch (err: any) {
-      console.error('Error fetching epoch names:', err);
-      setPostStatus({
-        message: `Error fetching epochs: \n${err.message}`,
-        type: 'error',
-      });
-      setDatasetError(true);
-      errorOccurred = true;
+      if (err.message === 'No config file loaded.') {
+        // reload the database
+        if (!isAutoReloadingRef.current) {
+          console.log(
+            'Error: "No config file loaded." Triggering auto-reload.'
+          );
+          await submitDirectoryPath(selectedDataset);
+        }
+      } else {
+        console.error('Error fetching epoch names:', err);
+        setPostStatus({
+          message: `Error fetching epochs: \n${err.message}`,
+          type: 'error',
+        });
+        setDatasetError(true);
+        errorOccurred = true;
+      }
     } finally {
       setLoadingEpochs(false);
     }
@@ -114,17 +152,19 @@ function App() {
       setAllEpochNames([]);
       setSelectedEpochs(new Set());
     }
-  }, []);
+  }, [isDatabaseLoaded]);
 
   useEffect(() => {
-    fetchEpochNames()
-      .then(() => {
-        console.log('fetchEpochNames run');
-      })
-      .catch((error) => {
-        console.error('Error from promise chain of fetchEpochNames', error);
-      });
-  }, []);
+    if (isDatabaseLoaded && !isAutoReloadingRef.current) {
+      fetchEpochNames()
+        .then(() => {
+          console.log('fetchEpochNames run (triggered by isDatabaseLoaded)');
+        })
+        .catch((error) => {
+          console.error('Error from promise chain of fetchEpochNames', error);
+        });
+    }
+  }, [isDatabaseLoaded]);
 
   useEffect(() => {
     let intervalId: number | null = null;
@@ -139,7 +179,8 @@ function App() {
             // await fetchEpochNames();
             window.location.reload(); // TODO: Maybe there is a smoother approach? But don't worry about it for now
             setIsAnalysisRunning(false);
-
+            isAutoReloadingRef.current = false;
+            console.log('Analysis completed. Lock released.');
             if (intervalId) {
               clearInterval(intervalId);
             }
@@ -166,7 +207,7 @@ function App() {
         clearInterval(intervalId);
       }
     };
-  }, [isAnalysisRunning, fetchEpochNames]);
+  }, [isAnalysisRunning]);
 
   const submitDirectoryPath = async (directoryIdentifier: string) => {
     if (!directoryIdentifier || !directoryIdentifier.trim()) {
@@ -177,6 +218,8 @@ function App() {
     setDatasetError(false);
     setDatasetLoading(true);
 
+    isAutoReloadingRef.current = true;
+
     try {
       await selectDirectory(directoryIdentifier);
 
@@ -184,6 +227,16 @@ function App() {
       localStorage.setItem(LOCAL_STORAGE_DATASET_KEY, directoryIdentifier);
 
       console.info(`Successfully processed directory: ${directoryIdentifier}`);
+      setIsDatabaseLoaded(true);
+      try {
+        localStorage.setItem(DATA_BASE_LOADED, 'true');
+        console.info(
+          'Database loaded successfully and state is persisted in localStorage!'
+        );
+      } catch (error) {
+        console.error('Error writing to localStorage:', error);
+        console.info('Database loaded, but failed to save persistence status.');
+      }
       setIsAnalysisRunning(true); // This calls the loading modal
     } catch (err: any) {
       setPostStatus({
@@ -196,6 +249,13 @@ function App() {
       setDatasetLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!isDatabaseLoaded && allEpochNames.length === 0) {
+      setDatasetLoading(true);
+      setIsConfigModalOpen(true);
+    }
+  }, [isDatabaseLoaded, allEpochNames.length]);
 
   const onDirectorySelect = () => {
     setIsConfigModalOpen(true);
@@ -400,6 +460,7 @@ function App() {
         onClose={() => setIsConfigModalOpen(false)}
         onSubmit={submitDirectoryPath}
         initialPath={selectedDataset}
+        isDatabaseLoaded={isDatabaseLoaded}
       />
     </div>
   );

@@ -75,10 +75,7 @@ object ApiServer extends IOApp {
         generateIRAsync(epochStore, semaphoreInstance, isReady)
       ).routes
       httpApp = Router("/" -> irServiceRoutes).orNotFound
-      _ <- generateIRAsync(epochStore, semaphoreInstance, isReady)(
-        "src/test/correct/secret_write/gcc/secret_write.adt",
-        Some("src/test/correct/secret_write/gcc/secret_write.relf")
-      ).start
+
       exitCode <- EmberServerBuilder
         .default[IO]
         .withHost(ipv4"0.0.0.0")

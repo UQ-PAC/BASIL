@@ -8,6 +8,7 @@ interface ConfigurationModalProps {
   onClose: () => void;
   onSubmit: (path: string) => Promise<void>;
   initialPath: string;
+  isDatabaseLoaded: boolean;
 }
 
 function ConfigurationModal({
@@ -15,6 +16,7 @@ function ConfigurationModal({
   onClose,
   onSubmit,
   initialPath,
+  isDatabaseLoaded,
 }: ConfigurationModalProps) {
   const [directoryPath, setDirectoryPath] = useState<string>(initialPath);
 
@@ -32,6 +34,8 @@ function ConfigurationModal({
     onClose();
   };
 
+  const isCloseLocked = !isDatabaseLoaded;
+
   if (!isOpen) return null;
 
   return (
@@ -43,8 +47,17 @@ function ConfigurationModal({
             className="modal-close-button"
             aria-label="Close configeration modal"
             onClick={onClose}
+            disabled={isCloseLocked}
           >
-            &times; {/* The image of an X */}
+            <Tooltip
+              content={
+                isCloseLocked
+                  ? 'Configuration is mandatory before continuing.'
+                  : 'Close configuration modal'
+              }
+            >
+              &times; {/* The image of an X */}
+            </Tooltip>
           </button>
         </div>
 

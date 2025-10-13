@@ -70,11 +70,23 @@ class IrServiceRoutes(
   }
 
   private def ensureReady(action: IO[Response[IO]]): IO[Response[IO]] =
+    def createUnavailableResponse(errMsg: String): IO[Response[IO]] =
+      logger.warn(errMsg) *>
+        ServiceUnavailable(errMsg)
+    
     isReady.get.flatMap {
       case true => action
       case false =>
-        logger.warn("IR data is still initializing. Please try again shortly.") *>
-          ServiceUnavailable("IR data is still initializing. Please try again shortly.")
+        epochStore.epochsRef.get.flatMap { epochs =>
+          if (epochs.isEmpty) {
+            val errMsg = "No config file loaded."
+            createUnavailableResponse(errMsg)
+
+          } else {
+            val errMsg = "IR data is still initialising. Please try again shortly."
+            createUnavailableResponse(errMsg)
+          }
+        }
     }
 
   /**
@@ -90,33 +102,58 @@ class IrServiceRoutes(
    */
   private val postSelectDirectoryRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
     case req @ POST -> Root / "config" / "select-directory" =>
-      val coreLogic: IO[Response[IO]] = for {
-        selection <- req.as[DirectorySelection]
 
-        config <- IO(
-          loadDirectory(ChooseInput.Gtirb, selection.directoryPath)
-        )
-          .handleErrorWith { e =>
-            logger.error(e)(s"Failed to load directory: ${selection.directoryPath}. Error: ${e.getMessage}") >>
-              IO.raiseError(new Exception(s"Configuration failed: ${e.getMessage}"))
-          }
+      val coreLogic: IO[Response[IO]] = req.as[DirectorySelection].flatMap { selection =>
 
-        _ <- logger.info(s"Successfully loaded config from directory. Input: ${config.inputFile}")
+        val hardcodedPath = "src/test/correct/secret_write/gcc/secret_write"
+        
+        if (selection.directoryPath == hardcodedPath) {
 
-        fiber <- generateIRAsync(
-          config.inputFile,
-          config.relfFile
-        ) // TODO: I want to remove this, just go straight to the config
-          .handleErrorWith(e => logger.error(e)("IR analysis failed"))
-          .start
+          val inputFile = "src/test/correct/secret_write/gcc/secret_write.adt"
+          val relfFile = Some("src/test/correct/secret_write/gcc/secret_write.relf")
 
-        _ <- fiber.join // Wait for analysis to complete
+          for {
+            _ <- logger.info(s"Using default hardcoded path: $inputFile")
 
-        resp <- Ok(
-          s"Analysis successfully triggered for directory: ${config.inputFile} / ${config.relfFile.getOrElse("none")}"
-        )
+            fiber <- generateIRAsync(inputFile, relfFile)
+              .handleErrorWith(e => logger.error(e)("IR analysis failed"))
+              .start
 
-      } yield resp
+            _ <- fiber.join 
+
+            resp <- Ok(
+              s"Analysis successfully triggered for default path: $inputFile / ${relfFile.getOrElse("none")}"
+            )
+          } yield resp
+
+        } else {
+
+          for {
+            config <- IO(
+              loadDirectory(ChooseInput.Gtirb, selection.directoryPath)
+            )
+              .handleErrorWith { e =>
+                logger.error(e)(s"Failed to load directory: ${selection.directoryPath}. Error: ${e.getMessage}") >>
+                  IO.raiseError(new Exception(s"Configuration failed: ${e.getMessage}"))
+              }
+
+            _ <- logger.info(s"Successfully loaded config from directory. Input: ${config.inputFile}")
+
+            fiber <- generateIRAsync(
+              config.inputFile,
+              config.relfFile
+            )
+              .handleErrorWith(e => logger.error(e)("IR analysis failed")).start
+
+            _ <- fiber.join
+
+            resp <- Ok(
+              s"Analysis successfully triggered for directory: ${config.inputFile} / ${config.relfFile.getOrElse("none")}"
+            )
+          } yield resp
+        }
+      }
+
       coreLogic.handleErrorWith { e =>
         logger.warn(s"Request failed: ${e.getMessage}") >>
           BadRequest(e.getMessage)
