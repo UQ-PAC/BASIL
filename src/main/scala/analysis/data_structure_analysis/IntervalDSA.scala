@@ -1585,8 +1585,12 @@ case class DsaProgramMetrics(
     for ((proc, metrics) <- procedureMetrics) {
       val procHeader = s"=== Procedure: ${proc.procName} "
       s += s"\n\n$procHeader${"=" * (HEADER_LENGTH - procHeader.length)}"
-      s += "\n\nNodes:"
+      s += "\n\nAll Nodes:"
       for (node <- metrics.nodes) {
+        s += "\n- " + node.toString
+      }
+      s += "\n\nCollapsed Nodes:"
+      for (node <- metrics.collapsed) {
         s += "\n- " + node.toString
       }
       s += "\n\nCells:"
@@ -1633,6 +1637,8 @@ case class DsaProgramMetrics(
 case class DsaProcedureMetrics(
   // the nodes belonging to this procedure; some of these might be clones of nodes in other procedures
   nodes: Set[IntervalNode],
+  // the set of collapsed nodes
+  collapsed: Set[IntervalNode],
   // the cells belonging to nodes of this procedure; some of these might be clones of cells in other procedures
   cells: Set[IntervalCell],
   // the memory accesses to each node in this procedure
@@ -1669,6 +1675,7 @@ def getDsaProgramMetrics(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]) = {
 
 def getProcedureMetrics(dsaCtx: DSAContext, dsg: IntervalGraph, cellsOfAccesses: Map[MemoryAccessConstraint[_], Set[IntervalCell]]) = {
   val nodes: Set[IntervalNode] = dsg.collect()(0)
+  val collapsed: Set[IntervalNode] = nodes.filter(_.isCollapsed)
   val cells: Set[IntervalCell] = nodes.flatMap(_.cells)
   val nodeAccesses: Map[IntervalNode, Set[MemoryAccessConstraint[_]]] = nodes.map(node => node ->
     cellsOfAccesses.filter((access, cells) => !(cells & node.cells.toSet).isEmpty).keySet).toMap
@@ -1678,6 +1685,7 @@ def getProcedureMetrics(dsaCtx: DSAContext, dsg: IntervalGraph, cellsOfAccesses:
   val maxCellAccesses: Int = cellAccesses.values.map(_.size).max
   DsaProcedureMetrics(
     nodes,
+    collapsed,
     cells,
     nodeAccesses,
     cellAccesses,
