@@ -709,6 +709,9 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
     }
 
     // broken
+    //(declare-const Var2 (_ BitVec 64))
+    //(assert (! (not (= (or (not (= (bvnot (bool2bv1 (= (concat (_ bv0 64) (bvadd Var2 (_ bv18446744073705224440 64))) (bvadd (concat (_ bv0 64) (bvadd Var2 (_ bv8 64))) (_ bv18446744073705224432 128))))) (_ bv1 1))) (= (bvadd Var2 (_ bv18446744073705224440 64)) (_ bv0 64))) (bvule Var2 (_ bv4327176 64)))) :named simp.209SimplifyExpr.scala..62))
+    //(check-sat)
     //case BinaryExpr(
     //      EQ,
     //      extended @ ZeroExtend(exts, orig @ BinaryExpr(o1, x1, z1)),
