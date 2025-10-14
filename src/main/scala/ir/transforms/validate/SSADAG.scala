@@ -146,7 +146,7 @@ object SSADAG {
           .get(b.label)
           .forall(_.contains(v))
 
-      val ite = true
+      val ite = false
 
       if (b.prevBlocks.nonEmpty) then {
         val defines: Seq[Variable] =
