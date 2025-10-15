@@ -1693,3 +1693,15 @@ def getProcedureMetrics(dsaCtx: DSAContext, dsg: IntervalGraph, cellsOfAccesses:
     maxCellAccesses
   )
 }
+
+def dsaMetricsToCsvLine(metrics: DsaProgramMetrics) = {
+  // dsa-default Nodes, dsa-default Nodes Collapsed, dsa-default Max Node Density, dsa-default Cells, dsa-default Max Cell Density
+  val nodes = metrics.procedureMetrics.values.flatMap(_.nodes)
+  val nodeCount = nodes.size.toString
+  val collapsedCount = nodes.filter(_.isCollapsed).size.toString
+  val maxNodeDensity = metrics.maxNodeDensity.toString
+  val cells = metrics.procedureMetrics.values.flatMap(_.cells)
+  val cellCount = cells.size.toString
+  val maxCellDensity = metrics.maxCellDensity.toString
+  s"$nodeCount,$collapsedCount,$maxNodeDensity,$cellCount,$maxCellDensity"
+}

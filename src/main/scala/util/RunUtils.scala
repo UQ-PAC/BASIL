@@ -157,8 +157,17 @@ object RunUtils {
       // print dsa info
       val ignoredProcNames = Set("_start", "__libc_start_main")
       val ignoredProcs = ctx.program.procedures.filter{ proc => ignoredProcNames.contains(proc.procName) }.toSet
-      Logger.writeToFile(File("dsa_stats.txt"),
-        s"${getDsaProgramMetrics(dsaResults, ignoredProcs).toString}\n\nTime to run DSA: ${dsaTimePerformance}ms")
+      val metrics = getDsaProgramMetrics(dsaResults, ignoredProcs)
+      // Logger.writeToFile(File("dsa_stats.txt"),
+      //   s"${metrics.toString}\n\nTime to run DSA: ${dsaTimePerformance}ms")
+
+      val basename = File(conf.loading.inputFile).getName.stripSuffix(".gts")
+      var fullname = basename + "-dsa"
+      if conf.dsaConfig.get.splitGlobals then fullname += "-split"
+      if conf.dsaConfig.get.eqClasses then fullname += "-eqv"
+      fullname += "-stats.txt"
+
+      Logger.writeToFile(File(fullname), dsaMetricsToCsvLine(metrics) + "," + dsaTimePerformance)
     }
 
     if q.summariseProcedures then
