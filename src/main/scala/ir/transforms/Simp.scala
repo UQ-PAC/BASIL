@@ -1280,7 +1280,9 @@ object OffsetProp {
               chain
           }
         }
-        throw Exception(
+
+        update(v, (None, None))
+        SimplifyLogger.error(
           s"Ran out of fuel recursively resolving copyprop (at $v): probable cycle. Next lookups are: $chain"
         )
       }

@@ -346,7 +346,7 @@ class GTIRBToIR(
 
     block.address.foreach { addr =>
       val pcCorrectExpr = BinaryExpr(EQ, Register("_PC", 64), BitVecLiteral(addr, 64))
-      val assertPC = Assert(pcCorrectExpr, Some("pc-tracking"), Some("pc-tracking"))
+      val assertPC = Assert(pcCorrectExpr, Some("pc-tracking " + pcCorrectExpr), Some("pc-tracking"))
       block.statements.append(assertPC)
     }
     block
