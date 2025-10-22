@@ -25,13 +25,10 @@ object AnalysisPipelineMRA {
 
   def reducibleLoops(IRProgram: Program) = {
     StaticAnalysisLogger.debug("reducible loops")
-    val foundLoops = LoopDetector.identify_loops(IRProgram)
-    foundLoops.irreducibleLoops.foreach(l => StaticAnalysisLogger.debug(s"Irreducible loop found: ${l.name}"))
 
-    val newLoops = foundLoops.reducibleTransformIR().identifiedLoops
-    newLoops.foreach(l => StaticAnalysisLogger.debug(s"Loop found: ${l.name}"))
+    IrreducibleLoops.transform_all_and_update(IRProgram)
 
-    foundLoops.updateIrWithLoops()
+    IRProgram
   }
 
   /** Run all static analysis passes on the provided IRProgram.
