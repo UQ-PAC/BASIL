@@ -1261,7 +1261,7 @@ object OffsetProp {
         case _ => throw Exception("Unexpected expression structure created by find() at some point")
       }
 
-    def findOff(v: Variable, c: BitVecLiteral, fuel: Int = 1000): BitVecLiteral | Variable | BinaryExpr =
+    def findOff(v: Variable, c: BitVecLiteral, fuel: Int = 10000): BitVecLiteral | Variable | BinaryExpr =
       find(v, fuel) match {
         case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
         case lv: Variable => BinaryExpr(BVADD, lv, c)
@@ -1270,7 +1270,7 @@ object OffsetProp {
         case _ => throw Exception("Unexpected expression structure created by find() at some point")
       }
 
-    def find(v: Variable, fuel: Int = 1000): BitVecLiteral | Variable | BinaryExpr = {
+    def find(v: Variable, fuel: Int = 10000): BitVecLiteral | Variable | BinaryExpr = {
       if (fuel == 0) {
         var chain = List(v)
         for (i <- 0 to 10) {
