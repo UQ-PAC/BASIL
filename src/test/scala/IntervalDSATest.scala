@@ -235,7 +235,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
           trimEarly = main.isDefined,
           mainProcedureName = main.getOrElse("main")
         ),
-        simplify = true,
+        simplify = SimplifyMode.Simplify,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
@@ -249,7 +249,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
       BASILConfig(
         context = Some(context),
         loading = ILLoadingConfig(inputFile = "", relfFile = None),
-        simplify = true,
+        simplify = SimplifyMode.Simplify,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
@@ -625,6 +625,8 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val globalCollapsed = Set("to_base64", "printmem", "gl_des_ecb_crypt", "from_base64", "des_key_schedule", "scanmem")
     val locals = res.dsa.get.local
     assert(locals.values.forall(_.glIntervals.size == 1))
+
+    println(locals.values.filterNot(IntervalDSA.checksStackMaintained).map(_.proc.procName).toSet)
 
     assert(
       locals.values.filterNot(g => stackCollapsed.contains(g.proc.procName)).forall(IntervalDSA.checksStackMaintained)

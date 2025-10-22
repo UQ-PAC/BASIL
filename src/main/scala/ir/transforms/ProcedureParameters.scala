@@ -4,7 +4,7 @@ import ir.cilvisitor.*
 import ir.{CallGraph, *}
 import specification.Specification
 import translating.PrettyPrinter
-import util.{DebugDumpIRLogger, Logger}
+import util.DebugDumpIRLogger
 
 import java.io.File
 import scala.collection.{immutable, mutable}
@@ -112,20 +112,16 @@ object DefinedOnAllPaths {
 }
 
 def liftProcedureCallAbstraction(ctx: ir.IRContext): ir.IRContext = {
+  val ns = liftProcedureCallAbstraction(ctx.program, Some(ctx.specification)).get
+  ctx.copy(specification = ns)
+}
 
-  transforms.clearParams(ctx.program)
+def liftProcedureCallAbstraction(program: Program, spec: Option[Specification]): Option[Specification] = {
 
-  val mainNonEmpty = ctx.program.mainProcedure.blocks.nonEmpty
-  val mainHasReturn = ctx.program.mainProcedure.returnBlock.isDefined
-  val mainHasEntry = ctx.program.mainProcedure.entryBlock.isDefined
+  transforms.clearParams(program)
 
-  val liveVars = if (mainNonEmpty && mainHasEntry && mainHasReturn) {
-    analysis.InterLiveVarsAnalysis(ctx.program).analyze()
-  } else {
-    Logger.error(s"Empty live vars $mainNonEmpty $mainHasReturn $mainHasEntry")
-    Map.empty
-  }
-  transforms.applyRPO(ctx.program)
+  val liveVars = analysis.interLiveVarsAnalysis(program)
+  transforms.applyRPO(program)
 
   val liveLab = () =>
     liveVars.collect { case (b: Block, r) =>
@@ -144,27 +140,28 @@ def liftProcedureCallAbstraction(ctx: ir.IRContext): ir.IRContext = {
 
   DebugDumpIRLogger.writeToFile(
     File(s"live-vars.il"),
-    PrettyPrinter.pp_prog_with_analysis_results(liveLab(), Map(), ctx.program, x => x)
+    PrettyPrinter.pp_prog_with_analysis_results(liveLab(), Map(), program, x => x)
   )
 
-  val params = inOutParams(ctx.program, liveVars)
+  val params = inOutParams(program, liveVars)
 
   // functions for which we don't know their behaviour and assume they modify all registers
-  val external = ctx.externalFunctions.map(_.name) ++ ctx.program.collect {
+  val external = program.collect {
     case b: Procedure if b.blocks.isEmpty => b.name
-  }
+  }.toSet
 
   val formalParams = SetFormalParams(params, external)
-  visit_prog(formalParams, ctx.program)
+  visit_prog(formalParams, program)
   val actualParams = SetActualParams(formalParams.mappingInparam, formalParams.mappingOutparam, external)
-  visit_prog(actualParams, ctx.program)
+  visit_prog(actualParams, program)
 
-  while (removeDeadInParams(ctx.program)) {}
+  while (removeDeadInParams(program)) {}
 
-  ctx.program.procedures.foreach(SpecFixer.updateInlineSpec(formalParams.mappingInparam, formalParams.mappingOutparam))
-  ctx.copy(specification =
-    SpecFixer.specToProcForm(ctx.specification, formalParams.mappingInparam, formalParams.mappingOutparam)
-  )
+  program.procedures.foreach(SpecFixer.updateInlineSpec(formalParams.mappingInparam, formalParams.mappingOutparam))
+
+  spec.map(s => {
+    SpecFixer.specToProcForm(s, formalParams.mappingInparam, formalParams.mappingOutparam)
+  })
 }
 
 def clearParams(p: Program) = {

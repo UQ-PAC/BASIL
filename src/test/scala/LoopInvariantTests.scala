@@ -6,7 +6,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest.programToContext
 import test_util.CaptureOutput
 import util.SMT.{SMTSolver, SatResult}
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, RunUtils}
+import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, SimplifyMode}
 
 @test_util.tags.UnitTest
 class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
@@ -43,7 +43,7 @@ class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
       BASILConfig(
         context = Some(context),
         loading = ILLoadingConfig(inputFile = "", relfFile = None),
-        simplify = true,
+        simplify = SimplifyMode.Simplify,
         generateLoopInvariants = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),

@@ -21,7 +21,11 @@ case class RegionTimer(name: String) {
   }
 }
 
-case class PerformanceTimer(timerName: String = "", logLevel: LogLevel = LogLevel.DEBUG) {
+case class PerformanceTimer(
+  timerName: String = "",
+  logLevel: LogLevel = LogLevel.DEBUG,
+  logger: GenericLogger = Logger
+) {
   private var lastCheckpoint: Long = System.currentTimeMillis()
   private var end: Long = 0
   private val checkpoints: mutable.Map[String, Long] = mutable.HashMap()
@@ -35,10 +39,10 @@ case class PerformanceTimer(timerName: String = "", logLevel: LogLevel = LogLeve
     checkpoints.put(name, delta)
     trace.add((name, delta))
     logLevel match {
-      case LogLevel.DEBUG => Logger.debug(s"timer:$timerName [$name]: ${delta}ms")
-      case LogLevel.INFO => Logger.info(s"timer:$timerName [$name]: ${delta}ms")
-      case LogLevel.WARN => Logger.warn(s"timer:$timerName [$name]: ${delta}ms")
-      case LogLevel.ERROR => Logger.error(s"timer:$timerName [$name]: ${delta}ms")
+      case LogLevel.DEBUG => logger.debug(s"timer:$timerName [$name]: ${delta}ms")
+      case LogLevel.INFO => logger.info(s"timer:$timerName [$name]: ${delta}ms")
+      case LogLevel.WARN => logger.warn(s"timer:$timerName [$name]: ${delta}ms")
+      case LogLevel.ERROR => logger.error(s"timer:$timerName [$name]: ${delta}ms")
       case _ => ???
     }
     delta

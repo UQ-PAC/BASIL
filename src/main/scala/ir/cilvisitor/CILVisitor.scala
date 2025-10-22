@@ -202,8 +202,12 @@ class CILVisitorImpl(val v: CILVisitor) {
         r match {
           case Nil => b.statements.remove(s)
           case n :: tl =>
-            b.statements.replace(s, n)
-            b.statements.insertAllAfter(Some(n), tl)
+            if (n ne s) {
+              b.statements.replace(s, n)
+              b.statements.insertAllAfter(Some(n), tl)
+            } else {
+              b.statements.insertAllAfter(Some(n), tl)
+            }
         }
       }
       b.replaceJump(visit_jump(b.jump))
@@ -216,7 +220,7 @@ class CILVisitorImpl(val v: CILVisitor) {
   def visit_proc(p: Procedure): List[Procedure] = {
     def continue(p: Procedure) = {
       v.enter_scope(p.formalInParam)
-      for (b <- p.blocks) {
+      for (b <- p.blocks.toList) {
         p.replaceBlock(b, visit_block(b))
       }
       v.leave_scope()
@@ -258,4 +262,5 @@ def visit_stmt(v: CILVisitor, e: Statement): List[Statement] = CILVisitorImpl(v)
 def visit_jump(v: CILVisitor, e: Jump): Jump = CILVisitorImpl(v).visit_jump(e)
 def visit_expr(v: CILVisitor, e: Expr): Expr = CILVisitorImpl(v).visit_expr(e)
 def visit_rvar(v: CILVisitor, e: Variable): Variable = CILVisitorImpl(v).visit_rvar(e)
+def visit_lvar(v: CILVisitor, e: Variable): Variable = CILVisitorImpl(v).visit_lvar(e)
 def visit_mem(v: CILVisitor, e: Memory): Memory = CILVisitorImpl(v).visit_mem(e)

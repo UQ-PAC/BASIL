@@ -6,7 +6,7 @@ import org.scalactic.*
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
 import translating.PrettyPrinter.*
-import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, LogLevel, Logger}
+import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, LogLevel, Logger, SimplifyMode}
 
 import scala.collection.immutable.*
 
@@ -143,7 +143,7 @@ class IRToDSLTest extends AnyFunSuite with CaptureOutput {
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out.bpl",
-        simplify = true
+        simplify = SimplifyMode.Simplify
       )
     )
 

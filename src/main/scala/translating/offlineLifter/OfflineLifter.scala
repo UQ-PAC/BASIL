@@ -116,6 +116,7 @@ class StmtListLifter extends LifterIFace[Int] {
 object Lifter {
 
   def liftBlockBytes(ops: Iterable[Int], initialSp: BigInt): Seq[Seq[Statement]] = {
+
     var sp = initialSp
     ops.toSeq.map { op =>
       val ins = if (op == 0xd503201f.toInt) {
@@ -124,10 +125,15 @@ object Lifter {
         Seq(Assert(FalseLiteral, Some(s"aarch64_system_exceptions_debug_breakpoint (0x$op)")))
       } else {
         try {
+          val checker = ir.invariant.ReadUninitialised()
           val lift = StmtListLifter()
           lift.builder.pcValue = sp
           f_A64_decoder[Expr, Int, BitVecLiteral](lift, BitVecLiteral(BigInt(op), 32), BitVecLiteral(sp, 64))
-          lift.extract.toSeq
+          val stmts = lift.extract.toSeq
+          checker.readUninitialised(stmts)
+          val r = checker.getResult()
+          if (r.isDefined) throw Exception(r.get + "\n" + stmts.mkString("\n"))
+          stmts
         } catch {
           case e => {
             val o = "%x".format(op)
@@ -137,7 +143,8 @@ object Lifter {
           }
         }
       }
-      sp = sp + 32
+      sp += 4
+      ins.foreach(s => s.comment = s.comment.orElse(Some("op: " + "0x%x".format(op))))
       ins
     }
   }

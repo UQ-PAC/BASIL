@@ -2,7 +2,9 @@ package translating
 
 import ir.*
 import ir.cilvisitor.*
-import util.{OnCrash, RingTrace}
+import util.Logger
+
+import java.io.{BufferedWriter, File, FileWriter, Writer}
 
 trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
   // def vstmt(s: Statement) : Repr[Statement]
@@ -47,7 +49,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
       case ZeroExtend(bits, arg) => vzeroextend(bits, vexpr(arg))
       case SignExtend(bits, arg) => vsignextend(bits, vexpr(arg))
       case BinaryExpr(op, arg, arg2) => vbinary_expr(op, vexpr(arg), vexpr(arg2))
-      case b @ AssocExpr(op, arg) => vexpr(b.toBinaryExpr)
+      case b @ AssocExpr(op, args) => vassoc_expr(op, args.map(vexpr))
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
       case v: Variable => vrvar(v)
       case f @ FApplyExpr(n, params, rt, _) => vfapply_expr(n, params.map(vexpr))
@@ -114,6 +116,7 @@ trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
 
 trait BasilIRExp[Repr[+_]] {
   def vexpr(e: Expr): Repr[Expr]
+  def vassoc_expr(o: BoolBinOp, es: List[Repr[Expr]]): Repr[Expr]
   def vextract(ed: Int, start: Int, a: Repr[Expr]): Repr[Expr]
   def vquantifier(q: QuantifierExpr): Repr[Expr]
   def vlambda(q: LambdaExpr): Repr[Expr]
@@ -121,7 +124,6 @@ trait BasilIRExp[Repr[+_]] {
   def vzeroextend(bits: Int, b: Repr[Expr]): Repr[Expr]
   def vsignextend(bits: Int, b: Repr[Expr]): Repr[Expr]
   def vbinary_expr(e: BinOp, l: Repr[Expr], r: Repr[Expr]): Repr[Expr]
-  def vbool_expr(e: BoolBinOp, l: List[Repr[Expr]]): Repr[Expr]
   def vunary_expr(e: UnOp, arg: Repr[Expr]): Repr[Expr]
   def vliteral(l: Literal): Repr[Literal] = {
     l match {
@@ -164,7 +166,7 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
         }
       case UnaryExpr(op, arg) => vunary_expr(op, vexpr(arg))
       case v: Variable => vrvar(v)
-      case b @ AssocExpr(op, args) => vbool_expr(op, args.map(vexpr))
+      case b @ AssocExpr(op, args) => vassoc_expr(op, args.map(vexpr))
       case r: SharedMemory => ???
       case r: StackMemory => ???
       case f @ FApplyExpr(n, params, rt, _) => vfapply_expr(n, params.map(vexpr))
@@ -178,10 +180,23 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
 
 enum Sexp[+T] {
   case Symb(v: String)
-  case Slist(v: List[Sexp[T]])
+  case Slist(v: Iterable[Sexp[T]])
 }
 
 object Sexp {
+
+  def write[T](b: Writer, s: Sexp[T]): Unit = s match {
+    case Sexp.Symb(a) => b.append(a)
+    case Sexp.Slist(v) => {
+      b.append("(")
+      for (s <- v) {
+        write(b, s)
+        b.append(" ")
+      }
+      b.append(")")
+    }
+
+  }
 
   def print[T](s: Sexp[T]): String = s match {
     case Sexp.Symb(a) => a
@@ -190,12 +205,9 @@ object Sexp {
 }
 
 def sym[T](l: String): Sexp[T] = Sexp.Symb[T](l)
-def list[T](l: Sexp[T]*): Sexp[T] = Sexp.Slist(l.toList)
+def list[T](l: Sexp[T]*): Sexp[T] = Sexp.Slist(l)
 
-val dumpTrace = RingTrace[String](3, "BasilIRToSMT2")
 object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
-
-  OnCrash.register(dumpTrace)
 
   def vload(lhs: Sexp[Variable], mem: String, index: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryLoad] = ???
   def vstore(mem: Memory, index: Sexp[Expr], value: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryStore] = ???
@@ -212,25 +224,40 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   def vintlit(b: BigInt): Sexp[IntLiteral] = ???
 
   class SMTBuilder() {
+
+    enum Cmd {
+      case AssertExp(e: Expr, n: Option[String])
+      case Raw(e: Sexp[Expr])
+
+      def toSexp = this match {
+        case Cmd.Raw(e) => e
+        case Cmd.AssertExp(e, name) => {
+          val expr: Sexp[Expr] = BasilIRToSMT2.vexpr(e)
+          val inner: Sexp[Expr] = name.map(n => list(sym("!"), expr, sym(":named"), sym(n))).getOrElse(expr)
+          list(sym("assert"), inner)
+        }
+      }
+    }
+
     var before = true
-    var exprs = Vector[Sexp[Expr]]()
+    var exprs = List[Cmd]()
     var exprsBefore = Vector[Sexp[Expr]]()
     var decls = Set[Sexp[Expr]]()
     var typedecls = Set[Sexp[Expr]]()
 
-    def addAssume(e: Expr) = {
-      before = false
-      val (t, d) = BasilIRToSMT2.extractDecls(e)
-      decls = decls ++ d
-      typedecls = typedecls ++ t
-      exprs = exprs ++ List(list(sym("assume"), BasilIRToSMT2.vexpr(e)))
-    }
+    // def addAssume(e: Expr) = {
+    //  before = false
+    //  val (t, d) = BasilIRToSMT2.extractDecls(e)
+    //  decls = decls ++ d
+    //  typedecls = typedecls ++ t
+    //  exprs = exprs ++ List(list(sym("assume"), BasilIRToSMT2.vexpr(e)))
+    // }
 
     def addCommand(rawSexp: String*) = {
       if (before) {
         exprsBefore = exprsBefore.appended(list(rawSexp.map(sym[Expr](_)): _*))
       } else {
-        exprs = exprs.appended(list(rawSexp.map(sym[Expr](_)): _*))
+        exprs = Cmd.Raw(list(rawSexp.map(sym[Expr](_)): _*)) :: exprs
       }
     }
 
@@ -239,18 +266,53 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       val (t, d) = BasilIRToSMT2.extractDecls(e)
       decls = decls ++ d
       typedecls = typedecls ++ t
-      val expr: Sexp[Expr] = BasilIRToSMT2.vexpr(e)
-      val inner: Sexp[Expr] = name.map(n => list(sym("!"), expr, sym(":named"), sym(n))).getOrElse(expr)
-
-      exprs = exprs ++ List(list(sym("assert"), inner))
+      exprs = Cmd.AssertExp(e, name) :: exprs
     }
 
-    def getCheckSat() = {
-      (exprsBefore.toVector ++ typedecls ++ decls ++ exprs ++ List(list(sym("check-sat"))))
-        .map(Sexp.print)
-        .mkString("\n")
+    def writeCheckSat(b: Writer, getUnsatCore: Boolean = false) = {
+      val setUnsat =
+        if getUnsatCore then Seq(list(sym("set-option"), sym(":produce-unsat-cores"), sym("true"))) else Seq()
+      val getUnsat = if getUnsatCore then Seq(list(sym("get-unsat-core"))) else Seq()
+
+      def psexp(p: Sexp[Expr]) = {
+        Sexp.write(b, p)
+        b.append("\n")
+      }
+
+      setUnsat.foreach(psexp)
+      exprsBefore.foreach(psexp)
+      typedecls.foreach(psexp)
+      decls.foreach(psexp)
+      exprs.foreach(e => psexp(e.toSexp))
+      // b.append("(check-sat-using (then (repeat (then (repeat (then euf-completion simplify)) (par-or (try-for smt 5000) skip))) smt))")
+      psexp(list(sym("check-sat")))
+      getUnsat.foreach(psexp)
     }
 
+    def writeCheckSatToFile(fname: File, getUnsatCore: Boolean = false): Unit = {
+      val fw = FileWriter(fname)
+      val f = BufferedWriter(fw)
+      try {
+        writeCheckSat(f, getUnsatCore)
+      } finally {
+        if (f != null) {
+          f.close()
+        }
+        if (fw != null) {
+          fw.close()
+        }
+      }
+    }
+
+    // def getCheckSat(getUnsatCore: Boolean = false) = {
+    //  val setUnsat =
+    //    if getUnsatCore then Seq(list(sym("set-option"), sym(":produce-unsat-cores"), sym("true"))) else Seq()
+    //  val getUnsat = if getUnsatCore then Seq(list(sym("get-unsat-core"))) else Seq()
+
+    //  setUnsat.iterator ++ exprsBefore.iterator ++ typedecls ++ decls ++ exprs.view.map(_()) ++ Seq(
+    //    list(sym("check-sat"))
+    //  ) ++ getUnsat
+    // }
   }
 
   /** Immediately invoke z3 and block until it returns a result.
@@ -326,11 +388,9 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   override def vextract(ed: Int, start: Int, a: Sexp[Expr]): Sexp[Expr] =
     list(list(sym("_"), sym("extract"), int2smt(ed - 1), int2smt(start)), a)
   override def vbinary_expr(e: BinOp, l: Sexp[Expr], r: Sexp[Expr]): Sexp[Expr] = {
-    dumpTrace.add(e.toString + "(" + l + "," + r + ")")
     list(sym(opnameToFun(e)), l, r)
   }
-  override def vbool_expr(e: BoolBinOp, l: List[Sexp[Expr]]): Sexp[Expr] =
-    dumpTrace.add(e.toString + "(" + l.mkString(",") + ")")
+  override def vassoc_expr(e: BoolBinOp, l: List[Sexp[Expr]]): Sexp[Expr] =
     Sexp.Slist(sym(opnameToFun(e)) :: l)
   override def vunary_expr(e: UnOp, arg: Sexp[Expr]): Sexp[Expr] = list(sym(unaryOpnameToFun(e)), arg)
 
@@ -341,14 +401,25 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     case FalseLiteral => sym("false")
   }
 
+  def mkIte(cases: List[Seq[Sexp[Expr]]]): Sexp[Expr] = {
+    cases match {
+      case Seq(cond, casev) :: Nil => casev
+      case Seq(cond, casev) :: tl => list(sym("ite"), (cond), (casev), mkIte(tl))
+    }
+  }
+
   def endianToBool(endian: Endian): Sexp[Expr] = {
     if endian == Endian.LittleEndian then vexpr(FalseLiteral) else vexpr(TrueLiteral)
   }
   override def vfapply_expr(name: String, args: Seq[Sexp[Expr]]): Sexp[Expr] = {
-    if (args.size == 1) {
-      list(sym(name), args.head)
-    } else {
-      list(sym(name), Sexp.Slist(args.toList))
+    name match {
+      case "ite" => {
+        val cases = args.grouped(2)
+        mkIte(cases.toList)
+      }
+      case _ => {
+        list(sym(name) :: args.toList: _*)
+      }
     }
   }
 
@@ -376,6 +447,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
 
   def interpretFun(x: FApplyExpr): Option[Sexp[Expr]] = {
     x.name match {
+      case "ite" => None
       case "bool2bv1" => {
         Some(booltoBVDef)
       }
@@ -390,6 +462,9 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
           )
         )
       }
+      case _ =>
+        Logger.warn(s"Undeclared uninterp emitted : ${x.name}")
+        None
     }
   }
 

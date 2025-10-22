@@ -187,6 +187,22 @@ sealed trait BVUnOp(op: String) extends UnOp {
 case object BVNOT extends BVUnOp("not")
 case object BVNEG extends BVUnOp("neg")
 
+def boolAnd(exps: Iterable[Expr]) =
+  val l = exps.toList
+  l.size match {
+    case 0 => TrueLiteral
+    case 1 => l.head
+    case _ => AssocExpr(BoolAND, l)
+  }
+
+def boolOr(exps: Iterable[Expr]) =
+  val l = exps.toList
+  l.size match {
+    case 0 => FalseLiteral
+    case 1 => l.head
+    case _ => AssocExpr(BoolOR, l)
+  }
+
 case class AssocExpr(op: BoolBinOp, args: List[Expr]) extends Expr with CachedHashCode {
   require(args.size >= 2, "AssocExpr requires at least two operands")
   override def getType: IRType = BoolType
@@ -381,6 +397,7 @@ sealed trait Variable extends Expr {
 
 object Variable {
   implicit def ordering[V <: Variable]: Ordering[V] = Ordering.by(_.name)
+  implicit def catsOrdering[V <: Variable]: cats.kernel.Order[V] = cats.kernel.Order.by(_.name)
 }
 
 object Register {
@@ -409,7 +426,7 @@ case class LocalVar(varName: String, override val irType: IRType, val index: Int
 }
 
 object LocalVar {
-  def unapply(l: LocalVar): Some[(String, IRType, Int)] = Some((l.name, l.irType, l.index))
+  def unapply(l: LocalVar): Some[(String, IRType, Int)] = Some((l.varName, l.irType, l.index))
 
   /**
    * Construct a LocalVar by infering its index from the provided name corresponding to [[LocalVar.name]].

@@ -54,7 +54,7 @@ class DotNode(val id: String, val label: String, highlight: Boolean = false) ext
 
   def equals(other: DotNode): Boolean = toDotString.equals(other.toDotString)
 
-  def hl = if (highlight) then "style=filled, fillcolor=\"orangered\", " else ""
+  def hl = if (highlight) then "style=filled, fillcolor=\"aliceblue\", " else ""
 
   def toDotString: String =
     s"\"$id\"" + s"[${hl}label=\"" + escape(wrap(label, 100)) + "\", shape=\"box\", fontname=\"Mono\", fontsize=\"5\"]"
