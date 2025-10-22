@@ -3,9 +3,6 @@ package ir.eval
 import boogie.Scope
 import ir.*
 import util.functional.*
-import util.functional.State.*
-
-import scala.collection.immutable
 
 def doLeft[L, T, V, E](f: State[L, V, E]): State[(L, T), V, E] = for {
   n <- State[(L, T), V, E]((s: (L, T)) => {

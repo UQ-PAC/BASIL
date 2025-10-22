@@ -3,7 +3,6 @@ package ir
 import analysis.IrreducibleLoops.BlockLoopInfo
 import analysis.MergedRegion
 import boogie.*
-import translating.PrettyPrinter.*
 import util.assertion.*
 import util.functional.Snoc
 import util.intrusive_list.*
