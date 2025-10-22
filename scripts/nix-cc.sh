@@ -15,9 +15,11 @@ in the OUTPUTDIR.
 positional arguments:
   INPUTDIR     input directory (this will be copied! make sure it is not too big)
   OUTPUTDIR    output directory to place binary and lifted files
-  COMMAND      custom compiler command and arguments. this should produce an
-                   'a.out' file (available compilers: gcc, clang)
-                   (default: gcc with all C files in directory)
+  COMMAND      custom compiler command and arguments. this must produce an
+                   'a.out' file. this will be interpreted by the shell within
+                   Nix and so may contain globs or environment variable definitions.
+                   (available compilers: gcc, clang)
+                   (default: gcc *.c)
 EOF
   exit $1
 }
@@ -75,6 +77,7 @@ nix-build --extra-experimental-features "nix-command flakes" --no-out-link \
     pkgs = pac-nix.packages.\${system};
     aarch64pkgs = pac-nix.inputs.nixpkgs.legacyPackages.\${system}.pkgsCross.aarch64-multiplatform;
   in aarch64pkgs.runCommand "basil-test-files" {
+      hardeningDisable = [ "all" ];
       nativeBuildInputs = [
         aarch64pkgs.buildPackages.gcc
         aarch64pkgs.buildPackages.clang
