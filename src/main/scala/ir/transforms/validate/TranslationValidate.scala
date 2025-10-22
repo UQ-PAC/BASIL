@@ -969,7 +969,7 @@ object TranslationValidator {
     sourceInfo: ProcInfo,
     targetInfo: ProcInfo
   ): TVResult = {
-    val runNamePrefix = runName + "-" + procTransformed.name + "-" + splitName
+    val runNamePrefix = "$" + runName + "$" + procTransformed.name + "$" + splitName
     val proc = procTransformed
 
     tvLogger.info("Generating TV for : " + runNamePrefix)

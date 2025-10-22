@@ -43,11 +43,7 @@ class SimpExpr(simplifier: Simplifier) extends CILVisitor with Simplifier {
   var changedAnything = false
   var count = 0
 
-  def simplify(e: Expr)(implicit
-  line: sourcecode.Line,
-  file: sourcecode.FileName,
-  name: sourcecode.Name
-) = {
+  def simplify(e: Expr)(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name) = {
     val (n, changed) = simplifier(e)
 
     changedAnything = changedAnything || changed
@@ -709,10 +705,10 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
     }
 
     // broken
-    //(declare-const Var2 (_ BitVec 64))
-    //(assert (! (not (= (or (not (= (bvnot (bool2bv1 (= (concat (_ bv0 64) (bvadd Var2 (_ bv18446744073705224440 64))) (bvadd (concat (_ bv0 64) (bvadd Var2 (_ bv8 64))) (_ bv18446744073705224432 128))))) (_ bv1 1))) (= (bvadd Var2 (_ bv18446744073705224440 64)) (_ bv0 64))) (bvule Var2 (_ bv4327176 64)))) :named simp.209SimplifyExpr.scala..62))
-    //(check-sat)
-    //case BinaryExpr(
+    // (declare-const Var2 (_ BitVec 64))
+    // (assert (! (not (= (or (not (= (bvnot (bool2bv1 (= (concat (_ bv0 64) (bvadd Var2 (_ bv18446744073705224440 64))) (bvadd (concat (_ bv0 64) (bvadd Var2 (_ bv8 64))) (_ bv18446744073705224432 128))))) (_ bv1 1))) (= (bvadd Var2 (_ bv18446744073705224440 64)) (_ bv0 64))) (bvule Var2 (_ bv4327176 64)))) :named simp.209SimplifyExpr.scala..62))
+    // (check-sat)
+    // case BinaryExpr(
     //      EQ,
     //      extended @ ZeroExtend(exts, orig @ BinaryExpr(o1, x1, z1)),
     //      BinaryExpr(o2, compar @ ZeroExtend(ext2, BinaryExpr(o4, x2, y2)), z2)
@@ -722,7 +718,7 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
     //      == simplifyCond(BinaryExpr(BVADD, ZeroExtend(exts, x2), (BinaryExpr(BVADD, ZeroExtend(exts, y2), z2)))) => {
     //  // C not Set
     //  logSimp(e, UnaryExpr(BoolNOT, BinaryExpr(BVUGT, x1, UnaryExpr(BVNOT, z1))))
-    //}
+    // }
 
     case BinaryExpr(
           EQ,
@@ -741,10 +737,10 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
     }
 
     // fails verification
-    //(assert (! (not (= (= (concat (_ bv0 64) (bvadd Var2 (_ bv18446744073705224440 64))) (bvadd (concat (_ bv0 64) (bvadd Var2 (_ bv8 64))) (_ bv18446744073705224432 128))) (and (bvult Var2 (bvneg (_ bv18446744073705224440 64))) (bvuge Var2 (bvneg (_ bv8 64)))))) :named simp.197SimplifyExpr.scala..762))
-    //(check-sat)
-    //(echo "simp.197SimplifyExpr.scala..762  ::  boolnot(eq(eq(zero_extend(64, bvadd(Var2:bv64, 0xffffffffffbdf8f8:bv64)), bvadd(zero_extend(64, bvadd(Var2:bv64, 0x8:bv64)), 0xffffffffffbdf8f0:bv128)), booland(bvult(Var2:bv64, bvneg(0xffffffffffbdf8f8:bv64)), bvuge(Var2:bv64, bvneg(0x8:bv64)))))")
-    //case BinaryExpr(
+    // (assert (! (not (= (= (concat (_ bv0 64) (bvadd Var2 (_ bv18446744073705224440 64))) (bvadd (concat (_ bv0 64) (bvadd Var2 (_ bv8 64))) (_ bv18446744073705224432 128))) (and (bvult Var2 (bvneg (_ bv18446744073705224440 64))) (bvuge Var2 (bvneg (_ bv8 64)))))) :named simp.197SimplifyExpr.scala..762))
+    // (check-sat)
+    // (echo "simp.197SimplifyExpr.scala..762  ::  boolnot(eq(eq(zero_extend(64, bvadd(Var2:bv64, 0xffffffffffbdf8f8:bv64)), bvadd(zero_extend(64, bvadd(Var2:bv64, 0x8:bv64)), 0xffffffffffbdf8f0:bv128)), booland(bvult(Var2:bv64, bvneg(0xffffffffffbdf8f8:bv64)), bvuge(Var2:bv64, bvneg(0x8:bv64)))))")
+    // case BinaryExpr(
     //      EQ,
     //      ZeroExtend(exts, orig @ BinaryExpr(BVADD, x1, y1: BitVecLiteral)),
     //      BinaryExpr(BVADD, ZeroExtend(ext1, BinaryExpr(BVADD, x2, y3neg: BitVecLiteral)), y4neg: BitVecLiteral)
@@ -767,7 +763,7 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
     //    e,
     //    BinaryExpr(BoolAND, BinaryExpr(BVULT, x1, UnaryExpr(BVNEG, y1)), BinaryExpr(BVUGE, x1, UnaryExpr(BVNEG, y3neg)))
     //  )
-    //}
+    // }
 
     /* generic comparison simplification */
     // redundant inequality
