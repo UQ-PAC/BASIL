@@ -1,7 +1,6 @@
 import analysis.{InterLiveVarsAnalysis, TwoElement, TwoElementTop}
 import ir.dsl.*
-import ir.{BitVecLiteral, LocalAssign, Program, Register, cilvisitor, transforms}
-import ir.{BitVecLiteral, Block, CFGPosition, LocalAssign, Program, Register, Variable, cilvisitor, dsl, transforms}
+import ir.{BitVecLiteral, CFGPosition, LocalAssign, Program, Register, Variable, cilvisitor, transforms}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
 import util.{BASILResult, LogLevel, Logger, StaticAnalysisConfig}
