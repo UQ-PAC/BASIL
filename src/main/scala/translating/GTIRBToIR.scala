@@ -11,7 +11,7 @@ import util.Logger
 import util.functional.{Snoc, foldLeft0}
 
 import java.util.Base64
-import scala.collection.mutable.{ArrayBuffer, Map, Set}
+import scala.collection.mutable.ArrayBuffer
 import scala.collection.{immutable, mutable}
 
 def b64encode(x: com.google.protobuf.ByteString) = Base64.getEncoder.encodeToString(x.toByteArray)

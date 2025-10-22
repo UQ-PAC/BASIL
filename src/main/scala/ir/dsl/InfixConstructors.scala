@@ -1,7 +1,6 @@
 package ir.dsl
 import ir.*
 import ir.dsl.*
-import translating.PrettyPrinter.*
 
 import scala.annotation.targetName
 import scala.collection.immutable.*

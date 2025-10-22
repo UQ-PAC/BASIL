@@ -1,4 +1,4 @@
-import ir.{IRContext, *}
+import ir.*
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
 import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, PCTrackingOption, SimplifyMode, StaticAnalysisConfig}

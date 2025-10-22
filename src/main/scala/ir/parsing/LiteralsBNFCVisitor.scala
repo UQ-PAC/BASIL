@@ -125,4 +125,4 @@ trait LiteralsBNFCVisitor[A]
 
 }
 
-private def ensureTraitHasNoAbstractMembers[A] = new LiteralsBNFCVisitor[A] {}
+private def ensureLiteralsVisitorHasNoAbstractMembers[A] = new LiteralsBNFCVisitor[A] {}

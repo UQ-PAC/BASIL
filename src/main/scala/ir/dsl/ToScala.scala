@@ -1,8 +1,8 @@
 package ir.dsl
 
 import ir.*
+import util.StringEscape
 import util.twine.Twine
-import util.{StringEscape, intersperse}
 
 /**
  * ToScala definition
