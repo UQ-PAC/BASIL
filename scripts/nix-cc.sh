@@ -66,6 +66,7 @@ tmpinputdir="$(echo "$inputdir" | sha1sum | tr -d ' -')"
 tmpinputdir="$(dirname "$outfile")/basil-nix-cc-input-$tmpinputdir"
 rm -rf "$tmpinputdir"
 (set -x; cp -r "$inputdir" "$tmpinputdir")
+echo "$command" > $tmpinputdir/.command
 inputdir="$tmpinputdir"
 
 # --extra-substituters https://pac-nix.cachix.org --extra-trusted-public-keys "pac-nix.cachix.org-1:l29Pc2zYR5yZyfSzk1v17uEZkhEw0gI4cXuOIsxIGpc=" \
@@ -90,10 +91,11 @@ nix-build --extra-experimental-features "nix-command flakes" --no-out-link \
       shopt -s expand_aliases
       mkdir \$out
       cp -r \${$inputdir}/. .
+      command="\$(cat .command)"
       (set -x;
         ls
         : BUILDING WITH COMMAND:
-        $command
+        eval "\$command"
         : ... DONE BUILDING.
         aarch64-unknown-linux-gnu-readelf -s -r -W a.out > a.relf
         aarch64-unknown-linux-gnu-objdump -d a.out > a.objdump
