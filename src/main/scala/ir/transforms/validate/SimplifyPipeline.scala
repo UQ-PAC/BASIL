@@ -1,7 +1,7 @@
 package ir.transforms.validate
 import ir.*
 import util.SMT.SatResult
-import util.{Logger, SimplifyMode}
+import util.{Logger, SimplifyMode, tvEvalLogger}
 
 import java.io.{BufferedWriter, File, FileWriter}
 
@@ -261,7 +261,7 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
     case _ => TVJob(None, None)
   }
 
-  Logger.info {
+  tvEvalLogger.debug {
     val counter = ir.transforms.CountStatements()
     val _ = visit_prog(counter, p)
     "tv-eval-marker: before-stmt-count=" + counter.count
@@ -296,7 +296,7 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   val _ = visit_prog(counter, p)
   counter.reportToLog("after")
 
-  Logger.info {
+  tvEvalLogger.debug {
     val counter = ir.transforms.CountStatements()
     val _ = visit_prog(counter, p)
     "tv-eval-marker: after-stmt-count=" + counter.count

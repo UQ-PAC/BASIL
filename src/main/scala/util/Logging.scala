@@ -190,3 +190,4 @@ val IntervalDSALogger = DSALogger.deriveLogger("SadDSA", Console.out).setLevel(L
 val condPropDebugLogger = SimplifyLogger.deriveLogger("inlineCond")
 val StackLogger = Logger.deriveLogger("Stack").setLevel(LogLevel.OFF)
 val tvLogger = Logger.deriveLogger("TranslationValidation").setLevel(LogLevel.INFO)
+val tvEvalLogger = Logger.deriveLogger("tv-eval").setLevel(LogLevel.INFO)

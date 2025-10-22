@@ -2,7 +2,7 @@ package ir.transforms
 
 import ir.*
 import ir.cilvisitor.*
-import util.Logger
+import util.tvEvalLogger
 
 import scala.util.chaining.scalaUtilChainingOps
 
@@ -62,7 +62,7 @@ class CountGuardStatements extends CILVisitor {
     SkipChildren()
   }
 
-  def reportToLog(label: String, log: String => Unit = Logger.info(_)) = {
+  def reportToLog(label: String, log: String => Unit = tvEvalLogger.debug(_)) = {
     val entries = guards.flatMap { (k, vs) => vs.map(k -> _) }
     val groupedByViolation = entries.groupMapReduce(_._2.productPrefix)(_._1.pipe(List(_)))(_ ++ _)
 
