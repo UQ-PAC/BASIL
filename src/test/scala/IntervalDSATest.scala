@@ -1,31 +1,33 @@
 import analysis.data_structure_analysis.{DSInterval, Heap, IntervalDSA, Par, Ret}
 import analysis.{AnalysisPipelineMRA, StaticAnalysisContext}
+import analysis.data_structure_analysis
+import analysis.data_structure_analysis.{DSInterval, Heap, IntervalDSA, Par, Ret, SymBase}
 import boogie.SpecGlobal
 import ir.Endian.LittleEndian
 import ir.dsl.{block, directCall, goto, proc, prog, ret}
 import ir.{BitVecLiteral, Endian, MemoryLoad, Register, SharedMemory, *}
 import org.scalatest.funsuite.AnyFunSuite
-import specification.Specification
 import test_util.BASILTest
+import test_util.BASILTest.programToContext
 import util.*
 import util.DSAPhase.{Local, TD}
 
 object IntervalDSATestData {
-  val mem = SharedMemory("mem", 64, 8)
-  val xAddress = BitVecLiteral(2000, 64)
-  val yAddress = BitVecLiteral(3000, 64)
-  val zAddress = BitVecLiteral(4000, 64)
-  val kAddress = BitVecLiteral(5000, 64)
-  val eight = BitVecLiteral(8, 64)
-  val x = SpecGlobal("x", 128, None, xAddress.value)
-  val y = SpecGlobal("y", 128, None, yAddress.value)
-  val z = SpecGlobal("z", 64, None, zAddress.value)
-  val k = SpecGlobal("k", 64, None, kAddress.value)
-  val R0 = Register("R0", 64)
-  val R1 = Register("R1", 64)
-  val R2 = Register("R2", 64)
-  val R3 = Register("R3", 64)
-  val bv64 = BitVecType(64)
+  private val mem = SharedMemory("mem", 64, 8)
+  private val xAddress = BitVecLiteral(2000, 64)
+  private val yAddress = BitVecLiteral(3000, 64)
+  private val zAddress = BitVecLiteral(4000, 64)
+  private val kAddress = BitVecLiteral(5000, 64)
+  private val eight = BitVecLiteral(8, 64)
+  private val x = SpecGlobal("x", 128, None, xAddress.value)
+  private val y = SpecGlobal("y", 128, None, yAddress.value)
+  private val z = SpecGlobal("z", 64, None, zAddress.value)
+  private val k = SpecGlobal("k", 64, None, kAddress.value)
+  private val R0 = Register("R0", 64)
+  private val R1 = Register("R1", 64)
+  private val R2 = Register("R2", 64)
+  private val R3 = Register("R3", 64)
+  private val bv64 = BitVecType(64)
 
   def write2: IRContext = {
     val program = prog(
@@ -217,36 +219,14 @@ object IntervalDSATestData {
   }
 }
 
-def runAnalysis(program: Program): StaticAnalysisContext = {
-  cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-  transforms.addReturnBlocks(program)
-  cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
-  val emptySpec = Specification(Set(), Set(), Map(), List(), List(), List(), Set())
-  val emptyContext = IRContext(List(), Set(), Set(), Set(), Map(), emptySpec, program)
-  AnalysisPipelineMRA.runToFixpoint(StaticAnalysisConfig(), emptyContext)
-}
-
-def programToContext(
-  program: Program,
-  globals: Set[SpecGlobal] = Set.empty,
-  globalOffsets: Map[BigInt, BigInt] = Map.empty
-): IRContext = {
-  cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-  transforms.addReturnBlocks(program)
-  cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
-  val spec = Specification(Set(), globals, Map(), List(), List(), List(), Set())
-  IRContext(List(), Set(), globals, Set(), globalOffsets, spec, program)
-}
-
-def globalsToLiteral(ctx: IRContext) = {
-  ctx.globals.map(g => (g.name, BitVecLiteral(g.address, 64))).toMap
-    ++ (ctx.funcEntries.map(f => (f.name, BitVecLiteral(f.address.toInt, 64))).toMap)
-}
-
 @test_util.tags.AnalysisSystemTest3
 class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
+
+  def globalsToLiteral(ctx: IRContext): Map[String, BitVecLiteral] = {
+    ctx.globals.map(g => (g.name, BitVecLiteral(g.address, 64))).toMap
+      ++ ctx.funcEntries.map(f => (f.name, BitVecLiteral(f.address.toInt, 64))).toMap
+  }
+
   def runTest(relativePath: String, main: Option[String] = None, config: DSConfig = DSConfig()): BASILResult = {
     val path = s"${BASILTest.rootDirectory}/$relativePath"
     RunUtils.loadAndTranslate(

@@ -192,8 +192,8 @@ enum LatticeMap[D, L] {
   ): LatticeMap[D, L] = this match {
     case Top() => TopMap(Map(from -> to))
     case Bottom() => BottomMap(Map(from -> to))
-    case TopMap(m) => if to == l.top then TopMap(m - from) else TopMap(m + (from -> to))
-    case BottomMap(m) => if to == l.bottom then BottomMap(m - from) else BottomMap(m + (from -> to))
+    case TopMap(m) => if to == l.top then LatticeMap.topMap(m - from) else TopMap(m + (from -> to))
+    case BottomMap(m) => if to == l.bottom then LatticeMap.bottomMap(m - from) else BottomMap(m + (from -> to))
   }
 
   /** Keeps all key value pairs satisfying the predicate, sending the rest to default
@@ -201,8 +201,8 @@ enum LatticeMap[D, L] {
   def filter(pred: ((D, L)) => Boolean): LatticeMap[D, L] = this match {
     case Top() => Top()
     case Bottom() => Bottom()
-    case TopMap(m) => TopMap(m.filter(pred))
-    case BottomMap(m) => BottomMap(m.filter(pred))
+    case TopMap(m) => LatticeMap.topMap(m.filter(pred))
+    case BottomMap(m) => LatticeMap.bottomMap(m.filter(pred))
   }
 
   def toMap: Map[D, L] = this match {

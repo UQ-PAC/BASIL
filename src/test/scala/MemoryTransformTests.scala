@@ -1,24 +1,14 @@
-import analysis.{AnalysisPipelineMRA, StaticAnalysisContext}
 import boogie.SpecGlobal
 import ir.*
 import ir.Endian.LittleEndian
 import ir.dsl.{block, directCall, goto, indirectCall, proc, prog, ret}
 import org.scalatest.funsuite.AnyFunSuite
-import specification.Specification
-import test_util.{BASILTest, CaptureOutput, programToContext}
+import test_util.BASILTest.programToContext
+import test_util.{BASILTest, CaptureOutput}
 import util.*
 
 @test_util.tags.UnitTest
 class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
-  def runAnalysis(program: Program): StaticAnalysisContext = {
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
-    val emptySpec = Specification(Set(), Set(), Map(), List(), List(), List(), Set())
-    val emptyContext = IRContext(List(), Set(), Set(), Set(), Map(), emptySpec, program)
-    AnalysisPipelineMRA.runToFixpoint(StaticAnalysisConfig(), emptyContext)
-  }
 
   def runTest(relativePath: String): BASILResult = {
     val path = s"${BASILTest.rootDirectory}/$relativePath"
@@ -59,7 +49,7 @@ class MemoryTransformTests extends AnyFunSuite with CaptureOutput {
     val global = memoryAssign.lhs
     val z = results.ir.globals.collectFirst { case g @ SpecGlobal("z", size, arraySize, address) => g }.get
 
-    assert(global.name == (s"Global_${z.address}_${z.address + (z.size / 8)}"), s"Expected variable to be named $z")
+    assert(global.name == s"Global_${z.address}_${z.address + (z.size / 8)}", s"Expected variable to be named $z")
   }
 
   test("multi proc global assignment") {
