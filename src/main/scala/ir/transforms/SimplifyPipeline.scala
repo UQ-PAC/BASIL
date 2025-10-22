@@ -2,7 +2,6 @@ package ir.transforms
 
 import analysis.{AnalysisManager, Interval as _, *}
 import ir.*
-import translating.*
 import translating.PrettyPrinter.*
 import util.{AnalysisResultDotLogger, DebugDumpIRLogger, Logger, PerformanceTimer, StaticAnalysisConfig}
 

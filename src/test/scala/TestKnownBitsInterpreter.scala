@@ -1,6 +1,5 @@
 import analysis.*
 import ir.dsl.*
-import ir.eval.*
 import ir.{dsl, *}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.*

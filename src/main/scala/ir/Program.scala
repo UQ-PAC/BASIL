@@ -2,7 +2,6 @@ package ir
 
 import analysis.{Loop, MergedRegion}
 import boogie.*
-import translating.PrettyPrinter.*
 import util.assertion.*
 import util.functional.Snoc
 import util.intrusive_list.*
