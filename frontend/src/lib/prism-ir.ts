@@ -13,7 +13,7 @@ Prism.languages.ir = {
   number: /\b0x[\da-fA-F]+|\b\d+\b/,
   type: {
     pattern: /\b(bv\d+|bool)\b/,
-    alias: 'class-name',
+    alias: 'data-type',
   },
   function: {
     pattern: /\b[a-zA-Z_][a-zA-Z0-9_]*?(?=\s*\()/,
@@ -30,7 +30,7 @@ Prism.languages.ir = {
   },
   register: {
     pattern: /\bR\d+(_\d+)?\b/,
-    alias: 'variable',
+    alias: 'register',
   },
   operator: /:=|->|=>|==|!=|<=|>=|<|>|\+|-|\*|\/|=/,
   punctuation: /[()\[\]:{};,]/,

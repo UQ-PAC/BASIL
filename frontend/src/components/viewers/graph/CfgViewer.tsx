@@ -35,7 +35,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
     beforeEdges,
     afterNodes,
     afterEdges,
-    loadingGraphs,
+    isLoadingGraphs,
     graphError: combinedGraphError,
     graphRenderKey,
     onBeforeNodesChange,
@@ -44,7 +44,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
     onAfterEdgesChange,
   } = useCfgData(selectedStartEpoch, selectedEndEpoch, selectedProcedureName);
 
-  if (loadingProcedures || loadingGraphs) {
+  if (loadingProcedures || isLoadingGraphs) {
     return <div className="cfg-viewer-message">Loading CFG data...</div>;
   }
 
@@ -96,7 +96,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
                   className="procedure-dropdown"
                   value={selectedProcedureName || ''}
                   onChange={(e) => setSelectedProcedureName(e.target.value)}
-                  disabled={loadingGraphs}
+                  disabled={isLoadingGraphs}
                 >
                   {!selectedProcedureName && (
                     <option value="">-- Choose a Procedure --</option>
@@ -115,7 +115,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
         {selectedStartEpoch &&
           selectedEndEpoch &&
           procedureNames.length === 0 &&
-          !loadingGraphs &&
+          !isLoadingGraphs &&
           !combinedGraphError && (
             <p className="no-procedures-message">
               No procedures found for epoch: '{selectedStartEpoch}' and '

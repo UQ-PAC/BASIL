@@ -17,7 +17,7 @@ interface CfgDataHookResult {
   beforeEdges: Edge[];
   afterNodes: Node<CustomNodeData>[];
   afterEdges: Edge[];
-  loadingGraphs: boolean;
+  isLoadingGraphs: boolean;
   graphError: string | null;
   graphRenderKey: number;
   onBeforeNodesChange: (changes: any) => void;
@@ -149,7 +149,7 @@ export function useCfgData(
     beforeEdges,
     afterNodes,
     afterEdges,
-    loadingGraphs,
+    isLoadingGraphs: loadingGraphs,
     graphError: graphvizWasmError || graphError,
     graphRenderKey,
     onBeforeNodesChange,

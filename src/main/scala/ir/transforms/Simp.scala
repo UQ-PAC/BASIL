@@ -1,25 +1,18 @@
 package ir.transforms
+import API.IREpoch
 import ir.*
 import ir.cilvisitor.*
+import ir.dsl.IRToDSL
 import ir.eval.{AlgebraicSimplifications, AssumeConditionSimplifications, simplifyExprFixpoint}
 import translating.PrettyPrinter.*
 import util.assertion.*
 import util.{SimplifyLogger, condPropDebugLogger}
 
 import scala.collection.mutable
+import scala.concurrent.ExecutionContext
 import scala.util.boundary
 
 import boundary.break
-import analysis._
-import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.concurrent.duration.*
-import scala.util.{Failure, Success}
-import ExecutionContext.Implicits.global
-import scala.util.boundary, boundary.break
-import ir.dsl.IRToDSL
-import API.IREpochStore
-import API.IREpoch
-import cats.effect.unsafe.implicits.global
 
 /** Simplification pass, see also: docs/development/simplification-solvers.md
   */
@@ -1093,12 +1086,7 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
         {
           SimplifyLogger
             .debug(s"CopyProp Transform ${p.name} (${p.blocks.size} blocks, expr complexity ${ExprComplexity()(p)})")
-          copypropTransform(
-            p,
-            procFrames,
-            addrToProc,
-            read
-          )
+          copypropTransform(p, procFrames, addrToProc, read)
         }
     )
   // Clone after the copyPropTransforms take place here

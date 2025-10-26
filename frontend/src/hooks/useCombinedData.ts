@@ -17,7 +17,7 @@ interface DotGraphResponse {
 
 interface CombinedDataHookResult {
   irCode: string | null;
-  loading: boolean;
+  isLoading: boolean;
   graphError: string | null;
   graphRenderKey: number;
   beforeNodes: Node<CustomNodeData>[];
@@ -189,7 +189,7 @@ export function useCombinedData(
 
   return {
     irCode,
-    loading,
+    isLoading: loading,
     graphError: combinedGraphError,
     graphRenderKey,
     beforeNodes,

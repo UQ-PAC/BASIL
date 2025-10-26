@@ -8,7 +8,7 @@ interface ConfigurationModalProps {
   onClose: () => void;
   onSubmit: (path: string) => Promise<void>;
   initialPath: string;
-  isDatabaseLoaded: boolean;
+  hasDatabaseLoaded: boolean;
 }
 
 function ConfigurationModal({
@@ -16,7 +16,7 @@ function ConfigurationModal({
   onClose,
   onSubmit,
   initialPath,
-  isDatabaseLoaded,
+  hasDatabaseLoaded,
 }: ConfigurationModalProps) {
   const [directoryPath, setDirectoryPath] = useState<string>(initialPath);
 
@@ -34,7 +34,7 @@ function ConfigurationModal({
     onClose();
   };
 
-  const isCloseLocked = !isDatabaseLoaded;
+  const isCloseLocked = !hasDatabaseLoaded;
 
   if (!isOpen) return null;
 

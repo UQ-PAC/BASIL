@@ -1,31 +1,20 @@
 package API
 
+import basil.main.Main.{ChooseInput, loadDirectory}
+import cats.effect.*
+import cats.effect.std.Semaphore
+import cats.implicits.*
+import io.circe.generic.auto.*
+import io.circe.syntax.*
+import ir.{Program, dotBlockGraph}
+import org.http4s.*
+import org.http4s.circe.*
+import org.http4s.dsl.io.*
+import org.typelevel.log4cats.{Logger, LoggerFactory, LoggerName}
+import translating.PrettyPrinter
+
 import java.lang
 import java.util.regex.Pattern
-
-import cats.effect._
-import cats.implicits._
-import cats.effect.std.Semaphore
-
-import org.http4s._
-import org.http4s.dsl.io._
-import org.http4s.circe._
-
-import io.circe.generic.auto._
-import io.circe.syntax._
-
-import basil.main.Main.{
-  ChooseInput,
-  loadDirectory
-}
-
-import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.LoggerFactory
-import org.typelevel.log4cats.LoggerName
-
-import ir.Program
-import ir.dotBlockGraph
-import translating.PrettyPrinter
 
 case class ConfigSelection(adt: String, relf: Option[String])
 case class AnalysisStatus(status: String)
@@ -73,7 +62,7 @@ class IrServiceRoutes(
     def createUnavailableResponse(errMsg: String): IO[Response[IO]] =
       logger.warn(errMsg) *>
         ServiceUnavailable(errMsg)
-    
+
     isReady.get.flatMap {
       case true => action
       case false =>
@@ -106,7 +95,7 @@ class IrServiceRoutes(
       val coreLogic: IO[Response[IO]] = req.as[DirectorySelection].flatMap { selection =>
 
         val hardcodedPath = "src/test/correct/secret_write/gcc/secret_write"
-        
+
         if (selection.directoryPath == hardcodedPath) {
 
           val inputFile = "src/test/correct/secret_write/gcc/secret_write.adt"
@@ -119,19 +108,15 @@ class IrServiceRoutes(
               .handleErrorWith(e => logger.error(e)("IR analysis failed"))
               .start
 
-            _ <- fiber.join 
+            _ <- fiber.join
 
-            resp <- Ok(
-              s"Analysis successfully triggered for default path: $inputFile / ${relfFile.getOrElse("none")}"
-            )
+            resp <- Ok(s"Analysis successfully triggered for default path: $inputFile / ${relfFile.getOrElse("none")}")
           } yield resp
 
         } else {
 
           for {
-            config <- IO(
-              loadDirectory(ChooseInput.Gtirb, selection.directoryPath)
-            )
+            config <- IO(loadDirectory(ChooseInput.Gtirb, selection.directoryPath))
               .handleErrorWith { e =>
                 logger.error(e)(s"Failed to load directory: ${selection.directoryPath}. Error: ${e.getMessage}") >>
                   IO.raiseError(new Exception(s"Configuration failed: ${e.getMessage}"))
@@ -139,11 +124,9 @@ class IrServiceRoutes(
 
             _ <- logger.info(s"Successfully loaded config from directory. Input: ${config.inputFile}")
 
-            fiber <- generateIRAsync(
-              config.inputFile,
-              config.relfFile
-            )
-              .handleErrorWith(e => logger.error(e)("IR analysis failed")).start
+            fiber <- generateIRAsync(config.inputFile, config.relfFile)
+              .handleErrorWith(e => logger.error(e)("IR analysis failed"))
+              .start
 
             _ <- fiber.join
 

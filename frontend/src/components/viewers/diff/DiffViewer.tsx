@@ -30,7 +30,7 @@ export function DiffViewer({
   const [headerElement, setHeaderElement] = useState<HTMLElement | null>(null);
   const diffContainerRef = useRef<HTMLDivElement>(null);
 
-  const { irData, loading, error } = useIrDiffData(
+  const { irData, isLoading, error } = useIrDiffData(
     selectedStartEpoch,
     selectedEndEpoch
   );
@@ -208,7 +208,7 @@ export function DiffViewer({
   }, [irData, contextLines, outputFormat, theme]);
 
   // --- Conditional rendering: these checks must come AFTER all hooks ---
-  if (loading) {
+  if (isLoading) {
     return <div className="p-4 text-center">Loading diff...</div>;
   }
 

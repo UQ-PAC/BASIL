@@ -4,7 +4,7 @@ import { fetchDiffIRData, type IREpochData } from '../api/viewer.ts';
 
 interface UseIrDiffDataResult {
   irData: IREpochData | null;
-  loading: boolean;
+  isLoading: boolean;
   error: string | null;
 }
 
@@ -56,5 +56,5 @@ export function useIrDiffData(
     loadData();
   }, [selectedStartEpoch, selectedEndEpoch]);
 
-  return { irData, loading, error };
+  return { irData, isLoading: loading, error };
 }

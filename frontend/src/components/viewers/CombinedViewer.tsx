@@ -39,7 +39,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
 
   const {
     irCode,
-    loading,
+    isLoading,
     graphError,
     graphRenderKey,
     beforeNodes,
@@ -116,7 +116,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
 
   const currentCfgTitle = `${displayCfgType === 'before' ? 'Before' : 'After'} Transform: ${selectedProcedureName || 'N/A'}`;
 
-  if (loadingProcedures || loading) {
+  if (loadingProcedures || isLoading) {
     return <div className="combined-viewer-message">Loading data...</div>;
   }
 
@@ -164,7 +164,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
                   className="procedure-dropdown"
                   value={selectedProcedureName || ''}
                   onChange={(e) => setSelectedProcedureName(e.target.value)}
-                  disabled={loadingProcedures || loading}
+                  disabled={loadingProcedures || isLoading}
                 >
                   {!selectedProcedureName && (
                     <option value="">-- Choose a Procedure --</option>
@@ -181,7 +181,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
                 <button
                   className={`toggle-button ${displayCfgType === 'before' ? 'active' : ''}`}
                   onClick={() => setDisplayCfgType('before')}
-                  disabled={loadingProcedures || loading}
+                  disabled={loadingProcedures || isLoading}
                 >
                   {displayCfgType === 'before' && (
                     <span className="tick">✓</span>
@@ -191,7 +191,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
                 <button
                   className={`toggle-button ${displayCfgType === 'after' ? 'active' : ''}`}
                   onClick={() => setDisplayCfgType('after')}
-                  disabled={loadingProcedures || loading}
+                  disabled={loadingProcedures || isLoading}
                 >
                   {displayCfgType === 'after' && (
                     <span className="tick">✓</span>

@@ -1,7 +1,7 @@
 package API
 
 import java.nio.file.{Files, Path, Paths}
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 case class ConfigPair(adt: String, relf: Option[String])
 

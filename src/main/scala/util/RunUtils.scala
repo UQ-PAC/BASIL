@@ -1,5 +1,6 @@
 package util
 
+import API.IREpoch
 import Parsers.*
 import analysis.data_structure_analysis.*
 import analysis.{Interval as _, *}
@@ -8,6 +9,7 @@ import boogie.*
 import com.grammatech.gtirb.proto.IR.IR
 import gtirb.{GTIRBReadELF, GTIRBResolver}
 import ir.*
+import ir.dsl.IRToDSL
 import ir.dsl.given
 import ir.eval.*
 import ir.transforms.MemoryTransform
@@ -21,11 +23,10 @@ import util.{DebugDumpIRLogger, Logger}
 import java.io.{BufferedWriter, File, FileInputStream, FileWriter, PrintWriter}
 import java.nio.file.{Files, Paths}
 import scala.collection.mutable
-import scala.jdk.CollectionConverters.*
-import cilvisitor.*
-import API.IREpoch
-import ir.dsl.IRToDSL
 import scala.collection.mutable.ArrayBuffer
+import scala.jdk.CollectionConverters.*
+
+import cilvisitor.*
 
 /** This file contains the main program execution. See RunUtils.loadAndTranslate for the high-level process.
   */

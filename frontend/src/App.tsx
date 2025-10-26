@@ -460,7 +460,7 @@ function App() {
         onClose={() => setIsConfigModalOpen(false)}
         onSubmit={submitDirectoryPath}
         initialPath={selectedDataset}
-        isDatabaseLoaded={isDatabaseLoaded}
+        hasDatabaseLoaded={isDatabaseLoaded}
       />
     </div>
   );
