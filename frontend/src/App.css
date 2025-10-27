@@ -133,17 +133,17 @@
   --combined-ir-code-panel-border-color: #ddd;
 
   /* Code Color Scheme */
-  --token-keyword-color: #005fa3; /* strong blue — draws attention without overpowering */
-  --token-variable-color: #b33a00; /* warm brown-red — distinct from keywords, visible but not too harsh */
-  --token-label-color: #9c6f00; /* amber/goldenrod — readable on white */
+  --token-keyword-color: #005250; /* strong blue — draws attention without overpowering */
+  --token-variable-color: #b32b00; /* warm brown-red — distinct from keywords, visible but not too harsh */
+  --token-label-color: #5c5300; /* amber/goldenrod — readable on white */
   --token-function-color: #7b3fb3; /* violet */
-  --token-type-color: #0074a2; /* teal-blue — contrasts with keyword blue */
-  --token-number-color: #005fa3; /* reuse blue tone — consistency for numeric tokens */
-  --token-comment-color: #7a7a7a; /* neutral grey — readable but visually secondary */
+  --token-type-color: #0073a2; /* teal-blue — contrasts with keyword blue */
+  --token-number-color: #00213d; /* reuse blue tone — consistency for numeric tokens */
+  --token-comment-color: #505050; /* neutral grey — readable but visually secondary */
   --token-string-color: #006400; /* deep green — traditional for string literals */
-  --token-operator-color: #c22f2f; /* soft red  */
-  --token-punctuation-color: #505050; /* dark neutral grey  */
-  --token-property-color: #a0522d; /* sienna — earthy tone to differentiate from variables */
+  --token-operator-color: #d22f6f; /* soft red  */
+  --token-punctuation-color: #353535; /* dark neutral grey  */
+  --token-property-color: #a0674c; /* sienna — earthy tone to differentiate from variables */
 }
 
 /* TODO: Check that this works */
