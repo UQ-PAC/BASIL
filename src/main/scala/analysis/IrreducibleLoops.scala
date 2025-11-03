@@ -157,7 +157,7 @@ object IrreducibleLoops {
    *                header. for irreducible loops, it also contains secondary
    *                headers.
    */
-  case class BlockLoopState(
+  class BlockLoopState(
     val b: Block,
     var iloop_header: Option[Block],
     var dfsp_pos: Int,
@@ -165,6 +165,10 @@ object IrreducibleLoops {
     var is_traversed: Boolean,
     var headers: Set[Block]
   ) {
+
+    override def toString = {
+      s"BlockLoopState($b, $iloop_header, $dfsp_pos, $dfsp_pos_max, $is_traversed, $headers)"
+    }
 
     /**
     * Converts the mutable [[BlockLoopState]] into an immutable [[BlockLoopInfo]],
