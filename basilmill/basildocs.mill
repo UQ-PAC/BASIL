@@ -9,8 +9,11 @@ trait BasilDocs extends ScalaModule {
   this: BasilVersion =>
 
   def scalaDocOptions = Task {
+    val rootDir = mill.api.BuildCtx.workspaceRoot.toString
     super.scalaDocOptions() ++ scalaDocExternalMappingOptions() ++ Seq(
-      s"-source-links:github://UQ-PAC/BASIL/${gitCommit().getOrElse("main")}",
+      // "-help",
+      s"-source-links",
+      s"$rootDir=github://UQ-PAC/BASIL/${gitCommit().getOrElse("main")}",
       s"-doc-root-content:$moduleDir/main/scala/rootdoc.scala"
     )
   }
