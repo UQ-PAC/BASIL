@@ -4,8 +4,8 @@ import '../../styles/components/modals/modal-base.css';
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  theme: 'light' | 'dark' | 'system';
-  setTheme: (theme: 'light' | 'dark' | 'system') => void;
+  theme: 'light' | 'dark';
+  setTheme: (theme: 'light' | 'dark') => void;
 }
 
 function SettingsModal({
@@ -38,13 +38,6 @@ function SettingsModal({
             >
               {theme === 'light' && <span className="tick">✓</span>}
               Light
-            </button>
-            <button
-              className={`toggle-button ${theme === 'system' ? 'active' : ''}`}
-              onClick={() => setTheme('system')}
-            >
-              {theme === 'system' && <span className="tick">✓</span>}
-              System
             </button>
             <button
               className={`toggle-button ${theme === 'dark' ? 'active' : ''}`}
