@@ -8,8 +8,9 @@ import mill.api.BuildCtx
 trait BasilDocs extends ScalaModule {
   this: BasilVersion =>
 
+  private val rootDir = mill.api.BuildCtx.workspaceRoot.toString
+
   def scalaDocOptions = Task {
-    val rootDir = mill.api.BuildCtx.workspaceRoot.toString
     super.scalaDocOptions() ++ scalaDocExternalMappingOptions() ++ Seq(
       s"-source-links:$rootDir=github://UQ-PAC/BASIL/${gitCommit().getOrElse("main")}",
       s"-doc-root-content:$moduleDir/main/scala/rootdoc.scala"
@@ -81,6 +82,8 @@ trait BasilDocs extends ScalaModule {
     os.copy.into(docsIndex().path, dest / "api")
 
     os.walk(dest).foreach {
+      case path if path.ext == "html" =>
+        assert(!os.read(path).contains(rootDir), s"local build path unexpectedly present in file $path")
       case path if path.last == "ux.js" =>
         val old = os.read(path)
         val oldLen = old.length
