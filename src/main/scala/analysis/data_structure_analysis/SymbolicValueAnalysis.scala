@@ -295,16 +295,21 @@ object SymValues {
   }
 
   def literalsToSymValSet[T <: Offsets](
-    literals: Set[Int],
+    literals: Set[DSInterval],
     isGlobal: Int => Boolean,
     globals: Seq[DSInterval],
     domain: SymValSetDomain[T]
   ) = {
-    literals.foldLeft(domain.init(Block(""))) { (valSet, offset) =>
-      if isGlobal(offset) then {
-        val (interval, off) = getGlobal(globals, offset).get
-        domain.join(valSet, domain.init(GlobSym(interval), off))
-      } else domain.join(valSet, domain.init(Constant, offset))
+    literals.foldLeft(domain.init(Block(""))) {
+      case (valSet, DSInterval.Value(offset, j)) if offset == j => {
+        if isGlobal(offset) then {
+          val (interval, off) = getGlobal(globals, offset).get
+          domain.join(valSet, domain.init(GlobSym(interval), off))
+        } else domain.join(valSet, domain.init(Constant, offset))
+      }
+      case (valSet, _) =>
+        Logger.error(s"Unsound join of top to symvalues ${valSet.state.keys.toList}")
+        domain.join(valSet, domain.init(Constant, domain.offsetDomain.top))
     }
   }
 
@@ -320,11 +325,12 @@ object SymValues {
     val oDomain = symValSetDomain.offsetDomain
     expr match
       case literal @ BitVecLiteral(value, size) =>
-        val updated = transform(oDomain.init(bv2SignedInt(literal).toInt))
-        literalsToSymValSet(updated.toOffsets, isGlobal, globals, symValSetDomain)
+        val i = oDomain.init(bv2SignedInt(literal).toInt)
+        val updated = transform(i)
+        literalsToSymValSet(updated.toIntervals, isGlobal, globals, symValSetDomain)
       case literal @ IntLiteral(value) =>
         val updated = transform(oDomain.init(value.toInt))
-        literalsToSymValSet(updated.toOffsets, isGlobal, globals, symValSetDomain)
+        literalsToSymValSet(updated.toIntervals, isGlobal, globals, symValSetDomain)
       case Extract(end, start, body) =>
         exprToSymValSet(symValues, isGlobal, globals)(body) // todo incorrectly assuming value is preserved
       case ZeroExtend(extension, body) => exprToSymValSet(symValues, isGlobal, globals)(body)
