@@ -8,9 +8,7 @@ import test_util.CaptureOutput
 class ProcedureAnnotationTests extends AnyFunSuite, CaptureOutput {
 
   def annotateProgram(program: Program) = {
-    val foundLoops = LoopDetector.identify_loops(program)
-    val newLoops = foundLoops.reducibleTransformIR().identifiedLoops
-    foundLoops.updateIrWithLoops()
+    IrreducibleLoops.transform_all_and_update(program)
 
     val summaryGenerator = SummaryGenerator(program, true)
     program.procedures
@@ -41,6 +39,7 @@ class ProcedureAnnotationTests extends AnyFunSuite, CaptureOutput {
         out = Seq("a_out" -> BitVecType(64)),
         returnBlockLabel = Some("return")
       )(
+        block("procentry", goto("entry")),
         block("entry", goto("loop_body", "loop_exit")),
         block(
           "loop_body",
