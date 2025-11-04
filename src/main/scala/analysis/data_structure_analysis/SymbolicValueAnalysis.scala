@@ -263,7 +263,7 @@ class SymValSetDomain[T <: Offsets](using val offsetDomain: OffsetDomain[T]) ext
   def transform(s: SymValSet[T], f: T => T)(implicit dummyImplicit: DummyImplicit): SymValSet[T] = {
     SymValSet(s.state.view.mapValues(f).toMap)
   }
-  override def top: SymValSet[T] = SymValSet(Map.empty.withDefaultValue(offsetDomain.top))
+  override def top: SymValSet[T] = ???
   override def bot: SymValSet[T] = SymValSet(Map.empty)
 }
 
