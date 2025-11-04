@@ -14,9 +14,7 @@ class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
     program: Program,
     procedure: Procedure
   ): (Map[Block, List[Predicate]], Map[Block, List[Predicate]]) = {
-    val foundLoops = LoopDetector.identify_loops(program)
-    val newLoops = foundLoops.reducibleTransformIR().identifiedLoops
-    foundLoops.updateIrWithLoops()
+    IrreducibleLoops.transform_all_and_update(program)
 
     FullLoopInvariantGenerator(program).genInvariants(procedure)
   }

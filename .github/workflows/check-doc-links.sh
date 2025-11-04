@@ -34,6 +34,7 @@ args=(
   --no-progress
   --max-concurrency 16
   --max-retries 2
+  --max-redirects 10
   --timeout 60
   "$@"
 )
