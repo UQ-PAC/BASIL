@@ -78,9 +78,35 @@ class EdgeFunctionLattice[T, L <: Lattice[T]](val valuelattice: L) extends Latti
         case IdEdge() => this
         case ConstEdge(d) => JoinEdge(valuelattice.lub(c, d))
         case JoinEdge(d) => JoinEdge(valuelattice.lub(c, d))
+        case _ => e.joinWith(this)
       }
 
     override def toString = s"JoinEdge($c)"
   }
 
+  /** Edge that has `\l . lub (glb(l, a), b)` as a lambda expression. */
+  case class MeetThenJoinEdge(a: T, b: T) extends EdgeFunction[T] {
+    def apply(x: T): T = valuelattice.lub(valuelattice.glb(a, x), b)
+
+    def composeWith(e: EdgeFunction[T]): EdgeFunction[T] =
+      e match {
+        case IdEdge() => this
+        case ConstEdge(c) => ConstEdge(valuelattice.lub(b,  valuelattice.glb(a, c)))
+        case JoinEdge(_) => ??? // The JoinEdge case for composition is ignored
+        case MeetThenJoinEdge(c, d) => MeetThenJoinEdge(valuelattice.lub(b, d),
+          valuelattice.lub(b, valuelattice.glb(a, valuelattice.lub(c, d))))
+        case _ => ???
+      }
+
+    def joinWith(e: EdgeFunction[T]): EdgeFunction[T] =
+      e match {
+        case IdEdge() => MeetThenJoinEdge(valuelattice.top, b)
+        case ConstEdge(c) => MeetThenJoinEdge(a, valuelattice.lub(b, c))
+        case JoinEdge(d) => ???
+        case MeetThenJoinEdge(c, d) => MeetThenJoinEdge(valuelattice.lub(a, c), valuelattice.lub(b, d))
+        case _ => e.joinWith(this)
+      }
+
+    override def toString = s"MeetThenJoinEdge($a, $b)"
+  }
 }
