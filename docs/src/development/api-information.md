@@ -52,7 +52,13 @@ an IR in a html script
 ## Future Recommendations for the Interface
 Several future recommendations have been listed below. 
 
-### Example 1...
+### Grey Epochs that result in no changes
+Check the epochs as they arrive and whether the IR before and after differ in 
+any way. Of not, then grey them out, visually displaying no change.
+
+### Potential for Multiple Code-Colour Schemes
+Multiple code Colour schemes be implemented, with the selection potentially in
+the settings modal.
 
 ## Documentation
 This outlines briefly some documentation standards I have followed
