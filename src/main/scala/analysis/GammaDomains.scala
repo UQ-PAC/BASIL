@@ -4,8 +4,6 @@ import ir.*
 
 type VarGammaMap = LatticeMap[Variable, LatticeSet[Variable]]
 
-implicit val variableLatticeSetTerm: LatticeSet[Variable] = LatticeSet.Bottom()
-
 /**
  * An abstract domain that determines for each variable, a set of variables whose gammas (at
  * the start of a procedure) are "affected" this variable's gamma. This is paramaterised by
