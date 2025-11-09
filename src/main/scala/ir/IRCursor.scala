@@ -176,7 +176,7 @@ object InterProcIRCursor extends InterProcIRCursor
 trait CallGraph extends IRWalk[Procedure, Procedure] {
   final def succ(b: Procedure): Set[Procedure] = b.calls
 
-  final def pred(b: Procedure): Set[Procedure] = b.incomingCalls().map(_.parent.parent).toSet
+  final def pred(b: Procedure): Set[Procedure] = b.callers().toSet
 }
 
 object CallGraph extends CallGraph
