@@ -73,6 +73,8 @@
 
 .language-ir {
   text-shadow: none !important;
+  overflow-x: auto;
+  white-space: pre;
 }
 
 .ir-code-message {
