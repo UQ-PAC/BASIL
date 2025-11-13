@@ -43,10 +43,12 @@ function App() {
     setTheme,
     selectedProcedureName,
     setSelectedProcedureName,
+    isSidebarMinimised,
+    setIsSidebarMinimised,
+    isConfigModalOpen,
+    setIsConfigModalOpen,
   } = useAppContext();
 
-  const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
-  const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const isAutoReloadingRef = useRef(false);
 
@@ -153,7 +155,7 @@ function App() {
   );
 
   const toggleSidebar = () => {
-    setIsSidebarMinimized(!isSidebarMinimized);
+    setIsSidebarMinimised(!isSidebarMinimised);
   };
 
   const toggleSettings = () => {
@@ -219,7 +221,7 @@ function App() {
         />
         <main className="main-layout">
           <ResizableSidebar
-            isSidebarMinimised={isSidebarMinimized}
+            isSidebarMinimised={isSidebarMinimised}
             toggleSidebar={toggleSidebar}
           >
             <Sidebar

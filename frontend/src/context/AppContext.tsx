@@ -1,4 +1,11 @@
-import { createContext, useState, useContext, type ReactNode } from 'react';
+// src/context/AppContext.tsx
+import React, {
+  createContext,
+  useState,
+  useContext,
+  type ReactNode,
+  useRef,
+} from 'react';
 
 export interface PostStatus {
   message: string;
@@ -21,6 +28,13 @@ interface AppContextProps {
   setViewMode: (val: 'IR' | 'CFG' | 'IR/CFG') => void;
   theme: 'light' | 'dark';
   setTheme: (val: 'light' | 'dark') => void;
+  isSidebarMinimised: boolean;
+  setIsSidebarMinimised: (val: boolean) => void;
+  isConfigModalOpen: boolean;
+  setIsConfigModalOpen: (val: boolean) => void;
+  isSettingsOpen: boolean;
+  setIsSettingsOpen: (val: boolean) => void;
+  isAutoReloadingRef: React.RefObject<boolean>;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -60,6 +74,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return saved || 'light';
   });
 
+  const [isSidebarMinimised, setIsSidebarMinimised] = useState(false);
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const isAutoReloadingRef = useRef(false);
+
   return (
     <AppContext.Provider
       value={{
@@ -78,6 +97,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setViewMode,
         theme,
         setTheme,
+        isSidebarMinimised,
+        setIsSidebarMinimised,
+        isConfigModalOpen,
+        setIsConfigModalOpen,
+        isSettingsOpen,
+        setIsSettingsOpen,
+        isAutoReloadingRef,
       }}
     >
       {children}
