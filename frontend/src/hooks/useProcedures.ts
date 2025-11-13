@@ -1,12 +1,13 @@
 // src/hooks/useProcedures.ts
 import { useState, useEffect } from 'react';
 import { getProcedureNames } from '../api/data';
+import type { PostStatus } from '../context/AppContext.tsx';
 
 interface UseProceduresProps {
   selectedStartEpoch: string | null;
   selectedProcedureName: string | null;
   setSelectedProcedureName: (name: string | null) => void;
-  setPostStatus: (status: { message: string; type: string }) => void;
+  setPostStatus: (status: PostStatus) => void;
 }
 
 export function useProcedures({

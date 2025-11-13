@@ -1,11 +1,12 @@
 // src/hooks/useEpochs.ts
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getEpochNames } from '../api/data';
+import type { PostStatus } from '../context/AppContext.tsx';
 
 interface UseEpochsProps {
   isDatabaseLoaded: boolean;
   selectedDataset: string;
-  setPostStatus: (status: { message: string; type: string }) => void;
+  setPostStatus: (status: PostStatus) => void;
   setDatasetError: (val: boolean) => void;
   submitDirectoryPath: (path: string) => Promise<void>;
 }
@@ -55,7 +56,7 @@ export const useEpochs = ({
         }
         setPostStatus({
           message: `Loaded ${names.length} epoch(s).`,
-          type: 'success',
+          type: 'info',
         });
       } else {
         setPostStatus({

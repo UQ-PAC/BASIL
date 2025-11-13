@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { getAnalysisStatus } from '../api/analysis';
+import type { PostStatus } from '../context/AppContext.tsx';
 
 interface UseAnalysisStatusProps {
   isRunning: boolean;
   setIsRunning: (running: boolean) => void;
-  setPostStatus: (status: { message: string; type: string }) => void;
+  setPostStatus: (status: PostStatus) => void;
   setDatasetError: (val: boolean) => void;
 }
 

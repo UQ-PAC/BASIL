@@ -15,14 +15,11 @@ import { useDirectory } from './hooks/useDirectory.ts';
 import { useProcedures } from './hooks/useProcedures.ts';
 import { useAnalysisStatus } from './hooks/useAnalysisStatus.ts';
 import { useEpochs } from './hooks/useEpochs.ts';
+import { useAppContext } from './context/AppContext.tsx';
 
 const LOCAL_STORAGE_PROCEDURE_KEY = 'cfgViewerSelectedProcedure';
 const LOCAL_STORAGE_THEME_KEY = 'theme';
-const LOCAL_STORAGE_DATASET_KEY = 'selectedDataset';
 const LOCAL_STORAGE_VIEW_MODE_KEY = 'selectedViewMode';
-const DEFAULT_DATASET_PLACEHOLDER =
-  'src/test/correct/secret_write/gcc/secret_write';
-const DATA_BASE_LOADED = 'dataBaseLoaded';
 
 const ViewMode = {
   IR: 'IR',
@@ -30,17 +27,19 @@ const ViewMode = {
   IR_CFG: 'IR/CFG',
 };
 
-const initialiseState = () => {
-  try {
-    const storedValue = localStorage.getItem(DATA_BASE_LOADED);
-    return storedValue === 'true';
-  } catch (error) {
-    console.error('Error reading from localStorage:', error);
-    return true; // TODO: Throw an error instead - atm soft pass
-  }
-};
-
 function App() {
+  const {
+    isDatabaseLoaded,
+    setIsDatabaseLoaded,
+    datasetError,
+    setDatasetError,
+    postStatus,
+    setPostStatus,
+    isAnalysisRunning,
+    setIsAnalysisRunning,
+    selectedDataset,
+  } = useAppContext();
+
   const [viewMode, setViewMode] = useState<'IR' | 'CFG' | 'IR/CFG'>(() => {
     return (
       (localStorage.getItem(LOCAL_STORAGE_VIEW_MODE_KEY) as
@@ -49,8 +48,6 @@ function App() {
         | 'IR/CFG') || 'IR'
     );
   });
-  const [isDatabaseLoaded, setIsDatabaseLoaded] =
-    useState<boolean>(initialiseState);
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
@@ -58,13 +55,6 @@ function App() {
     const savedTheme = localStorage.getItem(LOCAL_STORAGE_THEME_KEY);
     return (savedTheme as 'light' | 'dark') || 'light';
   });
-
-  const [selectedDataset] = useState<string>(() => {
-    const savedDataset = localStorage.getItem(LOCAL_STORAGE_DATASET_KEY);
-    return savedDataset || DEFAULT_DATASET_PLACEHOLDER;
-  });
-  const [postStatus, setPostStatus] = useState({ message: '', type: '' });
-  const [datasetError, setDatasetError] = useState<boolean>(false);
   const isAutoReloadingRef = useRef(false);
 
   const [selectedProcedureName, setSelectedProcedureName] = useState<
@@ -78,7 +68,6 @@ function App() {
       return null;
     }
   });
-  const [isAnalysisRunning, setIsAnalysisRunning] = useState(false);
   useAnalysisStatus({
     isRunning: isAnalysisRunning,
     setIsRunning: setIsAnalysisRunning,

@@ -1,6 +1,7 @@
 // src/hooks/useDirectory.ts
 import { useState } from 'react';
 import { selectDirectory } from '../api/analysis';
+import type { PostStatus } from '../context/AppContext.tsx';
 
 export const DATA_BASE_LOADED = 'dataBaseLoaded';
 export const LOCAL_STORAGE_DATASET_KEY = 'selectedDataset';
@@ -8,7 +9,7 @@ export const LOCAL_STORAGE_DATASET_KEY = 'selectedDataset';
 interface UseDirectoryProps {
   setIsAnalysisRunning: (running: boolean) => void;
   setDatasetError: (val: boolean) => void;
-  setPostStatus: (status: { message: string; type: string }) => void;
+  setPostStatus: (status: PostStatus) => void;
   setIsDatabaseLoaded: (loaded: boolean) => void;
 }
 
