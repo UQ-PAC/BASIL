@@ -15,13 +15,13 @@ const ErrorModal: React.FC<ErrorModalProps> = ({
 }) => {
   if (!isOpen || !postStatus.message) return null;
 
-  const messageClass = `${postStatus.type}-text`;
+  const messageClass = `status-${postStatus.type}`;
 
   return (
     <div className="modal-overlay">
       <div className="modal-content-base">
         <div className="modal-header">
-          <h2 className="modal-title">Analysis Error</h2>
+          <h2 className="modal-title">Analysis ${postStatus.type}</h2>
           <button
             className="modal-close-button"
             aria-label="Close settings modal"
