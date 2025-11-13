@@ -3,9 +3,10 @@ import boogie.SpecGlobal
 import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.{CaptureOutput, programToContext}
+import test_util.BASILTest.programToContext
+import test_util.CaptureOutput
 import util.SMT.{SMTSolver, SatResult}
-import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils}
+import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, RunUtils}
 
 @test_util.tags.UnitTest
 class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
@@ -13,9 +14,7 @@ class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
     program: Program,
     procedure: Procedure
   ): (Map[Block, List[Predicate]], Map[Block, List[Predicate]]) = {
-    val foundLoops = LoopDetector.identify_loops(program)
-    val newLoops = foundLoops.reducibleTransformIR().identifiedLoops
-    foundLoops.updateIrWithLoops()
+    IrreducibleLoops.transform_all_and_update(program)
 
     FullLoopInvariantGenerator(program).genInvariants(procedure)
   }

@@ -1,11 +1,10 @@
 package translating
-import analysis.{MergedRegion, RegionInjector}
+import analysis.RegionInjector
 import boogie.*
 import ir.*
 import specification.*
 import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
 
-import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 def memoryToConditionCoalesced(memorySections: Iterable[MemorySection]): List[BExpr] = {

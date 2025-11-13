@@ -1,7 +1,6 @@
 package ir
 import cfg_visualiser.{DotArrow, DotGraph, DotInterArrow, DotNode, DotRegularArrow}
 import translating.BasilIRPrettyPrinter
-import translating.PrettyPrinter.*
 import util.assertion.*
 
 import scala.annotation.tailrec

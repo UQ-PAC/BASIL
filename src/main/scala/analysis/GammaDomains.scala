@@ -220,13 +220,19 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
       case SimulAssign(assigns, _) => {
-        val terms = assigns.map((l, r) => (BVTerm.Var(l), exprToBVTerm(r).get))
-        val gammas = assigns.map((l, r) => (GammaTerm.Var(l), exprToGammaTerm(r).get))
+        val terms = assigns.map((l, r) => (BVTerm.Var(l), exprToBVTerm(r)))
+        val gammas = assigns.map((l, r) => (GammaTerm.Var(l), exprToGammaTerm(r)))
         val nb = terms.foldLeft(b) { case (acc, (l, r)) =>
-          acc.replace(l, r)
+          r match {
+            case Some(rhs) => acc.replace(l, rhs)
+            case None => acc.remove(l, Predicate.True) // TODO verify soundness
+          }
         }
         gammas.foldLeft(nb) { case (acc, (l, r)) =>
-          acc.replace(l, r)
+          r match {
+            case Some(rhs) => acc.replace(l, rhs)
+            case None => acc.remove(l, Predicate.True) // TODO verify soundness
+          }
         }
       }
       case a: MemoryAssign =>

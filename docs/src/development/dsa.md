@@ -96,7 +96,7 @@ int main(int r) {
 
 The DSG for procedure main **without** `--dsa-split`:
 ![](../img/dsa/nosplit.png)
-The globals array, x and y are all represented via the same node (Node 236) and because r is indeterminable 
+The globals array, x and y are all represented via the same node (Node 326) and because r is indeterminable 
 the node loses field sensitivity and collapses. 
 With `--dsa-split` enabled the DSG would be:
 ![](../img/dsa/split.png)

@@ -1,6 +1,5 @@
 import analysis.*
 import ir.dsl.*
-import ir.eval.*
 import ir.{dsl, *}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.*
@@ -132,7 +131,7 @@ class TestKnownBitsInterpreter
     )
   )
 
-  val kbitsCtx = util.IRLoading.load(kbitsProg)
+  val kbitsCtx = ir.IRLoading.load(kbitsProg)
 
   def params(v1: BigInt, v2: BigInt) = Some(
     Seq(

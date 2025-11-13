@@ -1,14 +1,15 @@
 package ir
 
-import analysis.{Loop, MergedRegion}
+import analysis.IrreducibleLoops.BlockLoopInfo
+import analysis.MergedRegion
 import boogie.*
-import translating.PrettyPrinter.*
 import util.assertion.*
 import util.functional.Snoc
 import util.intrusive_list.*
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{immutable, mutable}
+import scala.util.Random
 
 import eval.BitVectorEval
 
@@ -604,7 +605,7 @@ class Block private (
   var label: String,
   val statements: IntrusiveList[Statement],
   private var _jump: Jump,
-  private val _incomingJumps: mutable.HashSet[GoTo],
+  private val _incomingJumps: mutable.LinkedHashSet[GoTo],
   var meta: Metadata
 ) extends HasParent[Procedure]
     with DeepEquality {
@@ -621,7 +622,7 @@ class Block private (
     statements: IterableOnce[Statement] = Set.empty,
     jump: Jump = Unreachable()
   ) = {
-    this(label, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty, Metadata(None, address))
+    this(label, IntrusiveList().addAll(statements), jump, mutable.LinkedHashSet.empty, Metadata(None, address))
   }
 
   def address = meta.address
@@ -639,9 +640,9 @@ class Block private (
   def isReturn: Boolean = parent.returnBlock.contains(this)
   def isEntry: Boolean = parent.entryBlock.contains(this)
 
-  var inLoop: Set[Loop] = Set()
-  def isLoopHeader() = inLoop.exists(x => x.header == this)
-  def isLoopParticipant() = inLoop.nonEmpty
+  var loopInfo: Option[BlockLoopInfo] = None
+  def isLoopHeader() = loopInfo.fold(false)(_.isLoopHeader)
+  def isLoopParticipant() = loopInfo.fold(false)(_.isLoopParticipant)
 
   def jump: Jump = _jump
 
@@ -668,7 +669,17 @@ class Block private (
     this
   }
 
-  def incomingJumps: immutable.Set[GoTo] = _incomingJumps.toSet
+  def internalShuffleJumps(): Unit = {
+    jump match {
+      case g: GoTo => g.internalShuffleTargets()
+      case _ => ()
+    }
+    val shuffled = Random.shuffle(_incomingJumps.toList)
+    _incomingJumps.clear()
+    _incomingJumps ++= shuffled
+  }
+
+  def incomingJumps: immutable.Set[GoTo] = _incomingJumps.to(immutable.ListSet)
 
   def addIncomingJump(g: GoTo): Boolean = _incomingJumps.add(g)
 

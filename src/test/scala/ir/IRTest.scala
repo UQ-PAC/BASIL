@@ -4,7 +4,6 @@ import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.CaptureOutput
-import translating.PrettyPrinter.*
 
 import scala.collection.immutable.*
 
@@ -242,11 +241,15 @@ class IRTest extends AnyFunSuite with CaptureOutput {
       )
     )
 
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), p)
+    val rr1 = transforms.ReplaceReturns()
+    cilvisitor.visit_prog(rr1, p)
+    rr1.addR30Begins()
     transforms.addReturnBlocks(p)
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), p)
 
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), p)
+    val rr2 = transforms.ReplaceReturns()
+    cilvisitor.visit_prog(rr2, p)
+    rr2.addR30Begins()
     transforms.addReturnBlocks(p)
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), p)
 
@@ -258,8 +261,8 @@ class IRTest extends AnyFunSuite with CaptureOutput {
 
     assert(
       prev.size == 1 && prev
-        .collect {
-          case c: GoTo => (c.parent == p.labelToBlock("l_main"))
+        .collect { case c: GoTo =>
+          c.parent == p.labelToBlock("l_main")
         }
         .contains(true)
     )

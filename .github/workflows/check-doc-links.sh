@@ -29,11 +29,13 @@ args=(
   --remap '^file:///.* $0/index.html'
   --exclude '/scala-lang\.org/api/'
   --exclude '#L\d+$'
+  --exclude 'https://hdl\.handle\.net/1911/96345'
   --insecure
   --no-progress
   --max-concurrency 16
-  --max-retries 10
-  --timeout 120
+  --max-retries 2
+  --max-redirects 10
+  --timeout 60
   "$@"
 )
 

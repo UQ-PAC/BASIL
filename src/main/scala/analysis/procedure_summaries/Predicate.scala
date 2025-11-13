@@ -4,6 +4,7 @@ import boogie.*
 import ir.*
 import ir.transforms.AbstractDomain
 import util.assertion.*
+import util.functional.sequence
 
 // TODO DAG predicates (don't represent the same subexpression twice)
 
@@ -20,6 +21,8 @@ enum BVTerm {
   case Repeat(repeats: Int, body: BVTerm)
   case ZeroExtend(extension: Int, body: BVTerm)
   case SignExtend(extension: Int, body: BVTerm)
+  // TODO should params be something different?
+  case FApply(name: String, params: Seq[BVTerm], returnWidth: Int, uninterpreted: Boolean)
 
   // TODO width correctness
 
@@ -40,6 +43,8 @@ enum BVTerm {
     case Repeat(repeats, body) => BVRepeat(repeats, body.toBoogie)
     case ZeroExtend(extension, body) => BVZeroExtend(extension, body.toBoogie)
     case SignExtend(extension, body) => BVSignExtend(extension, body.toBoogie)
+    case FApply(name, params, returnWidth, uninterpreted) =>
+      BFunctionCall(name, params.map(_.toBoogie).toList, BitVecBType(returnWidth), uninterpreted)
   }
 
   /**
@@ -55,6 +60,8 @@ enum BVTerm {
     case Repeat(repeats, body) => ir.Repeat(repeats, body.toBasil)
     case ZeroExtend(extension, body) => ir.ZeroExtend(extension, body.toBasil)
     case SignExtend(extension, body) => ir.SignExtend(extension, body.toBasil)
+    case FApply(name, params, returnWidth, uninterpreted) =>
+      ir.FApplyExpr(name, params.map(_.toBasil), BitVecType(returnWidth), uninterpreted)
   }
 
   /**
@@ -72,6 +79,7 @@ enum BVTerm {
     case Repeat(repeats, body) => body.size * repeats
     case ZeroExtend(extension, body) => body.size + extension
     case SignExtend(extension, body) => body.size + extension
+    case FApply(_, _, returnWidth, _) => returnWidth
   }
 
   /**
@@ -98,6 +106,8 @@ enum BVTerm {
       case Repeat(repeats, body) => Repeat(repeats, body.simplify)
       case ZeroExtend(extension, body) => ZeroExtend(extension, body.simplify)
       case SignExtend(extension, body) => SignExtend(extension, body.simplify)
+      case FApply(name, params, returnWidth, uninterpreted) =>
+        FApply(name, params.map(_.simplify), returnWidth, uninterpreted)
       case _ => this
     }
     ret.simplified = true
@@ -118,6 +128,8 @@ enum BVTerm {
     case Repeat(repeats, body) => Repeat(repeats, body.replace(prev, cur))
     case ZeroExtend(extension, body) => ZeroExtend(extension, body.replace(prev, cur))
     case SignExtend(extension, body) => SignExtend(extension, body.replace(prev, cur))
+    case FApply(name, params, returnWidth, uninterpreted) =>
+      FApply(name, params.map(_.replace(prev, cur)), returnWidth, uninterpreted)
   }
 
   /**
@@ -132,6 +144,8 @@ enum BVTerm {
       case Repeat(repeats, body) => body.contains(term)
       case ZeroExtend(extension, body) => body.contains(term)
       case SignExtend(extension, body) => body.contains(term)
+      case FApply(name, params, returnWidth, uninterpreted) =>
+        params.exists(_.contains(term))
       case _ => false
     }
 
@@ -149,6 +163,8 @@ enum BVTerm {
       case Extract(end, start, body) => body.containsOnly(vars)
       case ZeroExtend(extension, body) => body.containsOnly(vars)
       case SignExtend(extension, body) => body.containsOnly(vars)
+      case FApply(name, params, returnWidth, uninterpreted) =>
+        params.forall(_.containsOnly(vars))
     }
   }
 
@@ -165,6 +181,7 @@ enum GammaTerm {
   case OldVar(v: Variable)
   case Uop(op: BoolUnOp, x: GammaTerm)
   case Join(s: Set[GammaTerm])
+  // TODO FApply terms?
 
   private var simplified: Boolean = false
 
@@ -245,7 +262,6 @@ enum GammaTerm {
    * Determines whether the term contains only variables in vars
    */
   def containsOnly(vars: Set[Variable]): Boolean = {
-    import GammaTerm.*
     this match {
       case Lit(x) => true
       case Var(v) => vars.contains(v)
@@ -258,7 +274,6 @@ enum GammaTerm {
 }
 
 object GammaTerm {
-  import GammaTerm.*
 
   val Low = Lit(TrueLiteral)
   val High = Lit(FalseLiteral)
@@ -780,6 +795,8 @@ def exprToBVTerm(e: Expr): Option[BVTerm] = e match {
   case Repeat(repeats, body) => exprToBVTerm(body).map(x => BVTerm.Repeat(repeats, x))
   case ZeroExtend(extension, body) => exprToBVTerm(body).map(x => BVTerm.ZeroExtend(extension, x))
   case SignExtend(extension, body) => exprToBVTerm(body).map(x => BVTerm.SignExtend(extension, x))
+  case FApplyExpr(name, params, returnType: BitVecType, uninterpreted) =>
+    sequence(params.map(x => exprToBVTerm(e))).map(BVTerm.FApply(name, _, returnType.size, uninterpreted))
   case _ => None
 }
 
@@ -805,7 +822,7 @@ def exprToGammaTerm(e: Expr): Option[GammaTerm] = e match {
 def exprToPredicate(e: Expr): Option[Predicate] = e match {
   case b: BoolLit => Some(Predicate.Lit(b))
   case UnaryExpr(BoolNOT, arg) => exprToPredicate(arg).map(p => Predicate.not(p))
-  case BinaryExpr(op: (PolyCmp | BVCmpOp | BoolCmpOp), arg1, arg2) =>
+  case BinaryExpr(op: (PolyCmp | BVCmpOp | BoolBinOp), arg1, arg2) =>
     (
       List(arg1, arg2).map(e =>
         e.getType match {
@@ -816,7 +833,7 @@ def exprToPredicate(e: Expr): Option[Predicate] = e match {
       ),
       op
     ) match {
-      case (Some(l: Predicate) :: Some(r: Predicate) :: Nil, op: (BoolCmpOp | PolyCmp)) => Some(Predicate.bop(op, l, r))
+      case (Some(l: Predicate) :: Some(r: Predicate) :: Nil, op: (BoolBinOp | PolyCmp)) => Some(Predicate.bop(op, l, r))
       case (Some(l: BVTerm) :: Some(r: BVTerm) :: Nil, op: (BVCmpOp | PolyCmp)) => Some(Predicate.BVCmp(op, l, r))
       case _ => None
     }

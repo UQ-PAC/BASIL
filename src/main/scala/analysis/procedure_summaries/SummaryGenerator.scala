@@ -2,7 +2,7 @@ package analysis
 
 import boogie.{BExpr, TrueBLiteral}
 import ir.*
-import ir.transforms.{SCCCallgraphWorklistSolver, reversePostOrder, worklistSolver}
+import ir.transforms.{SCCCallgraphWorklistSolver, Transform, reversePostOrder, worklistSolver}
 import util.ProcedureSummariesLogger as Logger
 
 case class Condition(pred: Predicate, label: Option[String] = None)
@@ -44,7 +44,7 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
      * (think nested in statements).
      */
     Logger.debug(s"Generating gamma with reachability preconditions for $procedure")
-    val initialMustGammaDeps = LatticeMap.BottomMap(
+    val initialMustGammaDeps = LatticeMap.bottomMap(
       (relevantGlobals ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap
     )
     val mustGammaDomain = MustGammaDomain(initialMustGammaDeps)
@@ -149,7 +149,7 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
       PredProductDomain(DoubleIntervalDomain(Some(procedure)), MayGammaDomain(initialMayGammaDeps)),
       10
     )
-    val (beforeAbsInt, afterAbsInt) = worklistSolver(predAbsIntDomain).solveProc(procedure)
+    val (beforeAbsInt, afterAbsInt) = worklistSolver(predAbsIntDomain, widen = true).solveProc(procedure)
 
     val absIntPreds = returnBlock
       .map(b =>
@@ -209,3 +209,22 @@ class SummaryGenerator(program: Program, parameterForm: Boolean = false) {
       .filter(_ != TrueBLiteral)
   }
 }
+
+def getGenerateProcedureSummariesTransform(simplified: Boolean): Transform =
+  Transform(
+    "GenerateProcedureSummaries",
+    (ctx, man) => {
+      val prog = ctx.program
+      // Need to know modifies clauses to generate summaries, but this is probably out of place (fixme)
+      val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
+      prog.setModifies(specModifies)
+
+      val summaryGenerator = SummaryGenerator(prog, simplified)
+      for procedure <- prog.procedures if procedure != prog.mainProcedure do
+        procedure.requires = summaryGenerator.generateRequires(procedure)
+        procedure.ensures = summaryGenerator.generateEnsures(procedure)
+
+      man.ClobberAll
+    },
+    notice = "Generating Procedure Summaries"
+  )

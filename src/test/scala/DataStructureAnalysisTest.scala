@@ -1,21 +1,11 @@
 import analysis.data_structure_analysis.*
+import analysis.{AnalysisPipelineMRA, StaticAnalysisContext}
 import boogie.SpecGlobal
 import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
-import specification.Specification
 import test_util.{BASILTest, CaptureOutput}
-import translating.PrettyPrinter.*
-import util.{
-  BASILConfig,
-  BASILResult,
-  BoogieGeneratorConfig,
-  ILLoadingConfig,
-  IRContext,
-  RunUtils,
-  StaticAnalysisConfig,
-  StaticAnalysisContext
-}
+import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, StaticAnalysisConfig}
 
 /** This is the test suite for testing DSA functionality The tests follow a general pattern of running BASIL analyses on
   * a test program and then asserting properties about the Data Structure Graph (DSG) of the function produced at
@@ -28,14 +18,13 @@ import util.{
 @test_util.tags.UnitTest
 class DataStructureAnalysisTest extends AnyFunSuite with CaptureOutput {
 
-  def runAnalysis(program: Program): StaticAnalysisContext = {
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
-    val emptySpec = Specification(Set(), Set(), Map(), List(), List(), List(), Set())
-    val emptyContext = IRContext(List(), Set(), Set(), Set(), Map(), emptySpec, program)
-    RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
+  def runAnalysis(
+    program: Program,
+    globals: Set[SpecGlobal] = Set(),
+    globalOffsets: Map[BigInt, BigInt] = Map()
+  ): StaticAnalysisContext = {
+    val context = BASILTest.programToContext(program, globals, globalOffsets)
+    AnalysisPipelineMRA.runToFixpoint(StaticAnalysisConfig(), context)
   }
 
   def runTest(relativePath: String): BASILResult = {
@@ -756,14 +745,7 @@ class DataStructureAnalysisTest extends AnyFunSuite with CaptureOutput {
 
     val program = prog(proc("main", block("block", load, ret)))
 
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
-    val spec = Specification(Set(), globals, Map(), List(), List(), List(), Set())
-    val context = IRContext(List(), Set(), globals, Set(), globalOffsets, spec, program)
-    val staticAnalysisResult = RunUtils.staticAnalysis(StaticAnalysisConfig(), context)
-
+    val staticAnalysisResult = runAnalysis(program, globals, globalOffsets)
     val dsg = staticAnalysisResult.topDownDSA(program.mainProcedure)
 
     val V0pointee = dsg.adjust(dsg.varToCell(load)(V0))

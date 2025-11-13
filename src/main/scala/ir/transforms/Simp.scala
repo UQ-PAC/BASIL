@@ -1,15 +1,12 @@
 package ir.transforms
-import API.IREpoch
+
 import ir.*
 import ir.cilvisitor.*
-import ir.dsl.IRToDSL
 import ir.eval.{AlgebraicSimplifications, AssumeConditionSimplifications, simplifyExprFixpoint}
-import translating.PrettyPrinter.*
 import util.assertion.*
 import util.{SimplifyLogger, condPropDebugLogger}
 
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext
 import scala.util.boundary
 
 import boundary.break
@@ -870,6 +867,22 @@ def coalesceBlocks(p: Program): Boolean = {
   didAny
 }
 
+val coalesceBlocksOnce = Transform(
+  "CoalesceBlocksOnce",
+  (ctx, man) => {
+    coalesceBlocks(ctx.program)
+    man.ClobberAll
+  }
+)
+
+val coalesceBlocksFixpoint = Transform(
+  "CoalesceBlocksFixpoint",
+  (ctx, man) => {
+    while (coalesceBlocks(ctx.program)) {}
+    man.ClobberAll
+  }
+)
+
 def removeDeadInParams(p: Program): Boolean = {
   var modified = false
   debugAssert(invariant.correctCalls(p))
@@ -1075,9 +1088,6 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
     }
   }
 
-  // Clone before the copypropTransforms take place
-  val clonedBeforeProgram = IRToDSL.convertProgram(p).resolve
-
   SimplifyLogger.info("[!] Simplify :: Expr/Copy-prop Transform")
   val work = p.procedures
     .filter(_.blocks.size > 0)
@@ -1089,13 +1099,6 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
           copypropTransform(p, procFrames, addrToProc, read)
         }
     )
-  // Clone after the copyPropTransforms take place here
-  val clonedAfterProgram =
-    IRToDSL.convertProgram(p).resolve
-  val epochName = "test_epoch_name"
-  val epochTester =
-    IREpoch(epochName, clonedBeforeProgram, clonedAfterProgram) // Sets up the very first epoch for testing
-//  IREpochStore.addEpoch(epochTester).unsafeRunSync() // testing as line for pipeline
 
   work.foreach((p, job) => {
     try {
@@ -1190,6 +1193,14 @@ def applyRPO(p: Program) = {
     reversePostOrder(proc)
   }
 }
+
+val applyRpoTransform = Transform(
+  "ApplyRPO",
+  (ctx, man) => {
+    applyRPO(man.program)
+    man.ClobberAll
+  }
+)
 
 object getProcFrame {
   class GetProcFrame(frames: Procedure => Set[Memory]) extends CILVisitor {
@@ -1940,7 +1951,7 @@ class DefinitelyExits(knownExit: Set[Procedure]) extends ProcedureSummaryGenerat
   def transfer(a: ir.transforms.PathExit, b: ir.Procedure): ir.transforms.PathExit = ???
 
   /**
-   *  Join the summary [[summaryForTarget]] for a call [[p]] into the local abstract state [[l]]
+   *  Join the summary `summaryForTarget` for a call `p` into the local abstract state `l`.
    */
   def localTransferCall(
     l: ir.transforms.PathExit,
@@ -1970,7 +1981,7 @@ class DefinitelyExits(knownExit: Set[Procedure]) extends ProcedureSummaryGenerat
   }
 }
 
-def findDefinitelyExits(p: Program) = {
+def findDefinitelyExits(p: Program): ProcReturnInfo = {
   val exit = p.procedures.filter(p => p.procName == "exit").toSet
   val dom = DefinitelyExits(exit)
   val ldom = ProcExitsDomain(x => false)
@@ -1985,6 +1996,59 @@ def findDefinitelyExits(p: Program) = {
     }.toSet
   )
 }
+
+val replaceJumpsInNonReturningProcs = Transform(
+  "ReplaceJumpsInNonReturningProcs",
+  (ctx, man) => {
+    val nonReturning = findDefinitelyExits(ctx.program)
+    ctx.program.mainProcedure.foreach {
+      case d: DirectCall if nonReturning.nonreturning.contains(d.target) => d.parent.replaceJump(Return())
+      case _ =>
+    }
+    man.ClobberAll
+  }
+)
+
+val removeExternalFunctionReferences = Transform(
+  "RemoveExternalFunctionReferences",
+  (ctx, man) => {
+    val externalNames = ctx.externalFunctions.map(_.name)
+    val unqualifiedNames = externalNames.filter(_.contains('@')).map(_.split('@')(0))
+    removeBodyOfExternal(externalNames ++ unqualifiedNames)(ctx.program)
+    for (p <- ctx.program.procedures) {
+      p.isExternal = Some(
+        ctx.externalFunctions.exists(e => e.name == p.procName || p.address.contains(e.offset)) || p.isExternal
+          .getOrElse(false)
+      )
+    }
+    man.ClobberAll
+  }
+)
+
+def getDoCleanupTransform(doSimplify: Boolean): Transform = TransformBatch(
+  "DoCleanup",
+  List(
+    makeProcEntriesNonLoops,
+    // useful for ReplaceReturns
+    // (pushes single block with `Unreachable` into its predecessor)
+    coalesceBlocksFixpoint,
+    applyRpoTransform,
+    replaceJumpsInNonReturningProcs,
+    getEstablishProcedureDiamondFormTransform(doSimplify),
+    removeExternalFunctionReferences
+  ),
+  notice = "Removing external function calls", // fixme: is this all the cleanup is doing?
+  postRunChecks = ctx => {
+    assert(invariant.singleCallBlockEnd(ctx.program))
+    assert(invariant.cfgCorrect(ctx.program))
+    assert(invariant.blocksUniqueToEachProcedure(ctx.program))
+    assert(invariant.procEntryNoIncoming(ctx.program))
+  }
+)
+
+// these are called a lot so it's useful to create them here rather than generating many copies on the fly
+lazy val doCleanupWithSimplify = getDoCleanupTransform(true)
+lazy val doCleanupWithoutSimplify = getDoCleanupTransform(false)
 
 class Simplify(val res: Boolean => Variable => Option[Expr], val initialBlock: Block = null) extends CILVisitor {
 
@@ -2209,14 +2273,20 @@ def removeTriviallyDeadBranches(p: Program, removeAllUnreachableBlocks: Boolean 
   dead.nonEmpty
 }
 
-// ensure procedure entry has no incoming jumps, if it does replace with new
-// block jumping to the old procedure entry
-def makeProcEntryNonLoop(p: Procedure) = {
-  if (p.entryBlock.exists(_.prevBlocks.nonEmpty)) {
-    val nb = Block(p.name + "_entry")
-    p.addBlock(nb)
-    val eb = p.entryBlock.get
-    nb.replaceJump(GoTo(eb))
-    p.entryBlock = nb
+val makeProcEntriesNonLoops = Transform(
+  "MakeProcEntriesNonLoops",
+  (ctx, man) => {
+    ctx.program.procedures.foreach(p => {
+      // ensure procedure entry has no incoming jumps, if it does replace with new
+      // block jumping to the old procedure entry
+      if (p.entryBlock.exists(_.prevBlocks.nonEmpty)) {
+        val nb = Block(p.name + "_entry")
+        p.addBlock(nb)
+        val eb = p.entryBlock.get
+        nb.replaceJump(GoTo(eb))
+        p.entryBlock = nb
+      }
+    })
+    man.ClobberAll
   }
-}
+)

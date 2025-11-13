@@ -4,22 +4,12 @@ import boogie.SpecGlobal
 import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
-import specification.Specification
-import test_util.{CaptureOutput, programToContext}
+import test_util.BASILTest.programToContext
+import test_util.CaptureOutput
 import util.*
 
 @test_util.tags.UnitTest
 class SVATest extends AnyFunSuite with CaptureOutput {
-
-  def runAnalysis(program: Program): StaticAnalysisContext = {
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
-    transforms.addReturnBlocks(program)
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
-
-    val emptySpec = Specification(Set(), Set(), Map(), List(), List(), List(), Set())
-    val emptyContext = IRContext(List(), Set(), Set(), Set(), Map(), emptySpec, program)
-    RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
-  }
 
   def runTest(context: IRContext): BASILResult = {
     RunUtils.loadAndTranslate(

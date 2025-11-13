@@ -1,11 +1,8 @@
 package ir.eval
 
 import ir.*
+import util.Logger
 import util.functional.*
-import util.functional.State.*
-import util.{IRContext, Logger}
-
-import scala.collection.immutable
 
 enum BreakPointLoc:
   case CMD(c: Command)

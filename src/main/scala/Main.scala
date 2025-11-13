@@ -1,6 +1,7 @@
 package basil.main // TODO: IS this okay, I require this
 
 import gtirb.GTIRBReadELF
+import ir.{FrontendMode, IRLoading}
 import mainargs.{Flag, ParserForClass, arg, main}
 import util.boogie_interaction.BoogieResultKind
 import util.{
@@ -11,9 +12,7 @@ import util.{
   DSAPhase,
   DSConfig,
   DebugDumpIRLogger,
-  FrontendMode,
   ILLoadingConfig,
-  IRLoading,
   LogLevel,
   Logger,
   MemoryRegionsMode,

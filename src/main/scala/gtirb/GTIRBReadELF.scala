@@ -2,7 +2,6 @@ package gtirb
 
 import boogie.SpecGlobal
 import com.google.protobuf.ByteString
-import com.grammatech.gtirb.proto.CFG.EdgeType.*
 import specification.{ExternalFunction, FuncEntry}
 import translating.{ELFBind, ELFNDX, ELFSymType, ELFSymbol, ELFVis, ReadELFData}
 import util.Logger
@@ -42,10 +41,13 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
    * https://github.com/ARM-software/abi-aa/blob/main/aaelf64/aaelf64.rst#relocation-types
    */
   sealed trait Elf64RelaType(val value: Long)
+  // dynamic relocations:
   case object R_AARCH64_COPY extends Elf64RelaType(1024)
   case object R_AARCH64_GLOB_DAT extends Elf64RelaType(1025)
   case object R_AARCH64_JUMP_SLOT extends Elf64RelaType(1026)
   case object R_AARCH64_RELATIVE extends Elf64RelaType(1027)
+  // static relocations:
+  case object R_AARCH64_ABS64 extends Elf64RelaType(257)
 
   protected def readRela(bs: AuxDecoder.Input) =
     import AuxDecoder.*
@@ -69,6 +71,8 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     case R_AARCH64_GLOB_DAT.value => R_AARCH64_GLOB_DAT
     case R_AARCH64_JUMP_SLOT.value => R_AARCH64_JUMP_SLOT
     case R_AARCH64_RELATIVE.value => R_AARCH64_RELATIVE
+    case R_AARCH64_ABS64.value => R_AARCH64_ABS64
+    case other => throw Exception(s"unknown AARCH64 relocation type: $other")
   }
 
   /**

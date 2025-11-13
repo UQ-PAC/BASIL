@@ -7,7 +7,6 @@ import gtirb.*
 import ir.*
 
 import scala.collection.immutable
-import scala.jdk.CollectionConverters.*
 
 trait InsnLoader {
   def decodeBlock(blockUUID: String, blockAddress: Option[BigInt]): Seq[Seq[Statement]]

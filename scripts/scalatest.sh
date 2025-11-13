@@ -22,12 +22,12 @@
 # - to print a summary of failing tests at the end of the output, pass I to -o.
 #
 
-classes="$(./mill --ticker false show test.compile | grep '"classes"' | cut -d'"' -f4 | cut -d: -f4)"
+classes="$(./mill -i --ticker false show test.compile | grep '"classes"' | cut -d'"' -f4 | cut -d: -f4)"
 
 if ! [[ -d "$classes" ]]; then
   echo "unable to determine mill class output directory: $classes" >&2
   exit 1
 fi
 
-exec ./mill --ticker false test.runMain org.scalatest.tools.Runner -R "$classes" "$@"
+exec ./mill -i --ticker false test.runMain org.scalatest.tools.Runner -R "$classes" "$@"
 

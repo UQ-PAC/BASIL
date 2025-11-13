@@ -54,7 +54,7 @@ export const useEpochs = ({
           setSelectedEpochs(new Set([names[0]]));
           setLastClickedEpoch(names[0]);
         }
-        setPostStatus({
+        setPostStatus({ // TODO: Info should not bring up the Warning modal!!!
           message: `Loaded ${names.length} epoch(s).`,
           type: 'info',
         });
