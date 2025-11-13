@@ -13,15 +13,16 @@ interface UseDirectoryProps {
 }
 
 export function useDirectory({
-                               setIsAnalysisRunning,
-                               setDatasetError,
-                               setPostStatus,
-                               setIsDatabaseLoaded,
-                             }: UseDirectoryProps) {
+  setIsAnalysisRunning,
+  setDatasetError,
+  setPostStatus,
+  setIsDatabaseLoaded,
+}: UseDirectoryProps) {
   const [datasetLoading, setDatasetLoading] = useState(false);
 
   const submitDirectoryPath = async (directoryIdentifier: string) => {
-    if (!directoryIdentifier || !directoryIdentifier.trim()) {
+    const cleanDirectoryIdentifier = directoryIdentifier.trim();
+    if (!cleanDirectoryIdentifier) {
       console.log('Directory path input empty.');
       return;
     }
@@ -30,10 +31,12 @@ export function useDirectory({
     setDatasetLoading(true);
 
     try {
-      await selectDirectory(directoryIdentifier);
-      console.info(`Successfully processed directory: ${directoryIdentifier}`);
+      await selectDirectory(cleanDirectoryIdentifier);
+      console.info(
+        `Successfully processed directory: ${cleanDirectoryIdentifier}`
+      );
 
-      localStorage.setItem(LOCAL_STORAGE_DATASET_KEY, directoryIdentifier);
+      localStorage.setItem(LOCAL_STORAGE_DATASET_KEY, cleanDirectoryIdentifier);
       setIsDatabaseLoaded(true);
       localStorage.setItem(DATA_BASE_LOADED, 'true');
       setIsAnalysisRunning(true);

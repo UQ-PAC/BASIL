@@ -11,10 +11,10 @@ import SettingsModal from './components/modals/SettingsModal.tsx';
 import LoadingModal from './components/modals/LoadingModal.tsx';
 import ErrorModal from './components/modals/ErrorModal.tsx';
 import ConfigurationModal from './components/modals/ConfigurationModal.tsx';
-import { getEpochNames } from './api/data.ts';
 import { useDirectory } from './hooks/useDirectory.ts';
 import { useProcedures } from './hooks/useProcedures.ts';
 import { useAnalysisStatus } from './hooks/useAnalysisStatus.ts';
+import { useEpochs } from './hooks/useEpochs.ts';
 
 const LOCAL_STORAGE_PROCEDURE_KEY = 'cfgViewerSelectedProcedure';
 const LOCAL_STORAGE_THEME_KEY = 'theme';
@@ -51,10 +51,6 @@ function App() {
   });
   const [isDatabaseLoaded, setIsDatabaseLoaded] =
     useState<boolean>(initialiseState);
-  const [allEpochNames, setAllEpochNames] = useState<string[]>([]);
-  const [selectedEpochs, setSelectedEpochs] = useState<Set<string>>(new Set());
-  const [lastClickedEpoch, setLastClickedEpoch] = useState<string | null>(null);
-  const [loadingEpochs, setLoadingEpochs] = useState(true);
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
@@ -97,69 +93,25 @@ function App() {
     setIsDatabaseLoaded,
   });
 
+  const {
+    allEpochNames,
+    selectedEpochs,
+    lastClickedEpoch,
+    loadingEpochs,
+    setSelectedEpochs,
+    setLastClickedEpoch,
+    fetchEpochNames,
+  } = useEpochs({
+    isDatabaseLoaded,
+    selectedDataset,
+    setPostStatus,
+    setDatasetError,
+    submitDirectoryPath,
+  });
+
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_VIEW_MODE_KEY, viewMode);
   }, [viewMode]);
-
-  const fetchEpochNames = useCallback(async () => {
-    if (!isDatabaseLoaded && selectedEpochs.size === 0) {
-      console.log('fetchEpochNames skipped: isDatabaseLoaded is false.');
-      return;
-    }
-
-    if (isAutoReloadingRef.current) {
-      console.log(
-        'fetchEpochNames skipped: Auto-reload process already active.'
-      );
-      return;
-    }
-
-    setLoadingEpochs(true);
-    let names: string[];
-    let errorOccurred = false;
-
-    try {
-      names = await getEpochNames();
-
-      setAllEpochNames(names);
-
-      if (names.length > 0) {
-        setSelectedEpochs(new Set([names[0]]));
-        setLastClickedEpoch(names[0]);
-      } else {
-        setPostStatus({
-          message: 'No analysis epochs found.',
-          type: 'warning',
-        });
-        setDatasetError(true);
-      }
-    } catch (err: any) {
-      if (err.message === 'No config file loaded.') {
-        // reload the database
-        if (!isAutoReloadingRef.current) {
-          console.log(
-            'Error: "No config file loaded." Triggering auto-reload.'
-          );
-          await submitDirectoryPath(selectedDataset);
-        }
-      } else {
-        console.error('Error fetching epoch names:', err);
-        setPostStatus({
-          message: `Error fetching epochs: \n${err.message}`,
-          type: 'error',
-        });
-        setDatasetError(true);
-        errorOccurred = true;
-      }
-    } finally {
-      setLoadingEpochs(false);
-    }
-
-    if (errorOccurred) {
-      setAllEpochNames([]);
-      setSelectedEpochs(new Set());
-    }
-  }, [isDatabaseLoaded]);
 
   useEffect(() => {
     if (isDatabaseLoaded && !isAutoReloadingRef.current) {
