@@ -65,6 +65,12 @@ Multiple code Colour schemes be implemented, with the selection potentially in
 the settings modal.
 
 ### Customisable font Size
+Allow the font size to be adjusted from settings. 
+
+### Single Procedure View 
+One improvement discussed with developers was to set the IR-IR view to display a single procedure 
+by default, maintaining consistency with the other visualisation modes. The option to view the
+entire IR would remain available as a manually selected secondary mode.
 
 ### Load On Demand Planetesimals
 LOD refers to loading only a subsection of the information at a time; as the user 
