@@ -160,10 +160,12 @@ function App() {
 
   const toggleSettings = () => {
     setIsSettingsOpen(!isSettingsOpen);
+    setPostStatus({ message: '', type: '' });
   };
 
   const handleCloseErrorModal = () => {
     setDatasetError(false);
+    setPostStatus({ message: '', type: '' });
   };
 
   useEffect(() => {
