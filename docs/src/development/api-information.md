@@ -30,6 +30,10 @@ Prettier has been selected as the project's automatic code formatter. Before pus
 any changes, run the following command to automatically apply this style to all 
 JavaScript, JSX, JSON, TypeScript, and CSS files. 
 
+```shell
+npm run format
+```
+
 ### Frontend Naming Conventions
 Review the following established naming conventions for all new components, variables, and files:
 
@@ -111,5 +115,3 @@ api-information.md - ReadMe for the API changes
 index.html - Contains the javascript and future ReactCode
 <br>
 Simp.scala - This contains code to build the IR. I need split up the IR between transform passes here
-
-

@@ -36,7 +36,7 @@
   text-shadow: none;
 }
 .toke.register {
-  color: var(--token-variable-color);;
+  color: var(--token-variable-color);
   text-shadow: none;
 }
 .token.operator {

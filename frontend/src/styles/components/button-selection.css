@@ -28,9 +28,7 @@
   line-height: 1.2;
   cursor: pointer;
   background-color: var(--sidebar-epoch-button-background-color);
-  color: var(
-    --sidebar-epoch-button-text-color
-  );
+  color: var(--sidebar-epoch-button-text-color);
   border: 1px solid black;
   transition: background-color 0.2s ease;
   position: relative;

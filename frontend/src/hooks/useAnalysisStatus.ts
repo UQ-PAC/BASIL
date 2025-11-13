@@ -10,11 +10,11 @@ interface UseAnalysisStatusProps {
 }
 
 export const useAnalysisStatus = ({
-                                    isRunning,
-                                    setIsRunning,
-                                    setPostStatus,
-                                    setDatasetError,
-                                  }: UseAnalysisStatusProps) => {
+  isRunning,
+  setIsRunning,
+  setPostStatus,
+  setDatasetError,
+}: UseAnalysisStatusProps) => {
   const isAutoReloadingRef = useRef(false);
 
   useEffect(() => {
