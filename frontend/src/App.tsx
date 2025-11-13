@@ -56,9 +56,9 @@ function App() {
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const savedTheme = localStorage.getItem(LOCAL_STORAGE_THEME_KEY);
-    return (savedTheme as 'light' | 'dark' | 'system') || 'system';
+    return (savedTheme as 'light' | 'dark') || 'light';
   });
 
   const [selectedDataset, setSelectedDataset] = useState<string>(() => {
@@ -365,11 +365,7 @@ function App() {
   };
 
   useEffect(() => {
-    if (theme === 'system') {
-      document.documentElement.removeAttribute('data-theme');
-    } else {
-      document.documentElement.setAttribute('data-theme', theme);
-    }
+    document.documentElement.setAttribute('data-theme', theme);
 
     localStorage.setItem('theme', theme);
   }, [theme]);
