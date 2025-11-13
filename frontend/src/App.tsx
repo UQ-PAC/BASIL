@@ -11,10 +11,10 @@ import SettingsModal from './components/modals/SettingsModal.tsx';
 import LoadingModal from './components/modals/LoadingModal.tsx';
 import ErrorModal from './components/modals/ErrorModal.tsx';
 import ConfigurationModal from './components/modals/ConfigurationModal.tsx';
-import { getAnalysisStatus } from './api/analysis.ts';
 import { getEpochNames } from './api/data.ts';
 import { useDirectory } from './hooks/useDirectory.ts';
 import { useProcedures } from './hooks/useProcedures.ts';
+import { useAnalysisStatus } from './hooks/useAnalysisStatus.ts';
 
 const LOCAL_STORAGE_PROCEDURE_KEY = 'cfgViewerSelectedProcedure';
 const LOCAL_STORAGE_THEME_KEY = 'theme';
@@ -83,6 +83,12 @@ function App() {
     }
   });
   const [isAnalysisRunning, setIsAnalysisRunning] = useState(false);
+  useAnalysisStatus({
+    isRunning: isAnalysisRunning,
+    setIsRunning: setIsAnalysisRunning,
+    setPostStatus,
+    setDatasetError,
+  });
 
   const { datasetLoading, submitDirectoryPath } = useDirectory({
     setIsAnalysisRunning,
@@ -166,49 +172,6 @@ function App() {
         });
     }
   }, [isDatabaseLoaded]);
-
-  useEffect(() => {
-    let intervalId: number | null = null;
-    if (isAnalysisRunning) {
-      let isPolling = false;
-      intervalId = setInterval(async () => {
-        if (isPolling) return;
-        try {
-          const statusData = await getAnalysisStatus();
-
-          if (statusData.status === 'completed') {
-            // await fetchEpochNames();
-            window.location.reload(); // TODO: Maybe there is a smoother approach? But don't worry about it for now
-            setIsAnalysisRunning(false);
-            isAutoReloadingRef.current = false;
-            console.log('Analysis completed. Lock released.');
-            if (intervalId) {
-              clearInterval(intervalId);
-            }
-          }
-        } catch (error) {
-          console.error('Polling for analysis status failed:', error);
-          setIsAnalysisRunning(false);
-          setPostStatus({
-            message: 'Analysis status check failed. Please refresh manually.',
-            type: 'error',
-          });
-          setDatasetError(true);
-          if (intervalId) {
-            clearInterval(intervalId);
-          }
-        } finally {
-          isPolling = false;
-        }
-      }, 1000); // Poll every 1 second
-    }
-
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [isAnalysisRunning]);
 
   useEffect(() => {
     if (!isDatabaseLoaded && allEpochNames.length === 0) {
