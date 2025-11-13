@@ -60,58 +60,64 @@ Several future recommendations have been listed below.
 Check the epochs as they arrive and whether the IR before and after differ in 
 any way. Of not, then grey them out, visually displaying no change.
 
-### Potential for Multiple Code-Colour Schemes
+### Potential for Multiple Code-Colour Schemes 
 Multiple code Colour schemes be implemented, with the selection potentially in
 the settings modal.
 
-## Documentation
-This outlines briefly some documentation standards I have followed
+### Customisable font Size
 
----
-# Development Process
-This section is a brief summary describing some of the design decisions.
+### Load On Demand Planetesimals
+LOD refers to loading only a subsection of the information at a time; as the user 
+scrolls down the view, new sections are dynamically loaded, ensuring fast API responses and 
+eliminating long wait times. When handling extremely large IRs, rendering thousands of lines 
+simultaneously can lead to noticeable delays. Implementing LOD rendering (perhaps loading only 
+1000 lines of code at a time) would significantly improve performance.
 
-## Language and Libraries
-I am using scala for the backend API to ensure. This allows direct interaction with the API endpoints
-and the scala code that generates the IR and modifies it through transform passes. 
-<br>
-The main library used is http4s. It is a type-safe HTTP library for Scala. 
+## Adding Additional Epoch Snapshots
+Most epoch logic is placed in src/main/scala/util/RunUtils.scala or a related helper.
 
-## API type
-I am using a RestAPI which using the standard GET method. So far I am only using this method. 
-There is no need to implement a POST, PUT or GET yet. 
+### Required Steps to Create a New Epoch
 
-### GET protocol
-There are two version of the Get protocol. They are:
-- GET (api/info) -> retrieve all
-- Get (api/info/{id}) -> retrieve specific
+In order to capture the epoch state, you must:
 
-## Architecture
+1. Capture the BEFORE State: Create a deep copy of the program before running the transform. 
+The call to IRToDSL.convertProgram(ctx.program).resolve ensures a correct, deep snapshot is taken.
+2. Run the Transform: Execute the transformation function, which modifies the program 
+ctx.program in-place.
+3. Capture the AFTER State: Create a deep copy of the program after the transform finishes.
+4. Add the Snapshot: Call the addEpochSnapshot helper function, providing the unique name and 
+the before/after states.
+
+Example Pattern
+
+The following Scala code demonstrates how to implement an epoch for a hypothetical transform:
+
+```scala
+// 1. Capture the BEFORE State
+val beforeNewTransformProg = IRToDSL.convertProgram(ctx.program).resolve
+
+// 2. Run the Transform
+ir.transforms.newTransform(ctx.program)
+
+// 3. Capture the AFTER State
+val afterNewTransformProg = IRToDSL.convertProgram(ctx.program).resolve
+
+// 4. Add the Snapshot
+addEpochSnapshot(
+"name_of_the_new_transform", // <--- THIS IS THE UNIQUE EPOCH NAME
+beforeNewTransformProg,
+afterNewTransformProg,
+collectedEpochs
+)
+```
 
 
-# Jesse Random ideas and Notes
-Here I have a list of a few of my choices and ideas. This will be tidied up later
+### Naming Conventions
+The epoch name (e.g., "name_of_the_new_transform") must be a unique, clear, and descriptive 
+string (using snake_case) that accurately describes the transformation that just took place. 
+This name is what the front-end uses to identify and fetch the corresponding program state pair.
 
-## Code Architecture
-I call a html file with code to display the IR atm. 
-
-- I am now using react + TypeScript. 
-
-## I am up to
-I have displayed an IR now. I have not run it through any transform passes yet. This still needs to be done. 
-<br>
-25/05/2025: I have displayed two versions on the IR between a selection of transform passes. 
-I now need to focus on the view of these elements and clean up the code. I also need more IRs
-to select from.
-
-
-## classes changes
-build.sc - I needed to add dependencies (for imports such as http4)
-<br>
-ApiServer - Code that will run the API endpoints. I am hoping to refactor this later
-<br>
-api-information.md - ReadMe for the API changes
-<br>
-index.html - Contains the javascript and future ReactCode
-<br>
-Simp.scala - This contains code to build the IR. I need split up the IR between transform passes here
+## Architecture Used
+Smart Hook Dumb Component is the main pattern used to enforce good coding standards such as the
+separation of concerns principle. For more in depth detail on the Architecture, ask to see Jesse
+Graf's Thesis on a Decompiler User Interface from 2025. 

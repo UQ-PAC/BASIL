@@ -92,19 +92,10 @@ export function useDiffViewer(
         // Syntax highlighting
         const lines = diffContainer.querySelectorAll('.d2h-code-line-ctn');
         lines.forEach((line) => {
-          const ins = line.querySelector('ins');
-          const del = line.querySelector('del');
-          const highlight = (el: HTMLElement | null) => {
-            if (!el) return;
-            el.innerHTML = Prism.highlight(
-              el.textContent ?? '',
-              Prism.languages.ir,
-              'ir'
-            );
-          };
-          highlight(ins as HTMLElement);
-          highlight(del as HTMLElement);
-          if (!ins && !del) highlight(line as HTMLElement);
+          if (line.querySelector('.token')) return; // skip if already highlighted
+
+          const text = line.textContent ?? '';
+          line.innerHTML = Prism.highlight(text, Prism.languages.ir, 'ir');
         });
       } catch (err) {
         console.error('Error rendering diff:', err);
