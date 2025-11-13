@@ -18,7 +18,6 @@ import { useEpochs } from './hooks/useEpochs.ts';
 import { useAppContext } from './context/AppContext.tsx';
 
 const LOCAL_STORAGE_PROCEDURE_KEY = 'cfgViewerSelectedProcedure';
-const LOCAL_STORAGE_THEME_KEY = 'theme';
 const LOCAL_STORAGE_VIEW_MODE_KEY = 'selectedViewMode';
 
 const ViewMode = {
@@ -29,45 +28,28 @@ const ViewMode = {
 
 function App() {
   const {
-    isDatabaseLoaded,
-    setIsDatabaseLoaded,
-    datasetError,
-    setDatasetError,
     postStatus,
     setPostStatus,
+    datasetError,
+    setDatasetError,
     isAnalysisRunning,
     setIsAnalysisRunning,
+    isDatabaseLoaded,
+    setIsDatabaseLoaded,
     selectedDataset,
+    viewMode,
+    setViewMode,
+    theme,
+    setTheme,
+    selectedProcedureName,
+    setSelectedProcedureName,
   } = useAppContext();
 
-  const [viewMode, setViewMode] = useState<'IR' | 'CFG' | 'IR/CFG'>(() => {
-    return (
-      (localStorage.getItem(LOCAL_STORAGE_VIEW_MODE_KEY) as
-        | 'IR'
-        | 'CFG'
-        | 'IR/CFG') || 'IR'
-    );
-  });
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    const savedTheme = localStorage.getItem(LOCAL_STORAGE_THEME_KEY);
-    return (savedTheme as 'light' | 'dark') || 'light';
-  });
   const isAutoReloadingRef = useRef(false);
 
-  const [selectedProcedureName, setSelectedProcedureName] = useState<
-    string | null
-  >(() => {
-    try {
-      const storedProcedure = localStorage.getItem(LOCAL_STORAGE_PROCEDURE_KEY);
-      return storedProcedure ? storedProcedure : null;
-    } catch (e) {
-      console.error('Failed to read from localStorage:', e);
-      return null;
-    }
-  });
   useAnalysisStatus({
     isRunning: isAnalysisRunning,
     setIsRunning: setIsAnalysisRunning,
