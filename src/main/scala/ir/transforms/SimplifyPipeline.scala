@@ -49,7 +49,7 @@ def doSimplify(
   transforms.applyRPO(program)
 
   // example of printing a simple analysis
-  
+
   val beforeSimplify = IRToDSL.convertProgram(ctx.program).resolve
   transforms.removeEmptyBlocks(program)
   transforms.coalesceBlocks(program)
@@ -169,7 +169,7 @@ def doSimplify(
     afterLiftLinuxAssertFailProg,
     collectedEpochs
   )
-  
+
   // assert(program.procedures.forall(transforms.rdDSAProperty))
 
   assert(invariant.blockUniqueLabels(program))
