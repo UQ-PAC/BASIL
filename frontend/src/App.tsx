@@ -12,8 +12,9 @@ import LoadingModal from './components/modals/LoadingModal.tsx';
 import ErrorModal from './components/modals/ErrorModal.tsx';
 import ConfigurationModal from './components/modals/ConfigurationModal.tsx';
 import { getAnalysisStatus } from './api/analysis.ts';
-import { getEpochNames, getProcedureNames } from './api/data.ts';
+import { getEpochNames } from './api/data.ts';
 import { useDirectory } from './hooks/useDirectory.ts';
+import { useProcedures } from './hooks/useProcedures.ts';
 
 const LOCAL_STORAGE_PROCEDURE_KEY = 'cfgViewerSelectedProcedure';
 const LOCAL_STORAGE_THEME_KEY = 'theme';
@@ -70,9 +71,6 @@ function App() {
   const [datasetError, setDatasetError] = useState<boolean>(false);
   const isAutoReloadingRef = useRef(false);
 
-  const [procedureNames, setProcedureNames] = useState<string[]>([]);
-  const [loadingProcedures, setLoadingProcedures] = useState(false);
-  const [procedureError, setProcedureError] = useState<string | null>(null);
   const [selectedProcedureName, setSelectedProcedureName] = useState<
     string | null
   >(() => {
@@ -229,57 +227,12 @@ function App() {
       ? Array.from(selectedEpochs)[selectedEpochs.size - 1]
       : null;
 
-  useEffect(() => {
-    const fetchProcedureNames = async () => {
-      if (!singleSelectedStartEpoch && !singleSelectedEndEpoch) {
-        setProcedureNames([]);
-        setSelectedProcedureName(null);
-        setProcedureError(null);
-        return;
-      }
-
-      setLoadingProcedures(true);
-      setProcedureError(null);
-      try {
-        const names: string[] = await getProcedureNames(
-          singleSelectedStartEpoch as string
-        );
-        setProcedureNames(names);
-
-        // Check if the previously selected procedure is still valid
-        if (
-          selectedProcedureName === null ||
-          !names.includes(selectedProcedureName)
-        ) {
-          if (names.length > 0) {
-            setSelectedProcedureName(names[0]);
-          } else {
-            setSelectedProcedureName(null);
-          }
-        } else {
-          console.log(
-            'Retaining previously selected procedure: ' + selectedProcedureName
-          );
-        }
-      } catch (e: any) {
-        console.error('Error fetching procedure names:', e);
-        setProcedureError(`Failed to load procedure names: ${e.message}`);
-        setProcedureNames([]);
-        setSelectedProcedureName(null);
-      } finally {
-        setLoadingProcedures(false);
-      }
-    };
-
-    fetchProcedureNames().catch(
-      (error) =>
-        console.error(
-          "Unhandled promise rejected from 'fetchProcedureNames': ",
-          error
-        )
-      // TODO: Also post an Error. DatabaseError
-    );
-  }, [singleSelectedEndEpoch, selectedProcedureName, selectedEpochs]);
+  const { procedureNames, loadingProcedures, procedureError } = useProcedures({
+    selectedStartEpoch: singleSelectedStartEpoch,
+    selectedProcedureName,
+    setSelectedProcedureName,
+    setPostStatus,
+  });
 
   // Save the selected procedure to local storage whenever it changes
   useEffect(() => {
