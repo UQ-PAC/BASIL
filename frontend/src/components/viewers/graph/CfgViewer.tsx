@@ -77,10 +77,6 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
     );
   }
 
-  // if ((!beforeNodes.length && !beforeEdges.length) && (!afterNodes.length && !afterEdges.length) && !loading && !error) {
-  //     return <div className="cfg-viewer-message">No CFG data available for the selected procedure.</div>;
-  // } // TODO: Maybe here just have a pop up notification instead...
-
   return (
     <div className="cfg-comparison-container-wrapper">
       <div className="cfg-viewer-header">
@@ -109,7 +105,6 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
                 </select>
               </div>
               <div className="flex-spacer"></div>{' '}
-              {/* TODO: Maybe add a bit more padding here? */}
             </>
           )}
         {selectedStartEpoch &&
@@ -170,7 +165,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
             </>
           ) : (
             <div className="cfg-panel-message">
-              No CFG data available for the Before Nodes view.
+              No CFG data available for the After Nodes view.
             </div>
           )}
         </div>

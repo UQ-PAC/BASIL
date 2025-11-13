@@ -70,7 +70,7 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  height: 100vh; /* TODO: Ensure that when there are so many options it is off the screen it still works */
+  height: 100vh;
   flex-shrink: 0;
 }
 

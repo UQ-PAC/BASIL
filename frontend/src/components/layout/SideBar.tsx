@@ -48,7 +48,6 @@ export function Sidebar({
               <span className="path-value">{displayPath}</span>
             </button>
           ) : (
-            // TODO: OR an error
             <button
               className="selected-path-button"
               onClick={onDirectorySelect}

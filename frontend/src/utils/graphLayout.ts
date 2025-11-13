@@ -242,7 +242,6 @@ export async function getLayoutedElements(
           .filter((elkNode) => rawNodesData.some((n) => n.id === elkNode.id))
           .map((elkNode) => {
             const originalNodeData = rawNodesMap.get(elkNode.id)!;
-            // TODO: Do I need this, if so, make it earlier so it doesn't affect padding
             const headerLine =
               originalNodeData.fullLabelContent
                 .split('\n')[0]
