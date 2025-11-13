@@ -1,5 +1,3 @@
-/* TODO: Move these to a different class */
-
 :root {
   /* Main display */
   --background-color: #ffffff;
@@ -10,8 +8,6 @@
   --border-color: #ccc;
 }
 
-/* TODO: Maybe there is a cleaner way to do this later on */
-/* TODO: System isn't working? */
 [data-theme='dark'] {
   /* Main display */
   --background-color: #1f2937;
@@ -65,7 +61,7 @@
   --combined-ir-code-panel-background-color: #000;
   --combined-ir-code-panel-border-color: #555;
 
-  /* Code Colour scheme TODO: Keep going with this */
+  /* Code Colour Scheme */
   --token-keyword-color: #569cd6;
   --token-variable-color: #9cdcfe;
   --token-label-color: #ffcc66;
@@ -133,17 +129,17 @@
   --combined-ir-code-panel-border-color: #ddd;
 
   /* Code Color Scheme */
-  --token-keyword-color: #005250; /* strong blue — draws attention without overpowering */
-  --token-variable-color: #b32b00; /* warm brown-red — distinct from keywords, visible but not too harsh */
-  --token-label-color: #5c5300; /* amber/goldenrod — readable on white */
-  --token-function-color: #7b3fb3; /* violet */
-  --token-type-color: #0073a2; /* teal-blue — contrasts with keyword blue */
-  --token-number-color: #00213d; /* reuse blue tone — consistency for numeric tokens */
-  --token-comment-color: #505050; /* neutral grey — readable but visually secondary */
-  --token-string-color: #006400; /* deep green — traditional for string literals */
-  --token-operator-color: #d22f6f; /* soft red  */
-  --token-punctuation-color: #353535; /* dark neutral grey  */
-  --token-property-color: #a0674c; /* sienna — earthy tone to differentiate from variables */
+  --token-keyword-color: #005250;
+  --token-variable-color: #b32b00;
+  --token-label-color: #5c5300;
+  --token-function-color: #7b3fb3;
+  --token-type-color: #0073a2;
+  --token-number-color: #00213d;
+  --token-comment-color: #505050;
+  --token-string-color: #006400;
+  --token-operator-color: #d22f6f;
+  --token-punctuation-color: #353535;
+  --token-property-color: #a0674c;
 }
 
 .app-layout {
