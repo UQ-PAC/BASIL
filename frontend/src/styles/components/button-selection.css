@@ -30,7 +30,7 @@
   background-color: var(--sidebar-epoch-button-background-color);
   color: var(
     --sidebar-epoch-button-text-color
-  ); /* TODO: Maybe change just to white */
+  );
   border: 1px solid black;
   transition: background-color 0.2s ease;
   position: relative;
@@ -51,6 +51,10 @@
 .toggle-button.active {
   background-color: #1976d2;
   color: #fff;
+}
+
+.toggle-button:focus {
+  outline: 0;
 }
 
 /* Drop down group */
