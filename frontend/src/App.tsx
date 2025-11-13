@@ -11,8 +11,9 @@ import SettingsModal from './components/modals/SettingsModal.tsx';
 import LoadingModal from './components/modals/LoadingModal.tsx';
 import ErrorModal from './components/modals/ErrorModal.tsx';
 import ConfigurationModal from './components/modals/ConfigurationModal.tsx';
-import { getAnalysisStatus, selectDirectory } from './api/analysis.ts';
+import { getAnalysisStatus } from './api/analysis.ts';
 import { getEpochNames, getProcedureNames } from './api/data.ts';
+import { useDirectory } from './hooks/useDirectory.ts';
 
 const LOCAL_STORAGE_PROCEDURE_KEY = 'cfgViewerSelectedProcedure';
 const LOCAL_STORAGE_THEME_KEY = 'theme';
@@ -61,12 +62,11 @@ function App() {
     return (savedTheme as 'light' | 'dark') || 'light';
   });
 
-  const [selectedDataset, setSelectedDataset] = useState<string>(() => {
+  const [selectedDataset] = useState<string>(() => {
     const savedDataset = localStorage.getItem(LOCAL_STORAGE_DATASET_KEY);
     return savedDataset || DEFAULT_DATASET_PLACEHOLDER;
   });
   const [postStatus, setPostStatus] = useState({ message: '', type: '' });
-  const [datasetLoading, setDatasetLoading] = useState(true);
   const [datasetError, setDatasetError] = useState<boolean>(false);
   const isAutoReloadingRef = useRef(false);
 
@@ -86,9 +86,12 @@ function App() {
   });
   const [isAnalysisRunning, setIsAnalysisRunning] = useState(false);
 
-  useEffect(() => {
-    setDatasetLoading(false);
-  }, []);
+  const { datasetLoading, submitDirectoryPath } = useDirectory({
+    setIsAnalysisRunning,
+    setDatasetError,
+    setPostStatus,
+    setIsDatabaseLoaded,
+  });
 
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_VIEW_MODE_KEY, viewMode);
@@ -209,55 +212,13 @@ function App() {
     };
   }, [isAnalysisRunning]);
 
-  const submitDirectoryPath = async (directoryIdentifier: string) => {
-    if (!directoryIdentifier || !directoryIdentifier.trim()) {
-      console.log('Directory path input empty.');
-      return;
-    }
-
-    setDatasetError(false);
-    setDatasetLoading(true);
-
-    isAutoReloadingRef.current = true;
-
-    try {
-      await selectDirectory(directoryIdentifier);
-
-      setSelectedDataset(directoryIdentifier);
-      localStorage.setItem(LOCAL_STORAGE_DATASET_KEY, directoryIdentifier);
-
-      console.info(`Successfully processed directory: ${directoryIdentifier}`);
-      setIsDatabaseLoaded(true);
-      try {
-        localStorage.setItem(DATA_BASE_LOADED, 'true');
-        console.info(
-          'Database loaded successfully and state is persisted in localStorage!'
-        );
-      } catch (error) {
-        console.error('Error writing to localStorage:', error);
-        console.info('Database loaded, but failed to save persistence status.');
-      }
-      setIsAnalysisRunning(true); // This calls the loading modal
-    } catch (err: any) {
-      setPostStatus({
-        message: `Error processing directory: \n${err.message}`,
-        type: 'error',
-      });
-      setDatasetError(true);
-      console.error('Error processing directory:', err);
-    } finally {
-      setDatasetLoading(false);
-    }
-  };
-
   useEffect(() => {
     if (!isDatabaseLoaded && allEpochNames.length === 0) {
-      setDatasetLoading(true);
       setIsConfigModalOpen(true);
     }
   }, [isDatabaseLoaded, allEpochNames.length]);
 
-  const onDirectorySelect = () => {
+  const openConfigModal = () => {
     setIsConfigModalOpen(true);
   };
 
@@ -428,7 +389,7 @@ function App() {
               onEpochSelect={handleEpochSelect}
               loading={loadingEpochs}
               selectedDataset={selectedDataset}
-              onDirectorySelect={onDirectorySelect}
+              onDirectorySelect={openConfigModal}
               datasetLoading={datasetLoading}
             />
           </ResizableSidebar>
