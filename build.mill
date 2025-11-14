@@ -51,11 +51,14 @@ def scalaDocGenerated: T[PathRef] = Task {
         PathRef(javadocDir)
       } else {
         println(scalaVersion())
-          println(scalaOrganization())
-          println(scalaDocClasspath().map(_.path.toString).map(x => s"'$x'").mkString(":"))
-          println(scalacPluginClasspath())
-          println((options ++ compileCp ++ scalaDocOptions() ++ files.map(_.toString())).map(x => s"'$x'").mkString(" "))
-        PathRef(javadocDir)
+        println(scalaOrganization())
+        val cp = (scalaDocClasspath().map(_.path.toString).map(x => s"'$x'").mkString(":"))
+        println(scalacPluginClasspath())
+        val args = ((options ++ compileCp ++ scalaDocOptions() ++ files.map(_.toString())).map(x => s"'$x'").mkString(" "))
+
+        val _ = "-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=1044 "
+        os.write(Task.dest / "go.sh", "#!/bin/bash\nmkdir -p " + javadocDir + "\nset -xeu\njavac -cp " + cp + " Main.java\njava -cp .:" + cp + " Main " + args)
+        PathRef(Task.dest)
       }
     }
 
