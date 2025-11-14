@@ -5,8 +5,8 @@ import analysis.{AnalysisManager, Interval as _, *}
 import ir.*
 import ir.dsl.IRToDSL
 import translating.PrettyPrinter.*
-import util.{AnalysisResultDotLogger, DebugDumpIRLogger, Logger, PerformanceTimer, StaticAnalysisConfig}
 import util.RunUtils.addEpochSnapshot
+import util.{AnalysisResultDotLogger, DebugDumpIRLogger, Logger, PerformanceTimer, StaticAnalysisConfig}
 
 import java.io.{BufferedWriter, File, FileWriter}
 import scala.collection.mutable.ArrayBuffer
