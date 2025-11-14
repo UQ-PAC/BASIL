@@ -17,6 +17,8 @@ object ScalaModuleProvider:
 
     val groupedMembers =
       def groupMembers(ms: List[Member], n: Int = 0): List[Member] =
+        println(n)
+        println(ms.map(_.name))
         ms.groupBy(_.name.split('.')(n)).values.map {
           case m :: ms if m.name.count(_ == '.') == n =>
             m.withMembers(groupMembers(ms, n + 1) ++ m.members)
