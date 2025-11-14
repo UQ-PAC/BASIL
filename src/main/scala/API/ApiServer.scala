@@ -1,29 +1,22 @@
 package API
 
-import ir.Program
-import util.RunUtils
-import util.BASILConfig
-import util.ILLoadingConfig
-
-import org.typelevel.log4cats.slf4j.Slf4jFactory
-import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.LoggerName
-import org.typelevel.log4cats.LoggerFactory
-import org.http4s._
-import org.http4s.implicits._
-import org.http4s.server.Router
-import org.http4s.ember.server.EmberServerBuilder
-import com.comcast.ip4s._
-
-import cats.implicits._
-import cats.effect._
+import cats.effect.*
 import cats.effect.std.Semaphore
+import cats.implicits.*
+import com.comcast.ip4s.*
+import ir.{Procedure, Program}
+import org.http4s.ember.server.EmberServerBuilder
+import org.http4s.implicits.*
+import org.http4s.server.Router
+import org.typelevel.log4cats.slf4j.Slf4jFactory
+import org.typelevel.log4cats.{Logger, LoggerFactory, LoggerName}
+import util.{BASILConfig, ILLoadingConfig, RunUtils}
+
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.Selectable.reflectiveSelectable
-import ir.Procedure
 
-case class IREpoch(name: String, beforeTransform: ir.Program, afterTransform: ir.Program)
+case class IREpoch(name: String, beforeTransform: Program, afterTransform: Program)
 
 class IREpochStore private (val epochsRef: Ref[IO, List[IREpoch]]) {
   def addEpoch(epoch: IREpoch): IO[Unit] =
