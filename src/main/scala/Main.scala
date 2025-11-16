@@ -1,4 +1,4 @@
-// package scala
+package basil.main
 
 import gtirb.GTIRBReadELF
 import ir.{FrontendMode, IRLoading}

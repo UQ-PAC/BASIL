@@ -1,0 +1,46 @@
+#diff {
+  flex: 1;
+  max-width: 100%;
+  min-width: 0;
+  padding-right: 1rem;
+  box-sizing: border-box;
+}
+
+.d2h-file-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.5em 1em;
+}
+
+.d2h-file-collapse {
+  display: none !important;
+}
+
+.d2h-file-name-wrapper {
+  display: none !important;
+}
+
+.d2h-code-line {
+  display: flex;
+  align-items: flex-start;
+}
+
+.d2h-code-side-line,
+.d2h-code-side-line-cnxt {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+}
+
+.d2h-code-side-linenumber,
+.d2h-cntx {
+  cursor: default !important;
+}
+
+.custom-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}

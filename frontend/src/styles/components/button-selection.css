@@ -1,0 +1,99 @@
+.flex-spacer {
+  flex-grow: 1;
+}
+
+/*Context group*/
+.context-wrapper {
+  position: absolute;
+  right: 1em;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+}
+
+/* Toggle group */
+.toggle-group {
+  display: flex;
+  gap: 2px;
+  align-items: flex-start;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.toggle-button {
+  padding: 2px 8px;
+  font-size: 0.9em;
+  line-height: 1.2;
+  cursor: pointer;
+  background-color: var(--sidebar-epoch-button-background-color);
+  color: var(--sidebar-epoch-button-text-color);
+  border: 1px solid black;
+  transition: background-color 0.2s ease;
+  position: relative;
+}
+
+.toggle-button .tick {
+  display: inline-block;
+  width: 16px;
+  text-align: center;
+  margin-right: 6px;
+  color: inherit;
+}
+
+.toggle-button:hover {
+  background-color: #b3b3b3;
+}
+
+.toggle-button.active {
+  background-color: #1976d2;
+  color: #fff;
+}
+
+.toggle-button:focus {
+  outline: 0;
+}
+
+/* Drop down group */
+.procedure-select-wrapper {
+  display: flex;
+  gap: 0.4em;
+}
+
+.procedure-select {
+  font-size: 0.9em;
+  color: #000;
+  white-space: nowrap;
+}
+
+.procedure-label {
+  font-size: 0.9em;
+  color: var(--text-color);
+  white-space: nowrap;
+}
+
+.procedure-dropdown {
+  color: var(--text-color);
+  background-color: var(--background-color);
+}
+
+.procedure-dropdown:hover {
+  border-color: #888;
+  background-color: var(--dropdown-background-color-hover);
+}
+
+.procedure-dropdown option {
+  background-color: #999;
+  color: #ddd;
+}
+
+.context-dropdown {
+  color: var(--text-color);
+  background-color: var(--background-color);
+}
+
+.context-dropdown:hover {
+  border-color: #888;
+  background-color: var(--dropdown-background-color-hover);
+}
