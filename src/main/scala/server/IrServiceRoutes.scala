@@ -1,4 +1,4 @@
-package API
+package server
 
 import basil.main.Main.{ChooseInput, loadDirectory}
 import cats.effect.*

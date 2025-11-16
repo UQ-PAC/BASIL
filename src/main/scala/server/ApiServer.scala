@@ -1,4 +1,4 @@
-package API
+package server
 
 import cats.effect.*
 import cats.effect.std.Semaphore

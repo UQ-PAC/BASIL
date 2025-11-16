@@ -1,6 +1,5 @@
 package util
 
-import API.IREpoch
 import analysis.data_structure_analysis.*
 import analysis.{AnalysisManager, Interval as _, *}
 import boogie.*
@@ -9,6 +8,7 @@ import ir.dsl.IRToDSL
 import ir.dsl.given
 import ir.eval.*
 import ir.transforms.*
+import server.IREpoch
 import translating.*
 import translating.PrettyPrinter.*
 import util.LogLevel.INFO

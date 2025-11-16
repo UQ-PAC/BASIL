@@ -1,9 +1,9 @@
 package ir.transforms
 
-import API.IREpoch
 import analysis.{AnalysisManager, Interval as _, *}
 import ir.*
 import ir.dsl.IRToDSL
+import server.IREpoch
 import translating.PrettyPrinter.*
 import util.RunUtils.addEpochSnapshot
 import util.{AnalysisResultDotLogger, DebugDumpIRLogger, Logger, PerformanceTimer, StaticAnalysisConfig}
