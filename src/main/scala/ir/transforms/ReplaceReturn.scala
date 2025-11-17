@@ -140,7 +140,23 @@ def establishProcedureDiamondForm(program: Program, doSimplify: Boolean = false)
 
   addReturnBlocks(program)
   cilvisitor.visit_prog(ConvertSingleReturn(), program)
+  noJumpsToEntry(program)
   debugAssert(ir.invariant.programDiamondForm(program))
+}
+
+def noJumpsToEntry(program: Program): Unit = {
+  for (procedure <- program.procedures) {
+    if (procedure.blocks.nonEmpty) {
+      val entry = procedure.entryBlock.get
+      if (entry.prevBlocks.nonEmpty) {
+        // Entry block has jumps to it, so create new entry block that contains GoTo to old entry
+        val label = procedure.freshBlockId(procedure.procName + "_new_entry")
+        val jump = GoTo(entry)
+        val newEntry = Block(label, None, List(), jump)
+        procedure.entryBlock = newEntry
+      }
+    }
+  }
 }
 
 def getEstablishProcedureDiamondFormTransform(doSimplify: Boolean): Transform =
