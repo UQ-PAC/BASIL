@@ -56,6 +56,9 @@ object ApiServer extends IOApp {
   implicit val loggerFactory: LoggerFactory[IO] = Slf4jFactory.create[IO]
   private val logger: Logger[IO] = loggerFactory.getLogger(LoggerName(getClass.getName))
 
+  /**
+   * Command-line entry point to the api server, on localhost:8080.
+   */
   override def run(args: List[String]): IO[ExitCode] = {
     for {
       isReady <- Ref[IO].of(false)
