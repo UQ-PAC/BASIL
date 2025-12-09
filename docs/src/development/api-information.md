@@ -1,4 +1,4 @@
-# API and Frontend Interface Information Page
+# REST API for Decompiler User Interface 
 
 This page discusses the set-up and use of BASIL's API and frontend development interface. 
 
