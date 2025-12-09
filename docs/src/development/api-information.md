@@ -12,7 +12,7 @@ npm install
 2. Run the _API_ Server (Backend). The following command uses the Mill build tool to automatically 
 download and compile all necessary Scala libraries, then starts the _API_ server.
 ```shell
-./mill runMain API/ApiServer
+./mill runMain server/ApiServer
 ```
 3. Run the Web Interface (Frontend): In a separate terminal, start the development server
 for the user interface. 
@@ -44,14 +44,6 @@ Review the following established naming conventions for all new components, vari
 | **Variables** and **Functions** | camelCase | `loadIrData()`, `currentEpochIndex` | Start lowercase, **capitalise** subsequent words. | 
 | **Booleans** | camelCase | `isDarkMode`, `hasError` | Must use `is` or `has` prefix. | 
 | **Hooks** | camelCase | `useCfgData.ts` | Must use the `use` prefix. |
-
-
-### Git commits
-For each of the frontend commits, I (Jesse) added the name of the branch first: 
-{Branch_name}: {Commit message}
-<br>
-e.g. Jesse-interface-thesis-proj: Creates a basic GET API endpoint which displays 
-an IR in a html script
 
 ## Future Recommendations for the Interface
 Several future recommendations have been listed below. 
