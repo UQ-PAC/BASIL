@@ -1,6 +1,7 @@
 import '../../styles/components/layout/header.css';
 
 import SettingsIcon from '../../assets/icon-settings.svg';
+import BasilIcon from '../../assets/basil-logo.svg';
 
 interface HeaderProps {
   setViewMode: (mode: 'IR' | 'CFG' | 'IR/CFG') => void;
@@ -12,7 +13,7 @@ export function Header({ setViewMode, viewMode, toggleSettings }: HeaderProps) {
   return (
     <header className="app-header">
       <div className="header-information">
-        <img className="header-logo" src="/BASIL_logo.png" alt="Basil" />
+        <BasilIcon className="header-logo"></BasilIcon>
         <h1 className="header-title">
           BASIL IR
           <br />
