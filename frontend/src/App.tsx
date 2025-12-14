@@ -16,6 +16,7 @@ import { useProcedures } from './hooks/useProcedures.ts';
 import { useAnalysisStatus } from './hooks/useAnalysisStatus.ts';
 import { useEpochs } from './hooks/useEpochs.ts';
 import { useAppContext } from './context/AppContext.tsx';
+import { useCustomLogo } from './hooks/useCustomLogo.ts';
 
 const LOCAL_STORAGE_PROCEDURE_KEY = 'cfgViewerSelectedProcedure';
 const LOCAL_STORAGE_VIEW_MODE_KEY = 'selectedViewMode';
@@ -80,6 +81,11 @@ function App() {
     setPostStatus,
     setDatasetError,
     submitDirectoryPath,
+  });
+
+  const { customLogoFile, handleSetCustomLogoFile } = useCustomLogo({
+    setPostStatus,
+    setDatasetError,
   });
 
   useEffect(() => {
@@ -173,12 +179,6 @@ function App() {
 
     localStorage.setItem('theme', theme);
   }, [theme]);
-
-  const [customLogoFile, setCustomLogoFile] = useState<File | null>(null);
-
-  const handleSetCustomLogoFile = (file: File | null) => {
-    setCustomLogoFile(file);
-  };
 
   const renderViewer = () => {
     switch (viewMode) {

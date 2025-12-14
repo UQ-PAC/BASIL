@@ -9,7 +9,7 @@ import React, {
 
 export interface PostStatus {
   message: string;
-  type: 'error' | 'warning' | 'info' | '';
+  type: 'error' | 'warning' | 'info' | 'success' | '';
 }
 
 interface AppContextProps {
