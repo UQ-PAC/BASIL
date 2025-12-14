@@ -1,19 +1,53 @@
+//src/components/layout/Header.tsx
+
+import { useEffect, useState } from 'react';
 import '../../styles/components/layout/header.css';
 
 import SettingsIcon from '../../assets/icon-settings.svg';
-import BasilIcon from '../../assets/basil-logo.svg';
+import DefaultBasilIcon from '../../assets/basil-logo.svg';
 
 interface HeaderProps {
   setViewMode: (mode: 'IR' | 'CFG' | 'IR/CFG') => void;
   viewMode: 'IR' | 'CFG' | 'IR/CFG';
   toggleSettings: () => void;
+  customLogoFile: File | null;
 }
 
-export function Header({ setViewMode, viewMode, toggleSettings }: HeaderProps) {
+export function Header({
+  setViewMode,
+  viewMode,
+  toggleSettings,
+  customLogoFile,
+}: HeaderProps) {
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (customLogoFile) {
+      const url = URL.createObjectURL(customLogoFile);
+      setLogoPreviewUrl(url);
+
+      return () => {
+        URL.revokeObjectURL(url);
+        setLogoPreviewUrl(null);
+      };
+    } else {
+      setLogoPreviewUrl(null);
+    }
+  }, [customLogoFile]);
+
   return (
     <header className="app-header">
       <div className="header-information">
-        <BasilIcon className="header-logo"></BasilIcon>
+        {logoPreviewUrl ? (
+          <img
+            src={logoPreviewUrl}
+            alt="Custom Basil Logo"
+            className="header-logo"
+          />
+        ) : (
+          <DefaultBasilIcon className="header-logo" />
+        )}
+
         <h1 className="header-title">
           BASIL IR
           <br />

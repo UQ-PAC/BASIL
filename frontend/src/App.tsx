@@ -174,6 +174,12 @@ function App() {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  const [customLogoFile, setCustomLogoFile] = useState<File | null>(null);
+
+  const handleSetCustomLogoFile = (file: File | null) => {
+    setCustomLogoFile(file);
+  };
+
   const renderViewer = () => {
     switch (viewMode) {
       case ViewMode.IR:
@@ -220,6 +226,7 @@ function App() {
           setViewMode={setViewMode}
           viewMode={viewMode}
           toggleSettings={toggleSettings}
+          customLogoFile={customLogoFile}
         />
         <main className="main-layout">
           <ResizableSidebar
@@ -244,6 +251,9 @@ function App() {
         onClose={toggleSettings}
         theme={theme}
         setTheme={setTheme}
+        customLogoFile={customLogoFile}
+        setCustomLogoFile={handleSetCustomLogoFile}
+        setPostStatus={setPostStatus}
       />
       <LoadingModal
         isOpen={isAnalysisRunning}
