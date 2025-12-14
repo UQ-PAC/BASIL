@@ -1,4 +1,5 @@
-// src/hooks/useLogoUrl.ts
+// src/hooks/logo/useLogoUrl.ts
+
 import { useState, useEffect } from 'react';
 
 export function useLogoUrl(file: File | null): string | null {

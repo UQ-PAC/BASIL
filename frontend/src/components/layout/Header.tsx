@@ -1,7 +1,7 @@
 //src/components/layout/Header.tsx
 
 import '../../styles/components/layout/header.css';
-import { useLogoUrl } from '../../hooks/useLogoUrl.ts';
+import { useLogoUrl } from '../../hooks/logo/useLogoUrl.ts';
 
 import SettingsIcon from '../../assets/icon-settings.svg';
 import DefaultBasilIcon from '../../assets/basil-logo.svg';

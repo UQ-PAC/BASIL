@@ -16,7 +16,7 @@ import { useProcedures } from './hooks/useProcedures.ts';
 import { useAnalysisStatus } from './hooks/useAnalysisStatus.ts';
 import { useEpochs } from './hooks/useEpochs.ts';
 import { useAppContext } from './context/AppContext.tsx';
-import { useCustomLogo } from './hooks/useCustomLogo.ts';
+import { useCustomLogo } from './hooks/logo/useCustomLogo.ts';
 
 const LOCAL_STORAGE_PROCEDURE_KEY = 'cfgViewerSelectedProcedure';
 const LOCAL_STORAGE_VIEW_MODE_KEY = 'selectedViewMode';

@@ -2,7 +2,7 @@
 
 import '../../styles/components/modals/modal-base.css';
 import type { PostStatus } from '../../context/AppContext.tsx';
-import { useLogoSettingsForm } from '../../hooks/useLogoSettingsForm.ts';
+import { useLogoSettingsForm } from '../../hooks/logo/useLogoSettingsForm.ts';
 
 interface SettingsModalProps {
   isOpen: boolean;

@@ -1,7 +1,7 @@
-// src/hooks/useLogoSettingsForm.ts
+// src/hooks/logo/useLogoSettingsForm.ts
 
 import React, { useState, useEffect } from 'react';
-import type { PostStatus } from '../context/AppContext.tsx';
+import type { PostStatus } from '../../context/AppContext.tsx';
 import { useLogoUrl } from './useLogoUrl.ts';
 
 interface LogoSettingsHookProps {

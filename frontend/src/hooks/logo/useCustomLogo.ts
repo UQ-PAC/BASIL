@@ -1,8 +1,8 @@
-// src/hooks/useCustomLogo.ts
+// src/hooks/logo/useCustomLogo.ts
 
 import { useState, useEffect } from 'react';
-import { base64ToFile } from '../utils/base64ToFile.ts';
-import type { PostStatus } from '../context/AppContext.tsx';
+import { base64ToFile } from '../../utils/base64ToFile.ts';
+import type { PostStatus } from '../../context/AppContext.tsx';
 
 const LOCAL_STORAGE_LOGO_KEY = 'customAppLogo';
 
