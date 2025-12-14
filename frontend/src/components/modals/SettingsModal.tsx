@@ -1,8 +1,8 @@
 // src/components/modals/SettingsModal.tsx
 
-import React, { useEffect, useState } from 'react';
 import '../../styles/components/modals/modal-base.css';
 import type { PostStatus } from '../../context/AppContext.tsx';
+import { useLogoSettingsForm } from '../../hooks/useLogoSettingsForm.ts';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -25,67 +25,18 @@ function SettingsModal({
 }: SettingsModalProps) {
   if (!isOpen) return null;
 
-  const [stagedLogoFile, setStagedLogoFile] = useState(customLogoFile);
-
-  useEffect(() => {
-    setStagedLogoFile(customLogoFile);
-  }, [isOpen, customLogoFile]);
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] || null;
-
-    const isAllowedType =
-      file?.type === 'image/png' || file?.type === 'image/svg+xml';
-
-    if (file && isAllowedType) {
-      setStagedLogoFile(file);
-    } else {
-      setStagedLogoFile(null);
-      if (file) {
-        setPostStatus({
-          message: 'Error: Please select a valid PNG or SVG image file.',
-          type: 'error',
-        });
-      }
-    }
-  };
-
-  const handleResetLogoAndApply = () => {
-    setStagedLogoFile(null);
-    // immediately apply reset, no need for 'confirmation button'
-    handleApplyLogo(null);
-  };
-
-  const handleApplyLogo = (fileToApply: File | null) => {
-    setCustomLogoFile(fileToApply);
-
-    if (!fileToApply) {
-      const fileInput = document.getElementById(
-        'logo-file-input'
-      ) as HTMLInputElement;
-      if (fileInput) {
-        fileInput.value = '';
-      }
-    }
-  };
-
-  const getPreviewUrl = (file: File | null): string | null => {
-    if (file) {
-      return URL.createObjectURL(file);
-    }
-    return null;
-  };
-  const previewUrl = getPreviewUrl(stagedLogoFile);
-
-  useEffect(() => {
-    return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [previewUrl]);
-
-  const isLogoChangePending = stagedLogoFile !== customLogoFile;
+  const {
+    stagedLogoFile,
+    previewUrl,
+    isLogoChangePending,
+    handleFileChange,
+    handleResetLogoAndApply,
+    handleApplyLogo,
+  } = useLogoSettingsForm({
+    initialFile: customLogoFile,
+    setCustomLogoFile,
+    setPostStatus,
+  });
 
   return (
     <div className="modal-overlay">
@@ -121,7 +72,7 @@ function SettingsModal({
 
           <div className="input-group" style={{ marginTop: '15px' }}>
             <label htmlFor="logo-file-input" className="logo-file-label">
-              Upload Custom Logo (.png only):
+              Upload Custom Logo (.png or .svg only):
             </label>
             <input
               id="logo-file-input"
@@ -181,7 +132,7 @@ function SettingsModal({
 
               {isLogoChangePending && (
                 <button
-                  onClick={() => handleApplyLogo(stagedLogoFile)}
+                  onClick={handleApplyLogo}
                   className="apply-logo-button"
                   style={{
                     padding: '8px 15px',
