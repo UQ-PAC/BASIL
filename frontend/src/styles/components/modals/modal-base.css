@@ -80,6 +80,14 @@
   }
 }
 
+.selection-text {
+  margin-right: 5px;
+  color: var(--text-color);
+
+  font-size: 1rem;
+  font-weight: 500;
+}
+
 /* Status messages (used by both loading and error modals) */
 .status-message {
   margin: 1rem auto 0;

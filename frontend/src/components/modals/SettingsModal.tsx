@@ -1,6 +1,7 @@
 // src/components/modals/SettingsModal.tsx
 
 import '../../styles/components/modals/modal-base.css';
+import '../../styles/components/modals/modal-settings.css';
 import type { PostStatus } from '../../context/AppContext.tsx';
 import { useLogoSettingsForm } from '../../hooks/logo/useLogoSettingsForm.ts';
 

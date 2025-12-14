@@ -1,0 +1,70 @@
+/* src/styles/components/modals/settings-modal.css */
+
+.input-group {
+    display: flex;
+}
+
+.settings-logo-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-top: 15px;
+}
+
+.toggle-group {
+    display: flex;
+    align-items: center;
+}
+
+.reset-button {
+    margin-left: 10px;
+    padding: 5px 10px;
+    background-color: #f44336;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-weight: bold;
+}
+.reset-button:hover {
+    background-color: #c0392b;
+}
+
+.logo-preview {
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid var(--modal-border-color, #eee);
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo-preview-info {
+    display: flex;
+    align-items: center;
+}
+
+.logo-preview img {
+    max-width: 100px;
+    max-height: 100px;
+    object-fit: contain;
+    margin-right: 20px;
+}
+.logo-preview p {
+    margin: 0;
+}
+
+.apply-logo-button {
+    padding: 8px 15px;
+    background-color: var(--primary-action-text-colour);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.apply-logo-button:hover {
+    background-color: var(--primary-action-text-background-colour);
+}
