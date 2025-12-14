@@ -1,7 +1,7 @@
 //src/components/layout/Header.tsx
 
-import { useEffect, useState } from 'react';
 import '../../styles/components/layout/header.css';
+import { useLogoUrl } from '../../hooks/useLogoUrl.ts';
 
 import SettingsIcon from '../../assets/icon-settings.svg';
 import DefaultBasilIcon from '../../assets/basil-logo.svg';
@@ -19,21 +19,7 @@ export function Header({
   toggleSettings,
   customLogoFile,
 }: HeaderProps) {
-  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (customLogoFile) {
-      const url = URL.createObjectURL(customLogoFile);
-      setLogoPreviewUrl(url);
-
-      return () => {
-        URL.revokeObjectURL(url);
-        setLogoPreviewUrl(null);
-      };
-    } else {
-      setLogoPreviewUrl(null);
-    }
-  }, [customLogoFile]);
+  const logoPreviewUrl = useLogoUrl(customLogoFile);
 
   return (
     <header className="app-header">
