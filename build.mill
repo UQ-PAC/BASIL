@@ -91,14 +91,6 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
     Some(BuildCtx.workspaceRoot / ".scalafix.conf")
   }
 
-  override def scalaDocOptions = Task {
-    super.scalaDocOptions() ++ scalaDocExternalMappingOptions() ++ Seq(
-      // Explicitly link cats.effect documentation to resolve internal Scaladoc references (like 'ExitCode')
-      // within transitive dependencies (decline-effect).
-      "-Ydoc-external-documentation:cats.effect=https://typelevel.org/cats-effect/api/3.x/"
-    )
-  }
-
   object test extends ScalaTests with TestModule.ScalaTest with ScalafixModule {
 
     override def ammoniteVersion = build.ammoniteVersion
