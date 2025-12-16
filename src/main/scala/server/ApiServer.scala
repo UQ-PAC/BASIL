@@ -1,15 +1,15 @@
 package server
 
-import cats.effect.*
 import cats.effect.std.Semaphore
-import cats.implicits.*
-import com.comcast.ip4s.*
+import cats.effect.{ExitCode, IO, Ref}
+import cats.syntax.all.*
+import com.comcast.ip4s.{Host, Port, host, port}
 import com.monovore.decline.Opts
 import com.monovore.decline.effect.CommandIOApp
 import ir.{Procedure, Program}
 import org.http4s.ember.server.EmberServerBuilder
-import org.http4s.implicits.*
 import org.http4s.server.Router
+import org.http4s.syntax.all.*
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.{Logger, LoggerFactory, LoggerName}
 import util.{BASILConfig, ILLoadingConfig, RunUtils}
