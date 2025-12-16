@@ -1,6 +1,10 @@
 // src/utils/base64ToFile.ts
 
-export const base64ToFile = (base64: string, filename: string, mimeType: string): File => {
+export const base64ToFile = (
+  base64: string,
+  filename: string,
+  mimeType: string
+): File => {
   const parts = base64.split(';base64,');
   const b64Data = parts.length > 1 ? parts[1] : base64;
 

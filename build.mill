@@ -58,9 +58,10 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
   val scalaXml = mvn"org.scala-lang.modules::scala-xml:2.1.0"
   val emberServer = mvn"org.http4s::http4s-ember-server::$http4sVersion"
   val log4cats = mvn"org.typelevel::log4cats-slf4j:2.6.0"
+  val declineEffect = mvn"com.monovore::decline-effect:2.2.0"
 
   override def mvnDeps = Seq(scalactic, sourceCode, mainArgs, upickle, aslpOffline, javaSmt, javaSmtZ3, catsEffect, http4Dsl,
-    http4Circe, circleGeneric, slf4j, scalaXml, emberServer, log4cats)
+    http4Circe, circleGeneric, slf4j, scalaXml, emberServer, log4cats, declineEffect)
 
   override def repositoriesTask = Task.Anon {
     super.repositoriesTask() :+ MavenRepository(

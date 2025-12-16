@@ -7,8 +7,8 @@
   --modal-header-background-color: #f5f5f5;
   --border-color: #ccc;
 
-  --primary-action-text-colour:  #007bff;
-  --primary-action-text-background-colour:  #0056b3;
+  --primary-action-text-colour: #007bff;
+  --primary-action-text-background-colour: #0056b3;
 }
 
 [data-theme='dark'] {

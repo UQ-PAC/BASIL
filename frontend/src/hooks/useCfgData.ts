@@ -124,7 +124,7 @@ export function useCfgData(
     };
 
     fetchAndRenderCfgs().catch((e) => {
-      console.error("Uncaught error during CFG fetching promise:", e);
+      console.error('Uncaught error during CFG fetching promise:', e);
       setGraphError(`Uncaught error during CFG fetching promise: ${e.message}`);
     });
   }, [selectedStartEpoch, selectedEndEpoch, selectedProcedureName]);

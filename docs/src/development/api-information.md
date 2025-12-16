@@ -21,6 +21,27 @@ npm run dev
 ```
 ---
 
+### To run with custom host and port use the following CLI
+To integrate the client (Vite) with a server running on a non-default host or port, 
+you must configure both the server execution and the client's environment variables.
+1. Start the server, specifying the desired host and port using flags.
+```shell
+./mill runMain server.ApiServer --host <HOST> --port <PORT>
+```
+**Example:** To run the server and expose it publicly on port 8081:
+```shell
+./mill runMain server.ApiServer --host 0.0.0.0 --port 8081
+```
+2. The client must be informed of the server's address by setting the 
+VITE_SERVER_HOST and VITE_SERVER_PORT environment variables.
+Either create a file named .env.development in the root of your project directory 
+or set the variables inline when executing the client command. 
+
+An example of setting the variables inline on Linux/macOS is:
+```shell
+VITE_SERVER_PORT=8081 VITE_SERVER_HOST=0.0.0.0 npm run dev
+```
+
 ## Development Style Guide for Future Development
 This section outlines the style guide and essential knowledge of tools required
 before further development on the interface.

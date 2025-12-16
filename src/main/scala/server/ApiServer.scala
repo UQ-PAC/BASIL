@@ -4,6 +4,8 @@ import cats.effect.*
 import cats.effect.std.Semaphore
 import cats.implicits.*
 import com.comcast.ip4s.*
+import com.monovore.decline.Opts
+import com.monovore.decline.effect.CommandIOApp
 import ir.{Procedure, Program}
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.implicits.*
@@ -52,14 +54,24 @@ object LineCounter {
   }
 }
 
-object ApiServer extends IOApp {
+object ApiServer
+    extends CommandIOApp(name = "basil-api-server", header = "BASIL API Server for IR analysis and visualization.") {
   implicit val loggerFactory: LoggerFactory[IO] = Slf4jFactory.create[IO]
   private val logger: Logger[IO] = loggerFactory.getLogger(LoggerName(getClass.getName))
 
-  /**
-   * Command-line entry point to the api server, on localhost:8080.
-   */
-  override def run(args: List[String]): IO[ExitCode] = {
+  private val hostOpt: Opts[Host] = Opts
+    .option[String](long = "host", short = "h", help = "The IP address to bind to (e.g., 127.0.0.1 or 0.0.0.0).")
+    .mapValidated(s => Host.fromString(s).toValidNel("Invalid host address"))
+    .withDefault(host"127.0.0.1")
+
+  private val portOpt: Opts[Port] = Opts
+    .option[Int](long = "port", short = "p", help = "The port number to listen on.")
+    .mapValidated(i => Port.fromInt(i).toValidNel("Invalid port number (must be 1-65535)"))
+    .withDefault(port"8080")
+
+  private val configOpts: Opts[(Host, Port)] = (hostOpt, portOpt).tupled
+
+  override def main: Opts[IO[ExitCode]] = configOpts.map { case (host, port) =>
     for {
       isReady <- Ref[IO].of(false)
       semaphoreInstance <- Semaphore[IO](1)
@@ -74,15 +86,16 @@ object ApiServer extends IOApp {
 
       exitCode <- EmberServerBuilder
         .default[IO]
-        .withHost(ipv4"127.0.0.1")
-        .withPort(port"8080")
+        .withHost(host)
+        .withPort(port)
         .withHttpApp(httpApp)
         .build
         .use { server =>
-          logger.info(s"Server started at http://localhost:8080/") *>
+          logger.info(s"Server started at ${server.baseUri}") *>
             IO.never
         }
-    } yield exitCode
+    } yield ExitCode.Success
+
   }
 
   private def generateIRAsync(
