@@ -9,7 +9,6 @@ import {
 import { getLayoutedElements } from '../utils/graphLayout.ts';
 import { fetchDotString, fetchIrCode } from '../api/viewer.ts';
 import { type CustomNodeData } from '../components/viewers/graph/CustomNode.tsx';
-import { useGraphvizWASM } from './useGraphvizWASM';
 
 interface DotGraphResponse {
   [procedureName: string]: string;
@@ -37,10 +36,9 @@ export function useCombinedData(
   displayCfgType: 'before' | 'after'
 ): CombinedDataHookResult {
   const [irCode, setIrCode] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [graphError, setGraphError] = useState<string | null>(null);
   const [graphRenderKey, setGraphRenderKey] = useState(0);
-  const { isGraphvizWasmReady, graphvizWasmError } = useGraphvizWASM();
 
   const [beforeNodes, setBeforeNodes, onBeforeNodesChange] = useNodesState<
     Node<CustomNodeData>
@@ -61,7 +59,7 @@ export function useCombinedData(
     }
 
     const fetchIrCodeData = async () => {
-      setLoading(true);
+      setIsLoading(true);
       try {
         const epoch =
           displayCfgType === 'before' ? selectedStartEpoch : selectedEndEpoch;
@@ -76,11 +74,14 @@ export function useCombinedData(
         console.error('Failed to fetch IR code:', error);
         setIrCode(null);
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
 
-    fetchIrCodeData();
+    fetchIrCodeData().catch((e) => {
+      console.error('Uncaught error during IR fetching:', e);
+      setGraphError(`Uncaught error during IR fetching: ${e.message}`);
+    });
   }, [
     selectedStartEpoch,
     selectedEndEpoch,
@@ -89,12 +90,7 @@ export function useCombinedData(
   ]);
 
   useEffect(() => {
-    if (
-      !isGraphvizWasmReady ||
-      !selectedStartEpoch ||
-      !selectedEndEpoch ||
-      !selectedProcedureName
-    ) {
+    if (!selectedStartEpoch || !selectedEndEpoch || !selectedProcedureName) {
       setBeforeNodes([]);
       setBeforeEdges([]);
       setAfterNodes([]);
@@ -104,7 +100,7 @@ export function useCombinedData(
     }
 
     const fetchCfgData = async () => {
-      setLoading(true);
+      setIsLoading(true);
       setGraphError(null);
       try {
         const [beforeDotResponse, afterDotResponse] = await Promise.all([
@@ -159,38 +155,36 @@ export function useCombinedData(
       } catch (e: any) {
         console.error('Error fetching data in useCombinedData:', e);
         setGraphError(
-          (graphvizWasmError ? graphvizWasmError + '\n' : '') +
-            `Failed to load data: ${e.message}`
+          `Failed to load or render CFG data in useCombinedData: ${e.message}`
         );
         setBeforeNodes([]);
         setBeforeEdges([]);
         setAfterNodes([]);
         setAfterEdges([]);
       } finally {
-        setLoading(false);
+        setIsLoading(false);
         setGraphRenderKey((prev) => prev + 1);
       }
     };
 
-    fetchCfgData();
+    fetchCfgData().catch((e) => {
+      console.error('Uncaught error during CFG fetching promise:', e);
+      setGraphError(`Uncaught error during CFG fetching promise: ${e.message}`);
+    });
   }, [
     selectedStartEpoch,
     selectedEndEpoch,
     selectedProcedureName,
-    isGraphvizWasmReady,
-    graphvizWasmError,
     setBeforeNodes,
     setBeforeEdges,
     setAfterNodes,
     setAfterEdges,
   ]);
 
-  const combinedGraphError = graphvizWasmError || graphError;
-
   return {
     irCode,
-    isLoading: loading,
-    graphError: combinedGraphError,
+    isLoading,
+    graphError,
     graphRenderKey,
     beforeNodes,
     beforeEdges,

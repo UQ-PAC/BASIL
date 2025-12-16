@@ -36,7 +36,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
     afterNodes,
     afterEdges,
     isLoadingGraphs,
-    graphError: combinedGraphError,
+    graphError: graphError,
     graphRenderKey,
     onBeforeNodesChange,
     onBeforeEdgesChange,
@@ -48,10 +48,10 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
     return <div className="cfg-viewer-message">Loading CFG data...</div>;
   }
 
-  if (procedureError || combinedGraphError) {
+  if (procedureError || graphError) {
     return (
       <div className="cfg-viewer-error">
-        Error: {procedureError || combinedGraphError}
+        Error: {procedureError || graphError}
       </div>
     );
   }
@@ -111,7 +111,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
           selectedEndEpoch &&
           procedureNames.length === 0 &&
           !isLoadingGraphs &&
-          !combinedGraphError && (
+          !graphError && (
             <p className="no-procedures-message">
               No procedures found for epoch: '{selectedStartEpoch}' and '
               {selectedEndEpoch}'

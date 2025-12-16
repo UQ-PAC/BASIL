@@ -10,7 +10,6 @@ import { getLayoutedElements } from '../utils/graphLayout.ts';
 import { fetchDotString } from '../api/viewer.ts';
 import { compareAndColourElements } from '../utils/cfgColouring.ts';
 import { type CustomNodeData } from '../components/viewers/graph/CustomNode.tsx';
-import { useGraphvizWASM } from './useGraphvizWASM.ts';
 
 interface CfgDataHookResult {
   beforeNodes: Node<CustomNodeData>[];
@@ -31,8 +30,6 @@ export function useCfgData(
   selectedEndEpoch: string | null,
   selectedProcedureName: string | null
 ): CfgDataHookResult {
-  const { isGraphvizWasmReady, graphvizWasmError } = useGraphvizWASM();
-
   const [beforeNodes, setBeforeNodes, onBeforeNodesChange] = useNodesState<
     Node<CustomNodeData>
   >([]);
@@ -45,23 +42,13 @@ export function useCfgData(
     []
   );
 
-  const [loadingGraphs, setLoadingGraphs] = useState(false);
+  const [isLoadingGraphs, setIsLoadingGraphs] = useState(false);
   const [graphError, setGraphError] = useState<string | null>(null);
   const [graphRenderKey, setGraphRenderKey] = useState(0);
 
   useEffect(() => {
-    if (graphvizWasmError) {
-      setGraphError(graphvizWasmError);
-      setLoadingGraphs(false);
-      return;
-    }
-    if (
-      !isGraphvizWasmReady ||
-      !selectedStartEpoch ||
-      !selectedEndEpoch ||
-      !selectedProcedureName
-    ) {
-      setLoadingGraphs(false);
+    if (!selectedStartEpoch || !selectedEndEpoch || !selectedProcedureName) {
+      setIsLoadingGraphs(false);
       setGraphError(null);
       setBeforeNodes([]);
       setBeforeEdges([]);
@@ -72,7 +59,7 @@ export function useCfgData(
     }
 
     const fetchAndRenderCfgs = async () => {
-      setLoadingGraphs(true);
+      setIsLoadingGraphs(true);
       setGraphError(null);
 
       try {
@@ -131,26 +118,24 @@ export function useCfgData(
         setAfterNodes([]);
         setAfterEdges([]);
       } finally {
-        setLoadingGraphs(false);
+        setIsLoadingGraphs(false);
         setGraphRenderKey((prev) => prev + 1);
       }
     };
 
-    fetchAndRenderCfgs();
-  }, [
-    selectedStartEpoch,
-    selectedEndEpoch,
-    selectedProcedureName,
-    isGraphvizWasmReady,
-  ]);
+    fetchAndRenderCfgs().catch((e) => {
+      console.error("Uncaught error during CFG fetching promise:", e);
+      setGraphError(`Uncaught error during CFG fetching promise: ${e.message}`);
+    });
+  }, [selectedStartEpoch, selectedEndEpoch, selectedProcedureName]);
 
   return {
     beforeNodes,
     beforeEdges,
     afterNodes,
     afterEdges,
-    isLoadingGraphs: loadingGraphs,
-    graphError: graphvizWasmError || graphError,
+    isLoadingGraphs,
+    graphError,
     graphRenderKey,
     onBeforeNodesChange,
     onBeforeEdgesChange,
