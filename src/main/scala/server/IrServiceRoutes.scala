@@ -448,32 +448,20 @@ class IrServiceRoutes(
   private def generateDotGraphs(program: Program): Map[String, String] = {
     program.procedures.map { proc =>
       val originalDotOutput = dotBlockGraph(proc)
-      val cleanedDotOutput = removeFontAttributes(originalDotOutput)
+      val cleanedDotOutput = removeGraphAttributesBlock(originalDotOutput)
       proc.procName -> cleanedDotOutput
     }.toMap
   }
-
-  private def removeFontAttributes(dotString: String): String = {
-    val fontAttributePattern = Pattern.compile(
-      """\s*(?:fontname="[^"]+"|fontsize="\d+(?:\.\d+)?"|fontname=[a-zA-Z0-9_]+|fontsize=\d+(?:\.\d+)?)\s*""",
-      Pattern.CASE_INSENSITIVE
+  
+  private def removeGraphAttributesBlock(dotString: String): String = {
+    // Removes the global 'graph' attribute block from the DOT string.
+    val graphAttributeBlockPattern = Pattern.compile(
+      """^graph.*;$""",
+      Pattern.CASE_INSENSITIVE | Pattern.MULTILINE
     )
 
-    val matcher = fontAttributePattern.matcher(dotString)
-    val sb = new lang.StringBuilder()
+    val cleanedString = graphAttributeBlockPattern.matcher(dotString).replaceAll("")
 
-    while (matcher.find()) {
-      val matchedGroup = matcher.group()
-      matcher.appendReplacement(sb, "")
-    }
-    matcher.appendTail(sb)
-
-    var cleanedString = sb.toString
-
-    cleanedString = cleanedString.replaceAll(",\\s*,", ",") // Corrects ", ," to ","
-    cleanedString = cleanedString.replaceAll(",\\s*]", "]") // Corrects ", ]" to "]"
-    cleanedString = cleanedString.replaceAll("\\[\\s*,", "[") // Corrects "[ ," to "["
-
-    cleanedString
+    cleanedString.trim
   }
 }
