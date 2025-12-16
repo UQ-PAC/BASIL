@@ -452,13 +452,10 @@ class IrServiceRoutes(
       proc.procName -> cleanedDotOutput
     }.toMap
   }
-  
+
   private def removeGraphAttributesBlock(dotString: String): String = {
     // Removes the global 'graph' attribute block from the DOT string.
-    val graphAttributeBlockPattern = Pattern.compile(
-      """^graph.*;$""",
-      Pattern.CASE_INSENSITIVE | Pattern.MULTILINE
-    )
+    val graphAttributeBlockPattern = Pattern.compile("""^graph.*;$""", Pattern.CASE_INSENSITIVE | Pattern.MULTILINE)
 
     val cleanedString = graphAttributeBlockPattern.matcher(dotString).replaceAll("")
 
