@@ -50,8 +50,7 @@ jobs:
 
       # TODO: This excludes the ExitCode warning from decline. Remove after https://github.com/typelevel/cats-effect/issues/4532
       - run: |
-          grep -v effect/shared/src/main/scala/com/monovore/decline/effect/CommandIOApp out/scalaDocGenerated.log |
-          ! grep --after-context=3 'Error\|Warning'
+          ! grep -v effect/shared/src/main/scala/com/monovore/decline/effect/CommandIOApp out/scalaDocGenerated.log | grep --after-context=3 'Error\|Warning'
         name: check for scaladoc warnings
 
       - id: docArgs
