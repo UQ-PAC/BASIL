@@ -52,8 +52,6 @@ trait BasilDocs extends ScalaModule {
       ".*/scala/.*::scaladoc3::https://scala-lang.org/api/3.3_LTS/",
       ".*/java/.*::javadoc::https://docs.oracle.com/en/java/javase/17/docs/api/java.base/",
       ".*/com/google/protobuf.*::javadoc::https://protobuf.dev/reference/java/api-docs/",
-      ".*/cats/effect/.*::scaladoc3::https://typelevel.org/cats-effect/api/",
-      ".*/com/monovore/decline.*::scaladoc3::https://monovore.com/decline/api/",
     )
     val externals = defaultExternals ++ docsRegexes().map {
       case (path, regex) => s"$regex::$baseUrl/$path"
