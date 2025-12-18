@@ -1562,7 +1562,11 @@ case class DsaProgramMetrics(
   // maximum node density (maxNodeAccesses / accessesCount)
   maxNodeDensity: Double,
   // maximum cell density (maxCellAccesses / accessesCount)
-  maxCellDensity: Double
+  maxCellDensity: Double,
+  // number of procedures with a collapsed stack
+  collapsedStacks: Int,
+  // number of global cells
+  globalCells: Int
 ) {
   override def toString(): String = {
     val HEADER_LENGTH = 120
@@ -1661,6 +1665,17 @@ def getDsaProgramMetrics(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]) = {
   val accessesCount: Int = accesses.size
   val maxNodeDensity: Double = maxNodeAccesses.toDouble / accessesCount
   val maxCellDensity: Double = maxCellAccesses.toDouble / accessesCount
+  var collapsedStacks: Int = 0
+  for ((proc, dsg) <- dsaCtx.topDown.filter{ case (k, v) => !ignoredProcs.contains(k) }) {
+    if !IntervalDSA.checksStackMaintained(dsg) then collapsedStacks += 1
+  }
+  var globalCells: Int = 0
+  for ((proc, dsg) <- dsaCtx.topDown.filter{ case (k, v) => !ignoredProcs.contains(k) }) {
+    for (node <- dsg.collect()(0).filterNot(_.isCollapsed)) {
+      if node.flags.global then globalCells += node.cells.size
+    }
+  }
+
   DsaProgramMetrics(
     accesses,
     cellsOfAccesses,
@@ -1669,7 +1684,9 @@ def getDsaProgramMetrics(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]) = {
     maxCellAccesses,
     accessesCount,
     maxNodeDensity,
-    maxCellDensity
+    maxCellDensity,
+    collapsedStacks,
+    globalCells
   )
 }
 
