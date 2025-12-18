@@ -1,1 +1,16 @@
-Program,dsa-default Nodes,dsa-default Nodes Collapsed,dsa-default Max Node Density,dsa-default Cells,dsa-default Max Cell Density,dsa-default Running Time,dsa-split Nodes,dsa-split Nodes Collapsed,dsa-split Max Node Density,dsa-split Cells,dsa-split Max Cell Density,dsa-split Running Time,dsa-eqv Nodes,dsa-eqv Nodes Collapsed,dsa-eqv Max Node Density,dsa-eqv Cells,dsa-eqv Max Cell Density,dsa-eqv Running Time
+Program,Node Count,Nodes Collapsed,Max Cell Density,Time(ms)
+
+eq,8,1,1.0,123
+split,9,2,0.4,123
+stack,62,1,0.8888888888888888,136
+complete_callgraph_1,120,12,0.48,239
+complete_callgraph_2,89,1,0.24242424242424243,223
+complete_callgraph_3,89,1,0.23529411764705882,177
+complete_callgraph_4,130,2,0.21153846153846154,208
+eq-split-eqv,30,0,0.2222222222222222,191
+split-split-eqv,28,2,0.4,145
+stack-split-eqv,98,0,0.2222222222222222,164
+complete_callgraph_1-split-eqv,205,7,0.48,227
+complete_callgraph_2-split-eqv,157,0,0.24242424242424243,209
+complete_callgraph_3-split-eqv,157,0,0.23529411764705882,203
+complete_callgraph_4-split-eqv,220,1,0.21153846153846154,296

@@ -1716,9 +1716,9 @@ def dsaMetricsToCsvLine(metrics: DsaProgramMetrics) = {
   val nodes = metrics.procedureMetrics.values.flatMap(_.nodes)
   val nodeCount = nodes.size.toString
   val collapsedCount = nodes.filter(_.isCollapsed).size.toString
-  val maxNodeDensity = metrics.maxNodeDensity.toString
-  val cells = metrics.procedureMetrics.values.flatMap(_.cells)
-  val cellCount = cells.size.toString
+  // val maxNodeDensity = metrics.maxNodeDensity.toString
+  // val cells = metrics.procedureMetrics.values.flatMap(_.cells)
+  // val cellCount = cells.size.toString
   val maxCellDensity = metrics.maxCellDensity.toString
-  s"$nodeCount,$collapsedCount,$maxNodeDensity,$cellCount,$maxCellDensity"
+  s"$nodeCount,$collapsedCount,$maxCellDensity"
 }
