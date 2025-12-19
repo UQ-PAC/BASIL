@@ -14,3 +14,4 @@ complete_callgraph_1-split-eqv,205,7,0.48,227
 complete_callgraph_2-split-eqv,157,0,0.24242424242424243,209
 complete_callgraph_3-split-eqv,157,0,0.23529411764705882,203
 complete_callgraph_4-split-eqv,220,1,0.21153846153846154,296
+cntlm-noduk_O0,11196,465,0.888909057905246,290672

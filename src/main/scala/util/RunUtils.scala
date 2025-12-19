@@ -158,44 +158,44 @@ object RunUtils {
       val ignoredProcNames = Set("_start", "__libc_start_main")
       val ignoredProcs = ctx.program.procedures.filter{ proc => ignoredProcNames.contains(proc.procName) }.toSet
       val metrics = getDsaProgramMetrics(dsaResults, ignoredProcs)
-      // Logger.writeToFile(File("dsa_stats.txt"),
-      //   s"${metrics.toString}\n\nTime to run DSA: ${dsaTimePerformance}ms")
+      Logger.writeToFile(File("dsa_stats.txt"),
+        s"${metrics.toString}\n\nTime to run DSA: ${dsaTimePerformance}ms")
 
-      // var collapsedStacksLocal = 0
-      // for ((proc, dsg) <- dsaResults.local.filter{ case (k, v) => !ignoredProcs.contains(k) }) {
-      //   if !IntervalDSA.checksStackMaintained(dsg) then collapsedStacksLocal += 1
-      // }
-      // Logger.println("Collapsed Stacks Local: " + collapsedStacksLocal)
-      // var collapsedStacksBu = 0
-      // for ((proc, dsg) <- dsaResults.bottomUp.filter{ case (k, v) => !ignoredProcs.contains(k) }) {
-      //   if !IntervalDSA.checksStackMaintained(dsg) then collapsedStacksBu += 1
-      // }
-      // Logger.println("Collapsed Stacks Bottom Up: " + collapsedStacksBu)
-      // var collapsedStacksTd = 0
-      // for ((proc, dsg) <- dsaResults.topDown.filter{ case (k, v) => !ignoredProcs.contains(k) }) {
-      //   if !IntervalDSA.checksStackMaintained(dsg) then collapsedStacksTd += 1
-      // }
-      // Logger.println("Collapsed Stacks Top Down: " + collapsedStacksTd)
+      var collapsedStacksLocal = 0
+      for ((proc, dsg) <- dsaResults.local.filter{ case (k, v) => !ignoredProcs.contains(k) }) {
+        if !IntervalDSA.checksStackMaintained(dsg) then collapsedStacksLocal += 1
+      }
+      Logger.println("Collapsed Stacks Local: " + collapsedStacksLocal)
+      var collapsedStacksBu = 0
+      for ((proc, dsg) <- dsaResults.bottomUp.filter{ case (k, v) => !ignoredProcs.contains(k) }) {
+        if !IntervalDSA.checksStackMaintained(dsg) then collapsedStacksBu += 1
+      }
+      Logger.println("Collapsed Stacks Bottom Up: " + collapsedStacksBu)
+      var collapsedStacksTd = 0
+      for ((proc, dsg) <- dsaResults.topDown.filter{ case (k, v) => !ignoredProcs.contains(k) }) {
+        if !IntervalDSA.checksStackMaintained(dsg) then collapsedStacksTd += 1
+      }
+      Logger.println("Collapsed Stacks Top Down: " + collapsedStacksTd)
 
-      // for ((proc, dsg) <- dsaResults.topDown.filterNot{ case (k, v) => ignoredProcs.contains(k) }) {
-      //   var globalCells = Set.empty[IntervalCell]
-      //   for (node <- dsg.collect()(0).filterNot(_.isCollapsed)) {
-      //     if (node.flags.global) {
-      //       for (cell <- node.cells) {
-      //         var alreadyAdded = false
-      //         for (countedCell <- globalCells) {
-      //           if (cell.equiv(countedCell)) {
-      //             alreadyAdded = true
-      //           }
-      //         }
-      //         if (!alreadyAdded) {
-      //           globalCells += cell
-      //         }
-      //       }
-      //     }
-      //   }
-      //   Logger.println(s"${proc.procName}: ${globalCells.size}")
-      // }
+      for ((proc, dsg) <- dsaResults.topDown.filterNot{ case (k, v) => ignoredProcs.contains(k) }) {
+        var globalCells = Set.empty[IntervalCell]
+        for (node <- dsg.collect()(0).filterNot(_.isCollapsed)) {
+          if (node.flags.global) {
+            for (cell <- node.cells) {
+              var alreadyAdded = false
+              for (countedCell <- globalCells) {
+                if (cell.equiv(countedCell)) {
+                  alreadyAdded = true
+                }
+              }
+              if (!alreadyAdded) {
+                globalCells += cell
+              }
+            }
+          }
+        }
+        Logger.println(s"${proc.procName}: ${globalCells.size}")
+      }
 
       // val basename = File(conf.loading.inputFile).getName.stripSuffix(".gts")
       // var fullname = basename + "-dsa"
