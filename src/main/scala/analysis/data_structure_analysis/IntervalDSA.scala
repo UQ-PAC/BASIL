@@ -1545,289 +1545,54 @@ def isGlobal(address: Int, irContext: IRContext): Boolean = {
 
 // --- DSA Evaluation Metrics ------------------------------------------------------------------------------------------
 
-// DSA metrics for the entire target program
 case class DsaProgramMetrics(
-  // the set of all memory accesses in the entire program
-  accesses: Set[MemoryAccessConstraint[_]],
-  // the set of cells associated with each access
-  cellsOfAccesses: Map[MemoryAccessConstraint[_], Set[IntervalCell]],
-  // information per procedure
-  procedureMetrics: Map[Procedure, DsaProcedureMetrics],
-  // maximum accesses to a single node in any procedure
-  maxNodeAccesses: Int,
-  // maximum accesses to a single cell in any procedure
-  maxCellAccesses: Int,
-  // number of memory accesses
-  accessesCount: Int,
-  // maximum node density (maxNodeAccesses / accessesCount)
-  maxNodeDensity: Double,
-  // maximum cell density (maxCellAccesses / accessesCount)
-  maxCellDensity: Double,
-  // number of procedures with a collapsed stack
-  collapsedStacks: Int,
-  // number of global cells
-  globalCells: Int
-) {
-  override def toString(): String = {
-    val HEADER_LENGTH = 120
-    var s = ""
-    s += "Accesses:"
-    for (access <- accesses) {
-      s += "\n- " + access.toString
-    }
-    s += "\n\nCells Associated With Each Access:"
-    for ((access, cells) <- cellsOfAccesses) {
-      s += "\n" + access.toString
-      if (cells.isEmpty) {
-        s += "\n    -> (none)"
-      } else {
-        for (cell <- cells) {
-          s += "\n    -> " + cell.toString
-        }
-      }
-    }
-    for ((proc, metrics) <- procedureMetrics) {
-      val procHeader = s"=== Procedure: ${proc.procName} "
-      s += s"\n\n$procHeader${"=" * (HEADER_LENGTH - procHeader.length)}"
-      s += "\n\nAll Nodes:"
-      for (node <- metrics.nodes) {
-        s += "\n- " + node.toString
-      }
-      s += "\n\nCollapsed Nodes:"
-      for (node <- metrics.collapsed) {
-        s += "\n- " + node.toString
-      }
-      s += "\n\nCells:"
-      for (cell <- metrics.cells) {
-        s += "\n- " + cell.toString
-      }
-      s += "\n\nAccesses to Each Node:"
-      for ((node, accesses) <- metrics.nodeAccesses) {
-        s += "\n" + node.toString
-        if (accesses.isEmpty) {
-          s += "\n    <- (none)"
-        } else {
-          for (access <- accesses) {
-            s += "\n    <- " + access.toString
-          }
-        }
-      }
-      s += "\n\nAccesses to Each Cell:"
-      for ((cell, accesses) <- metrics.cellAccesses) {
-        s += "\n" + cell.toString
-        if (accesses.isEmpty) {
-          s += "\n    <- (none)"
-        } else {
-          for (access <- accesses) {
-            s += "\n    <- " + access.toString
-          }
-        }
-      }
-      s += "\n\nMax Node Accesses: " + metrics.maxNodeAccesses.toString
-      s += "\n\nMax Cell Accesses: " + metrics.maxCellAccesses.toString
-    }
-    val overallStatsHeader = "=== Overall Stats "
-    s += s"\n\n$overallStatsHeader${"=" * (HEADER_LENGTH - overallStatsHeader.length)}"
-    s += "\n\nMax Node Accesses: " + maxNodeAccesses.toString
-    s += "\nMax Cell Accesses: " + maxCellAccesses.toString
-    s += "\nTotal Number of Accesses: " + accessesCount.toString
-    s += "\nMax Node Density: " + maxNodeDensity.toString
-    s += "\nMax Cell Density: " + maxCellDensity.toString
-    s
-  }
-}
-
-// DSA metrics for a particular procedure
-case class DsaProcedureMetrics(
-  // the nodes belonging to this procedure; some of these might be clones of nodes in other procedures
-  nodes: Set[IntervalNode],
-  // the set of collapsed nodes
-  collapsed: Set[IntervalNode],
-  // the cells belonging to nodes of this procedure; some of these might be clones of cells in other procedures
-  cells: Set[IntervalCell],
-  // the memory accesses to each node in this procedure
-  nodeAccesses: Map[IntervalNode, Set[MemoryAccessConstraint[_]]],
-  // the memory accesses to each cell in this procedure
-  cellAccesses: Map[IntervalCell, Set[MemoryAccessConstraint[_]]],
-  // maximum accesses to one this procedure's nodes (considers memory accesses across the entire target program)
-  maxNodeAccesses: Int,
-  // maximum accesses to one this procedure's cells (considers memory accesses across the entire target program)
-  maxCellAccesses: Int
+  totalNodes: Int,
+  totalCollapsed: Int,
+  maxCellDensity: Double
 )
 
-// def getDsaProgramMetrics(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]) = {
-//   val accesses: Set[MemoryAccessConstraint[_]] = dsaCtx.constraints.filter{ case (k, v) => !ignoredProcs.contains(k) }.values.flatten.toSet.collect { case m: MemoryAccessConstraint[_] => m }
-//   val cellsOfAccesses: Map[MemoryAccessConstraint[_], Set[IntervalCell]] = accesses.map(access => access ->
-//     dsaCtx.topDown.filter{ case (k, v) => !ignoredProcs.contains(k) }.values.flatMap(dsg => dsg.exprToCells(access.index).toSet.map(dsg.get).toSet).toSet).toMap
-//   val dsaProcedureMetrics: Map[Procedure, DsaProcedureMetrics] = dsaCtx.topDown.filter{ case (k, v) => !ignoredProcs.contains(k) }.map((proc, dsg) => proc -> getProcedureMetrics(dsaCtx, dsg, cellsOfAccesses))
-//   val maxNodeAccesses: Int = dsaProcedureMetrics.values.map(_.maxNodeAccesses).max
-//   val maxCellAccesses: Int = dsaProcedureMetrics.values.map(_.maxCellAccesses).max
-//   val accessesCount: Int = accesses.size
-//   val maxNodeDensity: Double = maxNodeAccesses.toDouble / accessesCount
-//   val maxCellDensity: Double = maxCellAccesses.toDouble / accessesCount
-//   var collapsedStacks: Int = 0
-//   for ((proc, dsg) <- dsaCtx.topDown.filter{ case (k, v) => !ignoredProcs.contains(k) }) {
-//     if !IntervalDSA.checksStackMaintained(dsg) then collapsedStacks += 1
-//   }
-//   var globalCells: Int = 0
-//   for ((proc, dsg) <- dsaCtx.topDown.filter{ case (k, v) => !ignoredProcs.contains(k) }) {
-//     for (node <- dsg.collect()(0).filterNot(_.isCollapsed)) {
-//       if node.flags.global then globalCells += node.cells.size
-//     }
-//   }
-
-//   DsaProgramMetrics(
-//     accesses,
-//     cellsOfAccesses,
-//     dsaProcedureMetrics,
-//     maxNodeAccesses,
-//     maxCellAccesses,
-//     accessesCount,
-//     maxNodeDensity,
-//     maxCellDensity,
-//     collapsedStacks,
-//     globalCells
-//   )
-// }
-
-// def getProcedureMetrics(dsaCtx: DSAContext, dsg: IntervalGraph, cellsOfAccesses: Map[MemoryAccessConstraint[_], Set[IntervalCell]]) = {
-//   val nodes: Set[IntervalNode] = dsg.collect()(0)
-//   val collapsed: Set[IntervalNode] = nodes.filter(_.isCollapsed)
-//   val cells: Set[IntervalCell] = nodes.flatMap(_.cells)
-//   val nodeAccesses: Map[IntervalNode, Set[MemoryAccessConstraint[_]]] = nodes.map(node => node ->
-//     cellsOfAccesses.filter((access, cells) => !(cells & node.cells.toSet).isEmpty).keySet).toMap
-//   val cellAccesses: Map[IntervalCell, Set[MemoryAccessConstraint[_]]] = cells.map(cell => cell ->
-//     cellsOfAccesses.filter((access, cellsAccessed) => cellsAccessed.contains(cell)).keySet).toMap
-//   val maxNodeAccesses: Int = nodeAccesses.values.map(_.size).max
-//   val maxCellAccesses: Int = cellAccesses.values.map(_.size).max
-//   DsaProcedureMetrics(
-//     nodes,
-//     collapsed,
-//     cells,
-//     nodeAccesses,
-//     cellAccesses,
-//     maxNodeAccesses,
-//     maxCellAccesses
-//   )
-// }
-
 def getDsaProgramMetrics(dsaCtx: DSAContext, ignoredProcs: Set[Procedure]) = {
-  // filter once upfront
   val relevantConstraints = dsaCtx.constraints.view.filterKeys(!ignoredProcs.contains(_))
   val relevantTopDown = dsaCtx.topDown.view.filterKeys(!ignoredProcs.contains(_))
   
-  // collect accesses without intermediate collections
   val accesses: Set[MemoryAccessConstraint[_]] = relevantConstraints.values.flatten.collect { 
     case m: MemoryAccessConstraint[_] => m 
   }.toSet
   
-  // avoid flatMap creating intermediate collections - use iterator
-  val cellsOfAccesses: Map[MemoryAccessConstraint[_], Set[IntervalCell]] = accesses.iterator.map { access =>
-    val cells = relevantTopDown.iterator.flatMap { case (_, dsg) =>
-      dsg.exprToCells(access.index).iterator.map(dsg.get)
-    }.toSet
-    access -> cells
-  }.toMap
+  val accessesCount = accesses.size
   
-  val dsaProcedureMetrics: Map[Procedure, DsaProcedureMetrics] = 
-    relevantTopDown.map((proc, dsg) => proc -> getProcedureMetrics(dsg, cellsOfAccesses)).toMap
+  // precompute access->cells mapping ONCE across all procedures
+  val accessToCells = scala.collection.mutable.Map[MemoryAccessConstraint[_], scala.collection.mutable.Set[IntervalCell]]()
+  for ((proc, dsg) <- relevantTopDown; access <- accesses) {
+    val cells = dsg.exprToCells(access.index).map(dsg.get)
+    if (!accessToCells.contains(access)) {
+      accessToCells(access) = scala.collection.mutable.Set.empty
+    }
+    accessToCells(access) ++= cells
+  }
   
-  val maxNodeAccesses: Int = dsaProcedureMetrics.valuesIterator.map(_.maxNodeAccesses).max
-  val maxCellAccesses: Int = dsaProcedureMetrics.valuesIterator.map(_.maxCellAccesses).max
-  val accessesCount: Int = accesses.size
-  val maxNodeDensity: Double = maxNodeAccesses.toDouble / accessesCount
-  val maxCellDensity: Double = maxCellAccesses.toDouble / accessesCount
+  var maxCellAccesses = 0
+  var totalNodes = 0
+  var totalCollapsed = 0
   
-  // combine stack and global checks into single pass
-  var collapsedStacks = 0
-  var globalCells = 0
   for ((proc, dsg) <- relevantTopDown) {
-    if !IntervalDSA.checksStackMaintained(dsg) then collapsedStacks += 1
-    globalCells += dsg.collect()(0).iterator.filterNot(_.isCollapsed).filter(_.flags.global).map(_.cells.size).sum
-  }
-
-  DsaProgramMetrics(accesses, cellsOfAccesses, dsaProcedureMetrics, maxNodeAccesses, 
-    maxCellAccesses, accessesCount, maxNodeDensity, maxCellDensity, collapsedStacks, globalCells)
-}
-
-// def getProcedureMetrics(dsg: IntervalGraph, cellsOfAccesses: Map[MemoryAccessConstraint[_], Set[IntervalCell]]) = {
-//   val nodes: Set[IntervalNode] = dsg.collect()(0)
-//   val collapsed: Set[IntervalNode] = nodes.filter(_.isCollapsed)
-//   val cells: Set[IntervalCell] = nodes.flatMap(_.cells)
-  
-//   // build both maps in single pass over cellsOfAccesses
-//   val nodeAccessesBuilder = scala.collection.mutable.Map[IntervalNode, Set[MemoryAccessConstraint[_]]]()
-//   val cellAccessesBuilder = scala.collection.mutable.Map[IntervalCell, Set[MemoryAccessConstraint[_]]]()
-  
-//   nodes.foreach(n => nodeAccessesBuilder(n) = Set.empty)
-//   cells.foreach(c => cellAccessesBuilder(c) = Set.empty)
-  
-//   for ((access, cellsAccessed) <- cellsOfAccesses) {
-//     for (cell <- cellsAccessed if cells.contains(cell)) {
-//       cellAccessesBuilder(cell) = cellAccessesBuilder(cell) + access
-//       for (node <- nodes if node.cells.contains(cell)) {
-//         nodeAccessesBuilder(node) = nodeAccessesBuilder(node) + access
-//       }
-//     }
-//   }
-  
-//   val nodeAccesses = nodeAccessesBuilder.toMap
-//   val cellAccesses = cellAccessesBuilder.toMap
-//   val maxNodeAccesses: Int = if (nodeAccesses.isEmpty) 0 else nodeAccesses.valuesIterator.map(_.size).max
-//   val maxCellAccesses: Int = if (cellAccesses.isEmpty) 0 else cellAccesses.valuesIterator.map(_.size).max
-  
-//   DsaProcedureMetrics(nodes, collapsed, cells, nodeAccesses, cellAccesses, maxNodeAccesses, maxCellAccesses)
-// }
-
-def getProcedureMetrics(dsg: IntervalGraph, cellsOfAccesses: Map[MemoryAccessConstraint[_], Set[IntervalCell]]) = {
-  val nodes: Set[IntervalNode] = dsg.collect()(0)
-  val collapsed: Set[IntervalNode] = nodes.filter(_.isCollapsed)
-  val cells: Set[IntervalCell] = nodes.flatMap(_.cells)
-  
-  // precompute cell-to-node mapping once
-  val cellToNodes = scala.collection.mutable.Map[IntervalCell, Set[IntervalNode]]()
-  for (node <- nodes; cell <- node.cells) {
-    cellToNodes(cell) = cellToNodes.getOrElse(cell, Set.empty) + node
-  }
-  
-  // build both maps in single pass
-  val nodeAccessesBuilder = scala.collection.mutable.Map[IntervalNode, scala.collection.mutable.Set[MemoryAccessConstraint[_]]]()
-  val cellAccessesBuilder = scala.collection.mutable.Map[IntervalCell, scala.collection.mutable.Set[MemoryAccessConstraint[_]]]()
-  
-  nodes.foreach(n => nodeAccessesBuilder(n) = scala.collection.mutable.Set.empty)
-  cells.foreach(c => cellAccessesBuilder(c) = scala.collection.mutable.Set.empty)
-  
-  for ((access, cellsAccessed) <- cellsOfAccesses; cell <- cellsAccessed if cells.contains(cell)) {
-    cellAccessesBuilder(cell) += access
-    // use precomputed mapping instead of iterating all nodes
-    for (node <- cellToNodes.getOrElse(cell, Set.empty)) {
-      nodeAccessesBuilder(node) += access
+    val nodes = dsg.collect()(0)
+    totalNodes += nodes.size
+    totalCollapsed += nodes.count(_.isCollapsed)
+    
+    val cells = nodes.flatMap(_.cells)
+    for (cell <- cells) {
+      // count how many accesses touch this cell
+      val count = accessToCells.count { case (access, cellSet) => cellSet.contains(cell) }
+      if (count > maxCellAccesses) maxCellAccesses = count
     }
   }
   
-  val nodeAccesses = nodeAccessesBuilder.view.mapValues(_.toSet).toMap
-  val cellAccesses = cellAccessesBuilder.view.mapValues(_.toSet).toMap
-  val maxNodeAccesses: Int = if (nodeAccesses.isEmpty) 0 else nodeAccesses.valuesIterator.map(_.size).max
-  val maxCellAccesses: Int = if (cellAccesses.isEmpty) 0 else cellAccesses.valuesIterator.map(_.size).max
+  val maxCellDensity = maxCellAccesses.toDouble / accessesCount
   
-  DsaProcedureMetrics(nodes, collapsed, cells, nodeAccesses, cellAccesses, maxNodeAccesses, maxCellAccesses)
+  DsaProgramMetrics(totalNodes, totalCollapsed, maxCellDensity)
 }
 
-// def dsaMetricsToCsvLine(metrics: DsaProgramMetrics) = {
-//   // dsa-default Nodes, dsa-default Nodes Collapsed, dsa-default Max Node Density, dsa-default Cells, dsa-default Max Cell Density
-//   val nodes = metrics.procedureMetrics.values.flatMap(_.nodes)
-//   val nodeCount = nodes.size.toString
-//   val collapsedCount = nodes.filter(_.isCollapsed).size.toString
-//   // val maxNodeDensity = metrics.maxNodeDensity.toString
-//   // val cells = metrics.procedureMetrics.values.flatMap(_.cells)
-//   // val cellCount = cells.size.toString
-//   val maxCellDensity = metrics.maxCellDensity.toString
-//   s"$nodeCount,$collapsedCount,$maxCellDensity"
-// }
-
 def dsaMetricsToCsvLine(metrics: DsaProgramMetrics) = {
-  val nodeCount = metrics.procedureMetrics.values.map(_.nodes.size).sum.toString
-  val collapsedCount = metrics.procedureMetrics.values.map(_.collapsed.size).sum.toString
-  val maxCellDensity = metrics.maxCellDensity.toString
-  s"$nodeCount,$collapsedCount,$maxCellDensity"
+  s"${metrics.totalNodes},${metrics.totalCollapsed},${metrics.maxCellDensity}"
 }
