@@ -139,9 +139,7 @@ class IntraLiveVarsDomain extends PowerSetDomain[Variable] {
       case a: Assume => s ++ a.body.variables
       case a: Assert => s ++ a.body.variables
       case i: IndirectCall => s + i.target
-      case c: DirectCall => {
-        s -- c.outParams.map(_._2) ++ c.actualParams.flatMap(_._2.variables)
-      }
+      case c: DirectCall => (s -- c.outParams.map(_._2)) ++ c.actualParams.flatMap(_._2.variables)
       case g: GoTo => s
       case r: Return => s ++ r.outParams.flatMap(_._2.variables)
       case r: Unreachable => s
@@ -1269,31 +1267,20 @@ object OffsetProp {
         case _ => throw Exception("Unexpected expression structure created by find() at some point")
       }
 
-    def find(v: Variable, fuel: Int = 10000): BitVecLiteral | Variable | BinaryExpr = {
-      if (fuel == 0) {
-        var chain = List(v)
-        for (i <- 0 to 10) {
-          chain = st.get(chain.head) match {
-            case Some((Some(v: Variable), _)) => v :: chain
-            case o =>
-              chain
+==== BASE ====
+    def joinState(lhs: Variable, rhs: Expr) = {
+      specJoinState(lhs, rhs) match {
+        case Some((l, r)) => {
+          if (st.contains(l) && st(l) != r) {
+            stSequenceNo += 1
           }
+          st(l) = r
         }
-
-        update(v, (None, None))
-        SimplifyLogger.error(
-          s"Ran out of fuel recursively resolving copyprop (at $v): probable cycle. Next lookups are: $chain"
-        )
-      }
-      st.get(v) match {
-        case None => v
-        case Some((None, None)) => v
-        case Some((None, Some(c))) => c
-        case Some((Some(v), None)) => find(v, fuel - 1)
-        case Some((Some(v), Some(c))) => findOff(v, c, fuel - 1)
+        case _ => ()
       }
     }
 
+==== BASE ====
     def specJoinState(lhs: Variable, rhs: Expr): Option[(Variable, Value)] = {
       rhs match {
         case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if (!st.contains(lhs)) =>
