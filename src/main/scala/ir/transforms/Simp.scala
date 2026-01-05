@@ -1258,7 +1258,6 @@ object OffsetProp {
         case _ => throw Exception("Unexpected expression structure created by find() at some point")
       }
 
-
     def find(v: Variable, fuel: Int = 1000): BitVecLiteral | Variable | BinaryExpr = {
       if (fuel == 0) {
         var chain = List(v)
@@ -1278,11 +1277,9 @@ object OffsetProp {
         case Some((None, None)) => v
         case Some((None, Some(c))) => c
         case Some((Some(v), None)) => find(v, fuel - 1)
-        case Some((Some(v), Some(c))) => 
-        (v, c, fuel - 1)
+        case Some((Some(v), Some(c))) => findOff(v, c, fuel - 1)
       }
     }
-
 
     def specJoinState(lhs: Variable, rhs: Expr): Option[(Variable, Value)] = {
       rhs match {
