@@ -334,6 +334,11 @@ class GoTo private (_targets: mutable.LinkedHashSet[Block], var label: Option[St
     debugAssert(!t.incomingJumps.contains(this))
   }
 
+  def replaceTarget(oldBlock: Block, newBlock: Block): Unit = {
+    removeTarget(oldBlock)
+    addTarget(newBlock)
+  }
+
   override def toString: String = s"${labelStr}GoTo(${targets.map(_.label).mkString(", ")})"
 }
 

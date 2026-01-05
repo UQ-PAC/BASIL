@@ -7,7 +7,6 @@ import util.functional.*
 import util.functional.State.*
 
 import scala.annotation.tailrec
-import scala.collection.immutable
 
 /**
  * Procedure signature used when returning from procedures and intrinsics.

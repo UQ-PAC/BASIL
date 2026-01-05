@@ -14,7 +14,6 @@ import util.{DebugDumpIRLogger, Logger}
 
 import java.io.{BufferedWriter, File, FileWriter, PrintWriter}
 import java.nio.file.{Files, Paths}
-import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 

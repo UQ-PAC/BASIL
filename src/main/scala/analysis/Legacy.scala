@@ -4,8 +4,6 @@ import analysis.Interval as _
 import analysis.data_structure_analysis.*
 import ir.*
 
-import scala.jdk.CollectionConverters.*
-
 case class StaticAnalysisContext(
   intraProcConstProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
   interProcConstProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],

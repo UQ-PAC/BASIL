@@ -1,8 +1,8 @@
 package ir
 
-import analysis.{Loop, MergedRegion}
+import analysis.IrreducibleLoops.BlockLoopInfo
+import analysis.MergedRegion
 import boogie.*
-import translating.PrettyPrinter.*
 import util.assertion.*
 import util.functional.Snoc
 import util.intrusive_list.*
@@ -640,9 +640,9 @@ class Block private (
   def isReturn: Boolean = parent.returnBlock.contains(this)
   def isEntry: Boolean = parent.entryBlock.contains(this)
 
-  var inLoop: Set[Loop] = Set()
-  def isLoopHeader() = inLoop.exists(x => x.header == this)
-  def isLoopParticipant() = inLoop.nonEmpty
+  var loopInfo: Option[BlockLoopInfo] = None
+  def isLoopHeader() = loopInfo.fold(false)(_.isLoopHeader)
+  def isLoopParticipant() = loopInfo.fold(false)(_.isLoopParticipant)
 
   def jump: Jump = _jump
 

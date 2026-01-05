@@ -4,8 +4,6 @@ import org.scalatest.funsuite.AnyFunSuite
 import test_util.CaptureOutput
 import util.Logger
 
-import scala.runtime.stdLibPatches.Predef.assert
-
 @test_util.tags.UnitTest
 class BitVectorAnalysisTests extends AnyFunSuite with CaptureOutput {
 

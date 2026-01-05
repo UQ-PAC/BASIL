@@ -3,7 +3,6 @@ package ir.transforms
 import ir.*
 import ir.cilvisitor.*
 import ir.eval.{AlgebraicSimplifications, AssumeConditionSimplifications, simplifyExprFixpoint}
-import translating.PrettyPrinter.*
 import util.assertion.*
 import util.{SimplifyLogger, condPropDebugLogger}
 
@@ -1250,15 +1249,6 @@ object OffsetProp {
     val lastUpdate = mutable.Map[Block, Int]()
     var stSequenceNo = 1
 
-    def eval(c: BitVecLiteral)(v: BitVecLiteral | Variable | BinaryExpr): BitVecLiteral | Variable | BinaryExpr =
-      v match {
-        case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
-        case lv: Variable => BinaryExpr(BVADD, lv, c)
-        case BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) =>
-          BinaryExpr(BVADD, l, ir.eval.BitVectorEval.smt_bvadd(r, c))
-        case _ => throw Exception("Unexpected expression structure created by find() at some point")
-      }
-
     def findOff(v: Variable, c: BitVecLiteral, fuel: Int = 1000): BitVecLiteral | Variable | BinaryExpr =
       find(v, fuel) match {
         case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
@@ -1267,6 +1257,7 @@ object OffsetProp {
           BinaryExpr(BVADD, l, ir.eval.BitVectorEval.smt_bvadd(r, c))
         case _ => throw Exception("Unexpected expression structure created by find() at some point")
       }
+
 
     def find(v: Variable, fuel: Int = 1000): BitVecLiteral | Variable | BinaryExpr = {
       if (fuel == 0) {
@@ -1287,9 +1278,11 @@ object OffsetProp {
         case Some((None, None)) => v
         case Some((None, Some(c))) => c
         case Some((Some(v), None)) => find(v, fuel - 1)
-        case Some((Some(v), Some(c))) => findOff(v, c, fuel - 1)
+        case Some((Some(v), Some(c))) => 
+        (v, c, fuel - 1)
       }
     }
+
 
     def specJoinState(lhs: Variable, rhs: Expr): Option[(Variable, Value)] = {
       rhs match {

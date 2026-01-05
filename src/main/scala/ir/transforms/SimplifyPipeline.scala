@@ -2,7 +2,6 @@ package ir.transforms
 
 import analysis.{AnalysisManager, Interval as _, *}
 import ir.*
-import translating.*
 import translating.PrettyPrinter.*
 import util.{AnalysisResultDotLogger, DebugDumpIRLogger, Logger, PerformanceTimer, StaticAnalysisConfig}
 
@@ -14,9 +13,7 @@ def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]): Unit = {
   val timer = PerformanceTimer("Simplify")
   val program = ctx.program
 
-  val foundLoops = LoopDetector.identify_loops(program)
-  val newLoops = foundLoops.reducibleTransformIR()
-  newLoops.updateIrWithLoops()
+  IrreducibleLoops.transform_all_and_update(program)
 
   for (p <- program.procedures) {
     p.normaliseBlockNames()
