@@ -15,9 +15,11 @@ in the OUTPUTDIR.
 positional arguments:
   INPUTDIR     input directory (this will be copied! make sure it is not too big)
   OUTPUTDIR    output directory to place binary and lifted files
-  COMMAND      custom compiler command and arguments. this should produce an
-                   'a.out' file (available compilers: gcc, clang)
-                   (default: gcc with all C files in directory)
+  COMMAND      custom compiler command and arguments. this must produce an
+                   'a.out' file. this will be interpreted by the shell within
+                   Nix and so may contain globs or environment variable definitions.
+                   (available compilers: gcc, clang)
+                   (default: gcc *.c)
 EOF
   exit $1
 }
@@ -64,6 +66,7 @@ tmpinputdir="$(echo "$inputdir" | sha1sum | tr -d ' -')"
 tmpinputdir="$(dirname "$outfile")/basil-nix-cc-input-$tmpinputdir"
 rm -rf "$tmpinputdir"
 (set -x; cp -r "$inputdir" "$tmpinputdir")
+echo "$command" > $tmpinputdir/.command
 inputdir="$tmpinputdir"
 
 # --extra-substituters https://pac-nix.cachix.org --extra-trusted-public-keys "pac-nix.cachix.org-1:l29Pc2zYR5yZyfSzk1v17uEZkhEw0gI4cXuOIsxIGpc=" \
@@ -75,6 +78,7 @@ nix-build --extra-experimental-features "nix-command flakes" --no-out-link \
     pkgs = pac-nix.packages.\${system};
     aarch64pkgs = pac-nix.inputs.nixpkgs.legacyPackages.\${system}.pkgsCross.aarch64-multiplatform;
   in aarch64pkgs.runCommand "basil-test-files" {
+      hardeningDisable = [ "all" ];
       nativeBuildInputs = [
         aarch64pkgs.buildPackages.gcc
         aarch64pkgs.buildPackages.clang
@@ -87,10 +91,11 @@ nix-build --extra-experimental-features "nix-command flakes" --no-out-link \
       shopt -s expand_aliases
       mkdir \$out
       cp -r \${$inputdir}/. .
+      command="\$(cat .command)"
       (set -x;
         ls
         : BUILDING WITH COMMAND:
-        $command
+        eval "\$command"
         : ... DONE BUILDING.
         aarch64-unknown-linux-gnu-readelf -s -r -W a.out > a.relf
         aarch64-unknown-linux-gnu-objdump -d a.out > a.objdump
