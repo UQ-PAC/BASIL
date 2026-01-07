@@ -32,3 +32,4 @@ src/test/*.md.part
 src/test/summary-*.md
 docs/book/**
 docs/book
+dsa-results.csv
