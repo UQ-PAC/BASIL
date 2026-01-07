@@ -139,63 +139,151 @@ object RunUtils {
     assert(ir.invariant.programDiamondForm(ctx.program))
     var dsaContext: Option[DSAContext] = None
     if (conf.dsaConfig.isDefined) {
+      val dsaConfig = conf.dsaConfig.get
       updateWithCallSCC(ctx.program)
       val startTime = System.currentTimeMillis()
-      val dsaResults = IntervalDSA(ctx, conf.dsaConfig.get).dsa()
+      val dsaResults = IntervalDSA(ctx, dsaConfig).dsa()
       val endTime = System.currentTimeMillis()
       val dsaTimePerformance = endTime - startTime
       dsaContext = Some(dsaResults)
 
-      if (q.memoryTransform && conf.dsaConfig.get.phase == DSAPhase.TD) { // need more than prereq
+      if (q.memoryTransform && dsaConfig.phase == DSAPhase.TD) { // need more than prereq
         val memTransferTimer = PerformanceTimer("Mem Transfer Timer", INFO)
         visit_prog(MemoryTransform(dsaResults.topDown, dsaResults.globals), ctx.program)
         memTransferTimer.checkPoint("Performed Memory Transform")
       }
-      
-      // write DSG of main procedure to file
-      // Logger.writeToFile(File("main_dsg.dot"), dsaResults.topDown(ctx.program.mainProcedure).toDot)
-      // print dsa info
+
       val ignoredProcNames = Set("_start", "__libc_start_main")
       val ignoredProcs = ctx.program.procedures.filter{ proc => ignoredProcNames.contains(proc.procName) }.toSet
-      val metrics = getDsaProgramMetrics(dsaResults, ignoredProcs)
-      Logger.writeToFile(File("dsa_stats.txt"),
-        s"${metrics.toString}\n\nTime to run DSA: ${dsaTimePerformance}ms")
 
-      var collapsedStacksLocal = 0
-      for ((proc, dsg) <- dsaResults.local.filter{ case (k, v) => !ignoredProcs.contains(k) }) {
-        if !IntervalDSA.checksStackMaintained(dsg) then collapsedStacksLocal += 1
-      }
-      Logger.println("Collapsed Stacks Local: " + collapsedStacksLocal)
-      var collapsedStacksBu = 0
-      for ((proc, dsg) <- dsaResults.bottomUp.filter{ case (k, v) => !ignoredProcs.contains(k) }) {
-        if !IntervalDSA.checksStackMaintained(dsg) then collapsedStacksBu += 1
-      }
-      Logger.println("Collapsed Stacks Bottom Up: " + collapsedStacksBu)
-      var collapsedStacksTd = 0
-      for ((proc, dsg) <- dsaResults.topDown.filter{ case (k, v) => !ignoredProcs.contains(k) }) {
-        if !IntervalDSA.checksStackMaintained(dsg) then collapsedStacksTd += 1
-      }
-      Logger.println("Collapsed Stacks Top Down: " + collapsedStacksTd)
+      var targetName = File(conf.loading.inputFile).getName.stripSuffix(".gts")
+      if conf.dsaConfig.get.splitGlobals then targetName += "-split"
+      if conf.dsaConfig.get.eqClasses then targetName += "-eqv"
 
-      for ((proc, dsg) <- dsaResults.topDown.filterNot{ case (k, v) => ignoredProcs.contains(k) }) {
-        var globalCells = Set.empty[IntervalCell]
-        for (node <- dsg.collect()(0).filterNot(_.isCollapsed)) {
-          if (node.flags.global) {
-            for (cell <- node.cells) {
-              var alreadyAdded = false
-              for (countedCell <- globalCells) {
-                if (cell.equiv(countedCell)) {
-                  alreadyAdded = true
+      if (dsaConfig.appendDsaStats.isDefined) {
+        val path = dsaConfig.appendDsaStats.get
+        // generate metrics
+        val metrics = getDsaProgramMetrics(dsaResults, ignoredProcs)
+        // append metrics to file
+        val existingContent = if (File(path).exists()) then scala.io.Source.fromFile(path).mkString else ""
+        Logger.writeToFile(File(path), existingContent + "\n" + targetName + "," + dsaMetricsToCsvLine(metrics) + "," + dsaTimePerformance)
+      } else {
+        // count collapsed stacks
+        var collapsedStacksTd = 0
+        for ((proc, dsg) <- dsaResults.topDown.filter{ case (k, v) => !ignoredProcs.contains(k) }) {
+          if !IntervalDSA.checksStackMaintained(dsg) then collapsedStacksTd += 1
+        }
+        var toWrite = s"Collapsed Stacks: ${collapsedStacksTd}\n"
+        // count global cells for each procedure
+        toWrite = toWrite + "Global Cells:\n"
+        for ((proc, dsg) <- dsaResults.topDown.filterNot{ case (k, v) => ignoredProcs.contains(k) }) {
+          var globalCells = Set.empty[IntervalCell]
+          for (node <- dsg.collect()(0).filterNot(_.isCollapsed)) {
+            if (node.flags.global) {
+              for (cell <- node.cells) {
+                var alreadyAdded = false
+                for (countedCell <- globalCells) {
+                  if (cell.equiv(countedCell)) {
+                    alreadyAdded = true
+                  }
                 }
-              }
-              if (!alreadyAdded) {
-                globalCells += cell
+                if (!alreadyAdded) {
+                  globalCells += cell
+                }
               }
             }
           }
+          toWrite = toWrite + s"${proc.procName}: ${globalCells.size}\n"
         }
-        Logger.println(s"${proc.procName}: ${globalCells.size}")
+        // write to file
+        Logger.writeToFile(File(targetName + "-collapses.txt"), toWrite)
       }
+
+      // if (q.dumpDsaNodeCollapses.isDefined) {
+        // // count collapsed stacks
+        // var collapsedStacksTd = 0
+        // for ((proc, dsg) <- dsaResults.topDown.filter{ case (k, v) => !ignoredProcs.contains(k) }) {
+        //   if !IntervalDSA.checksStackMaintained(dsg) then collapsedStacksTd += 1
+        // }
+        // var toWrite = s"Collapsed Stacks: ${collapsedStacksTd}\n"
+        // // count global cells for each procedure
+        // toWrite = toWrite + "Global Cells:\n"
+        // for ((proc, dsg) <- dsaResults.topDown.filterNot{ case (k, v) => ignoredProcs.contains(k) }) {
+        //   var globalCells = Set.empty[IntervalCell]
+        //   for (node <- dsg.collect()(0).filterNot(_.isCollapsed)) {
+        //     if (node.flags.global) {
+        //       for (cell <- node.cells) {
+        //         var alreadyAdded = false
+        //         for (countedCell <- globalCells) {
+        //           if (cell.equiv(countedCell)) {
+        //             alreadyAdded = true
+        //           }
+        //         }
+        //         if (!alreadyAdded) {
+        //           globalCells += cell
+        //         }
+        //       }
+        //     }
+        //   }
+        //   toWrite = toWrite + s"${proc.procName}: ${globalCells.size}\n"
+        // }
+        // // write to file
+        // Logger.writeToFile(File(dsaConfig.dumpDsaNodeCollapses.get), toWrite)
+      
+      // }
+ 
+
+
+      // write DSG of main procedure to file
+      // Logger.writeToFile(File("main_dsg.dot"), dsaResults.topDown(ctx.program.mainProcedure).toDot)
+      // print dsa info
+      // val ignoredProcNames = Set("_start", "__libc_start_main")
+      // val ignoredProcs = ctx.program.procedures.filter{ proc => ignoredProcNames.contains(proc.procName) }.toSet
+      // val metrics = getDsaProgramMetrics(dsaResults, ignoredProcs)
+      // Logger.writeToFile(File("dsa_stats.txt"),
+      //   s"${metrics.toString}\n\nTime to run DSA: ${dsaTimePerformance}ms")
+
+      // var collapsedStacksLocal = 0
+      // for ((proc, dsg) <- dsaResults.local.filter{ case (k, v) => !ignoredProcs.contains(k) }) {
+      //   if !IntervalDSA.checksStackMaintained(dsg) then collapsedStacksLocal += 1
+      // }
+      // Logger.println("Collapsed Stacks Local: " + collapsedStacksLocal)
+      // var collapsedStacksBu = 0
+      // for ((proc, dsg) <- dsaResults.bottomUp.filter{ case (k, v) => !ignoredProcs.contains(k) }) {
+      //   if !IntervalDSA.checksStackMaintained(dsg) then collapsedStacksBu += 1
+      // }
+      // Logger.println("Collapsed Stacks Bottom Up: " + collapsedStacksBu)
+
+
+
+      // var collapsedStacksTd = 0
+      // for ((proc, dsg) <- dsaResults.topDown.filter{ case (k, v) => !ignoredProcs.contains(k) }) {
+      //   if !IntervalDSA.checksStackMaintained(dsg) then collapsedStacksTd += 1
+      // }
+      // Logger.println("Collapsed Stacks Top Down: " + collapsedStacksTd)
+
+      // for ((proc, dsg) <- dsaResults.topDown.filterNot{ case (k, v) => ignoredProcs.contains(k) }) {
+      //   var globalCells = Set.empty[IntervalCell]
+      //   for (node <- dsg.collect()(0).filterNot(_.isCollapsed)) {
+      //     if (node.flags.global) {
+      //       for (cell <- node.cells) {
+      //         var alreadyAdded = false
+      //         for (countedCell <- globalCells) {
+      //           if (cell.equiv(countedCell)) {
+      //             alreadyAdded = true
+      //           }
+      //         }
+      //         if (!alreadyAdded) {
+      //           globalCells += cell
+      //         }
+      //       }
+      //     }
+      //   }
+      //   Logger.println(s"${proc.procName}: ${globalCells.size}")
+      // }
+
+
+
 
       // val basename = File(conf.loading.inputFile).getName.stripSuffix(".gts")
       // var fullname = basename + "-dsa"
@@ -203,12 +291,12 @@ object RunUtils {
       // if conf.dsaConfig.get.eqClasses then fullname += "-eqv"
       // fullname += "-stats.txt"
 
-      var targetName = File(conf.loading.inputFile).getName.stripSuffix(".gts")
-      if conf.dsaConfig.get.splitGlobals then targetName += "-split"
-      if conf.dsaConfig.get.eqClasses then targetName += "-eqv"
+      // var targetName = File(conf.loading.inputFile).getName.stripSuffix(".gts")
+      // if conf.dsaConfig.get.splitGlobals then targetName += "-split"
+      // if conf.dsaConfig.get.eqClasses then targetName += "-eqv"
 
-      val existingContent = if (File("dsa-results.csv").exists()) then scala.io.Source.fromFile("dsa-results.csv").mkString else ""
-      Logger.writeToFile(File("dsa-results.csv"), existingContent + "\n" + targetName + "," + dsaMetricsToCsvLine(metrics) + "," + dsaTimePerformance)
+      // val existingContent = if (File("dsa-results.csv").exists()) then scala.io.Source.fromFile("dsa-results.csv").mkString else ""
+      // Logger.writeToFile(File("dsa-results.csv"), existingContent + "\n" + targetName + "," + dsaMetricsToCsvLine(metrics) + "," + dsaTimePerformance)
 
       // Logger.writeToFile(File(fullname), dsaMetricsToCsvLine(metrics) + "," + dsaTimePerformance)
     }

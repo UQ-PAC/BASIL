@@ -62,7 +62,8 @@ case class DSConfig(
   splitGlobals: Boolean = false,
   globalAsserts: Boolean = false,
   eqClasses: Boolean = false,
-  checks: Boolean = true
+  checks: Boolean = true,
+  appendDsaStats: Option[String]
 )
 
 enum BoogieMemoryAccessMode {

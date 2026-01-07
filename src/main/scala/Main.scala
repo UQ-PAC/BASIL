@@ -249,6 +249,18 @@ object Main {
     dsaEqCells: Flag,
     @arg(name = "dsa-assert", doc = "insert assertions to check globals offset to top fall within global region bounds")
     dsaAssert: Flag,
+    @arg(
+      name = "append-dsa-stats",
+      doc =
+        "Appends the comma-separated values to the given file: Nodes, Nodes Collapsed, Max Cell Density"
+    )
+    appendDsaStats: Option[String],
+    // @arg(
+    //   name = "dump-dsa-node-collapses",
+    //   doc =
+    //     "Overwrites the given file with data about local and global DSA node collapses"
+    // )
+    // dumpDsaNodeCollapses: Option[String],
     @arg(name = "memory-transform", doc = "Transform memory access to region accesses")
     memoryTransform: Flag,
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
@@ -350,7 +362,8 @@ object Main {
                 conf.dsaSplitGlobals.value,
                 conf.dsaAssert.value,
                 conf.dsaEqCells.value,
-                conf.dsaChecks.value
+                conf.dsaChecks.value,
+                conf.appendDsaStats
               )
             )
           else throw new IllegalArgumentException(s"enabling --dsa requires --simplify")
