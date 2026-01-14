@@ -148,6 +148,10 @@ object RunUtils {
         memTransferTimer.checkPoint("Performed Memory Transform")
     }
 
+    if (conf.memoryEncoding) {
+      visit_prog(transforms.MemoryEncodingTransform(), ctx.program)
+    }
+
     if q.summariseProcedures then
       getGenerateProcedureSummariesTransform(q.loading.parameterForm || q.simplify)(ctx, analysisManager)
 

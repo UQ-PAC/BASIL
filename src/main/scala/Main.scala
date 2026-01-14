@@ -373,7 +373,7 @@ object Main {
       BoogieMemoryAccessMode.SuccessiveStoreSelect
     }
     val boogieGeneratorConfig =
-      BoogieGeneratorConfig(boogieMemoryAccessMode, true, rely, conf.threadSplit.value, conf.noif.value, conf.memoryEncoding.value)
+      BoogieGeneratorConfig(boogieMemoryAccessMode, true, rely, conf.threadSplit.value, conf.noif.value)
 
     var loadingInputs = if (conf.bapInputDirName.isDefined) then {
       loadDirectory(ChooseInput.Bap, conf.bapInputDirName.get)
@@ -474,7 +474,8 @@ object Main {
       outputPrefix = conf.outFileName,
       dsaConfig = dsa,
       memoryTransform = conf.memoryTransform.value,
-      assertCalleeSaved = calleeSaved
+      assertCalleeSaved = calleeSaved,
+      memoryEncoding = conf.memoryEncoding.value
     )
 
     Logger.info(programNameVersionHeader)
