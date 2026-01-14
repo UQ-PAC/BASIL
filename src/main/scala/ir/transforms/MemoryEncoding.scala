@@ -22,7 +22,7 @@ class MemoryEncodingTransform() extends CILVisitor {
 
   // Position is a mapping from pointer to its offset
   private val me_position = BMapVar("me_position", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
-  private val me_position_gamma = VMapVar("Gamma_me_position", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+  private val me_position_gamma = BMapVar("Gamma_me_position", MapBType(BitVecBType(64), BoolBType), Scope.Global)
   
   private def transform_malloc(p: Procedure) = {
     p.requires = p.requires ++ List(
@@ -35,23 +35,43 @@ class MemoryEncodingTransform() extends CILVisitor {
       // Alloc count is bumped up by 1 after every allocation
       BinaryBExpr(EQ, me_alloc_counter, BinaryBExpr(IntADD, Old(me_alloc_counter), IntBLiteral(BigInt(1)))),
 
-      // forall offset: bv64 :: (0 <= offset < 2^(64-M) /\ offset < R0) => me_object[offset] = me_alloc_counter
+      // Updates object mapping for all bytes in our allocated object
+      // forall offset: bv64 :: (0 <= offset < 2^(64-M) /\ offset < R0) => me_object[Old(R0) + offset] = Old(me_alloc_counter)
       ForAll(
         List(offset),
         BinaryBExpr(BoolIMPLIES,
           BinaryBExpr(BoolAND,
             BinaryBExpr(BoolAND,
               BinaryBExpr(BVULE, BitVecBLiteral(0,64), offset),
-              BinaryBExpr(BVULT, offset, r0)
+              BinaryBExpr(BVULT, offset, Old(r0))
             ),
             BinaryBExpr(BVULT, offset, BitVecBLiteral(scala.math.BigInt(2).pow(64-m), 64))
           ),
           BinaryBExpr(EQ,
-            MapAccess(me_object, offset),
-            Old(MapAccess(me_object, offset))
+            MapAccess(me_object, BinaryBExpr(BVADD, r0, offset)),
+            Old(me_alloc_counter)
           )
         )
-      )
+      ),
+
+      // Updates position mapping for all bytes in our allocated position
+      // forall offset: bv64 :: (0 <= offset < 2^(64-M) /\ offset < R0) => me_position[Old(R0) + offset] = offset
+      ForAll(
+        List(offset),
+        BinaryBExpr(BoolIMPLIES,
+          BinaryBExpr(BoolAND,
+            BinaryBExpr(BoolAND,
+              BinaryBExpr(BVULE, BitVecBLiteral(0,64), offset),
+              BinaryBExpr(BVULT, offset, Old(r0))
+            ),
+            BinaryBExpr(BVULT, offset, BitVecBLiteral(scala.math.BigInt(2).pow(64-m), 64))
+          ),
+          BinaryBExpr(EQ,
+            MapAccess(me_object, BinaryBExpr(BVADD, r0, offset)),
+            offset
+          )
+        )
+      ),
     )
   }
 
