@@ -254,7 +254,9 @@ object Main {
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
     noif: Flag,
     @arg(name = "nodebug", doc = "Disable runtime debug assertions")
-    noDebug: Flag
+    noDebug: Flag,
+    @arg(name = "memory-encoding", doc = "Enable memory encoding")
+    memoryEncoding: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -371,7 +373,7 @@ object Main {
       BoogieMemoryAccessMode.SuccessiveStoreSelect
     }
     val boogieGeneratorConfig =
-      BoogieGeneratorConfig(boogieMemoryAccessMode, true, rely, conf.threadSplit.value, conf.noif.value)
+      BoogieGeneratorConfig(boogieMemoryAccessMode, true, rely, conf.threadSplit.value, conf.noif.value, conf.memoryEncoding.value)
 
     var loadingInputs = if (conf.bapInputDirName.isDefined) then {
       loadDirectory(ChooseInput.Bap, conf.bapInputDirName.get)

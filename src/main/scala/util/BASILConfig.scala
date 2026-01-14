@@ -15,7 +15,8 @@ case class BoogieGeneratorConfig(
   coalesceConstantMemory: Boolean = true,
   procedureRely: Option[ProcRelyVersion] = None,
   threadSplit: Boolean = false,
-  directTranslation: Boolean = false
+  directTranslation: Boolean = false,
+  memoryEncoding: Boolean = false
 )
 
 case class ILLoadingConfig(
