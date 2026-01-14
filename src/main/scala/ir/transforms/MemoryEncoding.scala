@@ -10,18 +10,18 @@ class MemoryEncodingTransform() extends CILVisitor {
   
   // Helpful variables to have
   private val r0 = BVariable("R0", BitVecBType(64), Scope.Global)
-  private val r0_gamma = BVariable("Gamma_R0", BitVecBType(64), Scope.Global)
+  private val r0_gamma = BVariable("Gamma_R0", BoolBType, Scope.Global)
   private val offset = BVariable("offset", BitVecBType(64), Scope.Local)
   
   // Counter of allocations for getting a fresh id on new allocation
   private val me_alloc_counter = BVariable("me_alloc_counter", IntBType, Scope.Global)
 
   // Object is a mapping from pointer to allocation id
-  private val me_object = BMapVar("me_object", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+  private val me_object = BMapVar("me_object", MapBType(BitVecBType(64), IntBType), Scope.Global)
   private val me_object_gamma = BMapVar("Gamma_me_object", MapBType(BitVecBType(64), BoolBType), Scope.Global)
 
   // Position is a mapping from pointer to its offset
-  private val me_position = BMapVar("me_position", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+  private val me_position = BMapVar("me_position", MapBType(BitVecBType(64), BitVecBType(64)), Scope.Global)
   private val me_position_gamma = BMapVar("Gamma_me_position", MapBType(BitVecBType(64), BoolBType), Scope.Global)
 
   // Live is a mapping from allocation id to liveness
@@ -75,7 +75,7 @@ class MemoryEncodingTransform() extends CILVisitor {
             BinaryBExpr(BVULT, offset, BitVecBLiteral(scala.math.BigInt(2).pow(64-m), 64))
           ),
           BinaryBExpr(EQ,
-            MapAccess(me_object, BinaryBExpr(BVADD, r0, offset)),
+            MapAccess(me_position, BinaryBExpr(BVADD, r0, offset)),
             offset
           )
         )
@@ -84,13 +84,13 @@ class MemoryEncodingTransform() extends CILVisitor {
       // Ensures the object was fresh in the old live mapping
       BinaryBExpr(EQ,
         Old(MapAccess(me_live, Old(me_alloc_counter))),
-        BitVecBLiteral(2,64)
+        BitVecBLiteral(2,8)
       ),
 
       // Immediately make it Live now that its allocated
       BinaryBExpr(EQ,
         MapAccess(me_live, Old(me_alloc_counter)),
-        BitVecBLiteral(1,64)
+        BitVecBLiteral(1,8)
       ),
 
       // And give it the associated allocation size
