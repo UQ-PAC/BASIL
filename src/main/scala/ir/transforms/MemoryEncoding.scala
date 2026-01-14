@@ -23,6 +23,14 @@ class MemoryEncodingTransform() extends CILVisitor {
   // Position is a mapping from pointer to its offset
   private val me_position = BMapVar("me_position", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
   private val me_position_gamma = BMapVar("Gamma_me_position", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+
+  // Live is a mapping from allocation id to liveness
+  // 0=Dead, 1=Live, 2=Fresh
+  // if live, find allocation size in me_live_vals
+  private val me_live = BMapVar("me_live", MapBType(IntBType, BitVecBType(8)), Scope.Global)
+  private val me_live_val = BMapVar("me_live_val", MapBType(IntBType, BitVecBType(64)), Scope.Global)
+  private val me_live_gamma = BMapVar("Gamma_me_live", MapBType(IntBType, BoolBType), Scope.Global)
+  private val me_live_val_gamma = BMapVar("Gamma_me_live_val", MapBType(IntBType, BoolBType), Scope.Global)
   
   private def transform_malloc(p: Procedure) = {
     p.requires = p.requires ++ List(
@@ -72,7 +80,32 @@ class MemoryEncodingTransform() extends CILVisitor {
           )
         )
       ),
+
+      // Ensures the object was fresh in the old live mapping
+      BinaryBExpr(EQ,
+        Old(MapAccess(me_live, Old(me_alloc_counter))),
+        BitVecBLiteral(2,64)
+      ),
+
+      // Immediately make it Live now that its allocated
+      BinaryBExpr(EQ,
+        MapAccess(me_live, Old(me_alloc_counter)),
+        BitVecBLiteral(1,64)
+      ),
+
+      // And give it the associated allocation size
+      BinaryBExpr(EQ,
+        MapAccess(me_live_val, Old(me_alloc_counter)),
+        Old(r0)
+      )
     )
+  }
+
+  override def vprog(p: Program) = {
+    // todo, use datatypes like here: https://github.com/boogie-org/boogie/blob/master/Test/datatypes/is-cons.bpl
+    // requires adding a new BDataType and a bunch of infra so not easy for experimenting
+   
+    DoChildren()
   }
 
   override def vproc(p: Procedure) = {
