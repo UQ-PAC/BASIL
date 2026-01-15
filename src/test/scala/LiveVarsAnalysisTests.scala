@@ -1,9 +1,8 @@
 import analysis.{InterLiveVarsAnalysis, TwoElement, TwoElementTop}
 import ir.dsl.*
-import ir.{BitVecLiteral, Block, CFGPosition, LocalAssign, Program, Register, Variable, cilvisitor, dsl, transforms}
+import ir.{BitVecLiteral, CFGPosition, LocalAssign, Program, Register, Variable, cilvisitor, transforms}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
-import translating.PrettyPrinter.*
 import util.{BASILResult, LogLevel, Logger, StaticAnalysisConfig}
 
 @test_util.tags.UnitTest

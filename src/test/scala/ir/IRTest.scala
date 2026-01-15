@@ -4,7 +4,6 @@ import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.CaptureOutput
-import translating.PrettyPrinter.*
 
 import scala.collection.immutable.*
 
