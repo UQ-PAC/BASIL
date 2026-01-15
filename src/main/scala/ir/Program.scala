@@ -685,7 +685,7 @@ class Block private (
     _incomingJumps ++= shuffled
   }
 
-  def incomingJumps: immutable.Set[GoTo] = _incomingJumps.to(immutable.ListSet)
+  def incomingJumps: immutable.Set[GoTo] = scala.collection.immutable.UListSet.fromDistinct(_incomingJumps.iterator)
 
   def addIncomingJump(g: GoTo): Boolean = _incomingJumps.add(g)
 
