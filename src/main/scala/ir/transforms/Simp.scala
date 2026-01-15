@@ -1251,15 +1251,6 @@ object OffsetProp {
     val lastUpdate = mutable.Map[Block, Int]()
     var stSequenceNo = 1
 
-    def eval(c: BitVecLiteral)(v: BitVecLiteral | Variable | BinaryExpr): BitVecLiteral | Variable | BinaryExpr =
-      v match {
-        case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
-        case lv: Variable => BinaryExpr(BVADD, lv, c)
-        case BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) =>
-          BinaryExpr(BVADD, l, ir.eval.BitVectorEval.smt_bvadd(r, c))
-        case _ => throw Exception("Unexpected expression structure created by find() at some point")
-      }
-
     def findOff(v: Variable, c: BitVecLiteral, fuel: Int = 10000): BitVecLiteral | Variable | BinaryExpr =
       find(v, fuel) match {
         case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)

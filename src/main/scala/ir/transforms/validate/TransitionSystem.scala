@@ -1,5 +1,4 @@
 package ir.transforms.validate
-import analysis.Loop
 import ir.*
 import ir.dsl.IRToDSL
 
@@ -43,7 +42,7 @@ object TransitionSystem {
   val programCounterVar = GlobalVar("SYNTH_PC", BitVecType(64))
   val traceVar = GlobalVar("TRACE", traceType)
 
-  def procToTransition(p: Procedure, loops: List[Loop], cutJoins: Boolean = false) = {
+  def procToTransition(p: Procedure, loops: List[Block], cutJoins: Boolean = false) = {
 
     val pcVar = programCounterVar
 
@@ -97,22 +96,23 @@ object TransitionSystem {
 
     var loopCount = 0
 
-    for (l <- loops.filter(l => p.blocks.contains(l.header))) {
+    for (l <- loops) {
       loopCount += 1
 
-      val backedges = l.backEdges.toList.sortBy(e => s"${e.from.label}_${e.to.label}")
+      val backedges = l.prevBlocks.toList.sortBy(e => e.loopInfo.get.dfsp_pos)
       val label = s"Loop${loopCount}"
-      synthEntryJump.addTarget(l.header)
+      synthEntryJump.addTarget(l)
 
-      val nb = synthEntry.createBlockBetween(l.header, "cut_join_to_" + label)
+      val nb = synthEntry.createBlockBetween(l, "cut_join_to_" + label)
       nb.statements.prepend(pcGuard(label))
 
-      cutPoints = cutPoints.updated(label, l.header)
-      cutPointRealBlockBegin = cutPointRealBlockBegin.updated(label, l.header)
+
+      cutPoints = cutPoints.updated(label, l)
+      cutPointRealBlockBegin = cutPointRealBlockBegin.updated(label, l)
       for (backedge <- backedges) {
-        assert(l.header == backedge.to)
-        backedge.from.statements.append(LocalAssign(pcVar, PCSym(label), Some(label)))
-        backedge.from.replaceJump(GoTo(synthExit))
+        val nbe = backedge.createBlockBetween(l, "cut_from_to_" + label)
+        nbe.statements.append(LocalAssign(pcVar, PCSym(label), Some(label)))
+        nbe.replaceJump(GoTo(synthExit))
       }
     }
 
@@ -165,12 +165,17 @@ object TransitionSystem {
 
   }
 
+  def getLoopHeaders(p: Procedure) : List[Block] = {
+    val loops = analysis.IrreducibleLoops.identify_loops(p).toList.flatten
+    loops.foreach { loop => loop.b.loopInfo = Some(loop) }
+    loops.flatMap(_.headers).distinct
+  }
+
   def toTransitionSystemInPlace(p: Procedure): CutPointMap = {
     require(p.entryBlock.isDefined)
 
-    val loops = analysis.LoopDetector.identify_loops(p.entryBlock.get)
-    val floops = loops.loops_o
-    val cutPoints = procToTransition(p, floops)
+    val loops = getLoopHeaders(p)
+    val cutPoints = procToTransition(p, loops)
     p.formalInParam.clear()
     p.formalOutParam.clear()
 
@@ -184,12 +189,9 @@ object TransitionSystem {
 
     val program = IRToDSL.convertProgram(iprogram).resolve
 
-    val loops = analysis.LoopDetector.identify_loops(program)
-    val floops = loops.loops_o
-
     val cutPoints = program.procedures
       .map(p => {
-        p -> procToTransition(p, floops)
+        p -> procToTransition(p, getLoopHeaders(p))
       })
       .toMap
 
