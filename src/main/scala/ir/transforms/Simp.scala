@@ -669,8 +669,8 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
   }
 
   var replaced = Map[Variable, Expr]()
-
-  def substitute(pos: Command)(v: Variable): Option[Expr] = {
+  
+  def lookupOne(pos: Command, v: Variable) = {
     if (goodSubst(v)) {
       val res = defs.get(v).getOrElse(Set())
 
@@ -692,7 +692,8 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
             if (validate) {
               debugAssert(propOK(rhs))
             }
-            replaced = replaced + (v -> rhs)
+            //val same = rhs.variables.map(v => (v, v))
+            //replaced = ((replaced ++ same )+ (lhs -> rhs)) + (v -> rhs)
             Some(rhs)
           }
           case o => {
@@ -705,6 +706,25 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
     } else {
       None
     }
+  }
+
+
+  def lookup(pos: Command, v: Variable) : Option[Expr] = {
+    lookupOne(pos, v) match {
+      case Some(v: Variable) => lookup(pos, v).orElse(Some(v))
+      case Some(v) => (Some(v))
+      case None => None
+    }
+  }
+
+  def substitute(pos: Command)(v: Variable): Option[Expr] = {
+
+    val next = lookup(pos, v)
+    next.foreach(next => 
+      replaced = (replaced + (v -> next)
+    ))
+    next
+
   }
 
   override def vstmt(s: Statement) = s match {

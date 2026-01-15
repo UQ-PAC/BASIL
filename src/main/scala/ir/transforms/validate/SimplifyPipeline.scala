@@ -215,9 +215,9 @@ def guardCleanupTransforms(p: Program) = {
     visit_prog(transforms.CleanupAssignments(), prog)
   }
 
-  p.procedures.foreach(ir.eval.AlgebraicSimplifications(_))
+  //p.procedures.foreach(ir.eval.AlgebraicSimplifications(_))
   val guardProp = simplifyGuards(p)
-  println(guardProp)
+  println("GUARDPROP" + guardProp)
   p.procedures.foreach(p => {
     ir.eval.AlgebraicSimplifications(p)
     ir.eval.AssumeConditionSimplifications(p)
@@ -225,8 +225,9 @@ def guardCleanupTransforms(p: Program) = {
     ir.eval.cleanupSimplify(p)
   })
   deadAssignmentElimination(p)
-  simplifyCFG(p)
-  guardProp
+  //simplifyCFG(p)
+ Map[String, Map[ir.Variable, ir.Expr]]()
+ guardProp
 }
 
 def guardCleanup(config: TVJob, p: Program) = {
@@ -287,6 +288,7 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
 
   assert(ir.invariant.readUninitialised(ctx.program))
   transforms.applyRPO(p)
+  //config = config.copy(verify=Some(util.SMT.Solver.Z3))
   config = guardCleanup(config, p)
 
   assert(ir.invariant.readUninitialised(ctx.program))
