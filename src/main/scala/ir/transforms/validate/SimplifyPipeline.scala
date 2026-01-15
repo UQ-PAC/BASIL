@@ -203,7 +203,6 @@ def guardCleanupTransforms(p: Program) = {
   def simplifyGuards(prog: Program) = {
     (prog.procedures
       .map(p =>
-        transforms.fixupGuards(p)
         val gvis = transforms.GuardVisitor(true)
         visit_proc(gvis, p)
         p.name -> gvis.replaced
@@ -227,7 +226,6 @@ def guardCleanupTransforms(p: Program) = {
   })
   deadAssignmentElimination(p)
   simplifyCFG(p)
-  transforms.removeDuplicateGuard(p)
   guardProp
 }
 
