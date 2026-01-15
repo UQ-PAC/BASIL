@@ -38,6 +38,7 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
 
   override def scalacOptions: T[Seq[String]] = Seq("-deprecation", "-Wunused:imports", "-feature")
 
+  val parallel_collections = mvn"org.scala-lang.modules::scala-parallel-collections:1.2.0"
   val javaTests = mvn"com.novocode:junit-interface:0.11"
   val scalaTests = mvn"org.scalatest::scalatest:3.2.19"
   val scalaCheck = mvn"org.scalatestplus::scalacheck-1-18:3.2.19.0"
@@ -55,7 +56,7 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
   val cats_core = mvn"org.typelevel::cats-core:2.13.0"
   val cats_kernel = mvn"org.typelevel::cats-kernel:2.13.0"
 
-  override def mvnDeps = Seq(scalactic, sourceCode, mainArgs, upickle, aslpOffline, javaSmt, javaSmtZ3, javaSmtCVC5, cats_kernel, cats_core, cats_collections)
+  override def mvnDeps = Seq(scalactic, sourceCode, mainArgs, upickle, aslpOffline, javaSmt, javaSmtZ3, javaSmtCVC5, parallel_collections, cats_kernel, cats_core, cats_collections)
 
   override def repositoriesTask = Task.Anon {
     super.repositoriesTask() :+ MavenRepository(

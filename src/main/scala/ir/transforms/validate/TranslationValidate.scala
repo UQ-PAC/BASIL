@@ -1,5 +1,6 @@
 package ir.transforms.validate
 
+import scala.collection.parallel.CollectionConverters._
 import analysis.ProcFrames.*
 import cats.collections.DisjointSets
 import ir.*
@@ -1266,7 +1267,7 @@ object TranslationValidator {
     }
 
     var result = config
-    interesting.foreach(proc => {
+    interesting.par.foreach(proc => {
       val sourceProc = sourceProgClone.procedures.find(_.name == proc.name).get
       val targetProc = targetProgClone.procedures.find(_.name == proc.name).get
 
