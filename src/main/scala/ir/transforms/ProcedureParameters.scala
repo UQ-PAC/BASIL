@@ -650,6 +650,7 @@ object SpecFixer {
       case b: MapAccess => b.copy(index = varToOld(b.index))
       case b: MapUpdate => b.copy(index = varToOld(b.index), value = varToOld(b.value))
       case b: BByteExtract => b.copy(value = varToOld(b.value), offset = varToOld(b.offset))
+      case b: BValid => b
       case b: BInBounds => b.copy(base = varToOld(b.base), len = varToOld(b.len), i = varToOld(b.i))
       case b: BMemoryLoad => b.copy(index = varToOld(b.index))
       case b: BMemoryStore => b.copy(index = varToOld(b.index), value = varToOld(b.value))

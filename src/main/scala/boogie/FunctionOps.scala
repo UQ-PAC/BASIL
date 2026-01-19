@@ -6,7 +6,7 @@ val externAttr = BAttribute("extern")
 val inlineAttr = BAttribute("inline")
 
 type BasilIRFunctionOp = BoolToBV1Op | BVFunctionOp | MemoryLoadOp | MemoryStoreOp | ByteExtract | InBounds |
-  BUninterpreted
+  BUninterpreted | Valid
 
 def genFunctionOpDefinition(
   f: BasilIRFunctionOp,
@@ -42,7 +42,34 @@ def genFunctionOpDefinition(
     case b: InBounds => genInBoundsFunction(b)
     case u: BUninterpreted =>
       BFunction(u.name, u.in.map(BParam(_)), BParam(u.out), None, List(externAttr))
+    case v: Valid => genValidFunction(v)
   }
+}
+
+def genValidFunction(v: Valid) = {
+  val me_live = BMapVar("live", MapBType(IntBType, BitVecBType(8)), Scope.Parameter)
+  val me_live_val = BMapVar("live_val", MapBType(IntBType, BitVecBType(64)), Scope.Parameter)
+  val me_object = BMapVar("object", MapBType(BitVecBType(64), IntBType), Scope.Parameter)
+  val me_position = BMapVar("position", MapBType(BitVecBType(64), BitVecBType(64)), Scope.Parameter)
+
+  val pointer = BVariable("pointer", BitVecBType(64), Scope.Parameter)
+  val n = BVariable("n", BitVecBType(64), Scope.Parameter)
+
+  // Body:
+  val obj = MapAccess(me_object, pointer)
+  val size = MapAccess(me_live_val, obj)
+  val pos = MapAccess(me_position, pointer)
+  val body = BinaryBExpr(BoolAND,
+    BinaryBExpr(EQ, MapAccess(me_live, obj), BitVecBLiteral(1, 8)),
+    BinaryBExpr(BoolAND,
+      BinaryBExpr(BVULE, BitVecBLiteral(0, 64), pos),
+      BinaryBExpr(BVULE, pos, BinaryBExpr(BVSUB, size, n)),
+    )
+  )
+
+  val in = List(me_live, me_live_val, me_object, me_position, pointer, n)
+
+  BFunction(v.fnName, in, BParam(BoolBType), Some(body), List(externAttr))
 }
 
 def genLoadFunction(m: MemoryLoadOp) = {

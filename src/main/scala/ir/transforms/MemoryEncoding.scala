@@ -28,8 +28,8 @@ class MemoryEncodingTransform() extends CILVisitor {
   // 0=Dead, 1=Live, 2=Fresh
   // if live, find allocation size in me_live_vals
   private val me_live = BMapVar("me_live", MapBType(IntBType, BitVecBType(8)), Scope.Global)
-  private val me_live_val = BMapVar("me_live_val", MapBType(IntBType, BitVecBType(64)), Scope.Global)
   private val me_live_gamma = BMapVar("Gamma_me_live", MapBType(IntBType, BoolBType), Scope.Global)
+  private val me_live_val = BMapVar("me_live_val", MapBType(IntBType, BitVecBType(64)), Scope.Global)
   private val me_live_val_gamma = BMapVar("Gamma_me_live_val", MapBType(IntBType, BoolBType), Scope.Global)
   
   private def transform_malloc(p: Procedure) = {
@@ -101,9 +101,13 @@ class MemoryEncodingTransform() extends CILVisitor {
     )
   }
 
+    // valid function:
+      // BinaryBExpr(EQ, BValid(me_live, me_live_val, me_object, me_position, BitVecBLiteral(0,64), BitVecBLiteral(0,64)), TrueBLiteral)
+    
   override def vprog(p: Program) = {
-    // todo, use datatypes like here: https://github.com/boogie-org/boogie/blob/master/Test/datatypes/is-cons.bpl
-    // requires adding a new BDataType and a bunch of infra so not easy for experimenting
+    // TODO: datatype theory would clean this up a bit in future. Something like this:
+    // https://github.com/boogie-org/boogie/blob/master/Test/datatypes/is-cons.bpl
+
    
     DoChildren()
   }
