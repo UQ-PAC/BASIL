@@ -34,11 +34,15 @@ class MemoryEncodingTransform() extends CILVisitor {
   private val me_live_val_gamma = BMapVar("Gamma_me_live_val", MapBType(IntBType, BoolBType), Scope.Global)
 
   private def transform_free(p: Procedure) = {
-    val obj = MapAccess(me_object, Old(r0));
+    p.modifies ++= Set(
+      GlobalVar("me_live", MapType(IntType, BitVecType(8))),
+    );
+
+    val obj = MapAccess(me_object, r0);
 
     p.requires = p.requires ++ List(
       // Pointer must at base of allocation for free (no offset)
-      BinaryBExpr(EQ, MapAccess(me_position, Old(r0)), BitVecBLiteral(0,64)),
+      BinaryBExpr(EQ, MapAccess(me_position, r0), BitVecBLiteral(0,64)),
       // Pointer must be live to free
       BinaryBExpr(EQ, MapAccess(me_live, obj), BitVecBLiteral(1,8))
     )
@@ -62,6 +66,14 @@ class MemoryEncodingTransform() extends CILVisitor {
   }
   
   private def transform_malloc(p: Procedure) = {
+    p.modifies ++= Set(
+      GlobalVar("me_alloc_counter", IntType),
+      GlobalVar("me_live", MapType(IntType, BitVecType(8))),
+      GlobalVar("me_live_val", MapType(IntType, BitVecType(64))),
+      GlobalVar("me_position", MapType(BitVecType(64), BitVecType(64))),
+      GlobalVar("me_object", MapType(BitVecType(64), IntType)),
+    );
+    
     p.requires = p.requires ++ List(
       // Cant malloc 0 or less bytes
       BinaryBExpr(BVUGT, r0, BitVecBLiteral(0, 64)),
@@ -154,11 +166,14 @@ class MemoryEncodingTransform() extends CILVisitor {
     )
   }
 
-    // valid function:
-      // BinaryBExpr(EQ, BValid(me_live, me_live_val, me_object, me_position, BitVecBLiteral(0,64), BitVecBLiteral(0,64)), TrueBLiteral)
-    
+  private def transform_main(p: Procedure) = {
+    p.requires = p.requires ++ List(
+      BinaryBExpr(EQ, me_alloc_counter, IntBLiteral(0))
+    )
+  }
+
   override def vprog(p: Program) = {
-    // TODO: datatype theory would clean this up a bit in future. Something like this:
+    // TODO: datatypes would clean liveness up a bit in future. Something like this:
     // https://github.com/boogie-org/boogie/blob/master/Test/datatypes/is-cons.bpl
 
    
@@ -169,6 +184,7 @@ class MemoryEncodingTransform() extends CILVisitor {
     p.procName match {
       case "malloc" => transform_malloc(p)
       case "free" => transform_free(p)
+      case "main" => transform_main(p)
       case _ => { }
     }
 

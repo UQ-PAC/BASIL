@@ -63,7 +63,7 @@ def genValidFunction(v: Valid) = {
     BinaryBExpr(EQ, MapAccess(me_live, obj), BitVecBLiteral(1, 8)),
     BinaryBExpr(BoolAND,
       BinaryBExpr(BVULE, BitVecBLiteral(0, 64), pos),
-      BinaryBExpr(BVULE, pos, BinaryBExpr(BVSUB, size, n)),
+      BinaryBExpr(BVULE, BinaryBExpr(BVADD, pos, n), size),
     )
   )
 
