@@ -163,6 +163,33 @@ class MemoryEncodingTransform() extends CILVisitor {
           )
         )
       ),
+
+      // Guarantee that newly generated pointer is initially disjoint with all other live/fresh ptrs
+      // Forall i: bv64 ::
+      //   live(object(i)) /\ r0 <= i < r0 + Old(r0) => !disjoint(i, old(me_alloc_counter))
+      //   otherwise                                 =>  disjoint(i, old(me_alloc_counter))
+      {
+        val cond = BinaryBExpr(BoolAND,
+          BinaryBExpr(NEQ, MapAccess(me_live, MapAccess(me_object, i)), BitVecBLiteral(0,8)),
+          BinaryBExpr(BoolAND,
+            BinaryBExpr(BVULE, r0, i),
+            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, r0, Old(r0))),
+          )
+        )
+        ForAll(
+          List(i),
+          BinaryBExpr(BoolAND,
+            BinaryBExpr(BoolIMPLIES,
+              cond,
+              UnaryBExpr(BoolNOT, BDisjoint(me_live, me_live_val, me_object, me_position, i, r0))
+            ),
+            BinaryBExpr(BoolIMPLIES,
+              UnaryBExpr(BoolNOT, cond),
+              BDisjoint(me_live, me_live_val, me_object, me_position, i, r0)
+            )
+          )
+        )
+      }
     )
   }
 

@@ -605,6 +605,29 @@ case class BValid(
   override def loads: Set[BExpr] = inputs.flatMap(i => i.loads).toSet
 }
 
+/** Utility to check disjointedness of two pointers.
+  */
+case class Disjoint() extends FunctionOp {
+  val fnName: String = s"disjoint"
+}
+
+case class BDisjoint(
+  me_live: BMapVar, me_live_val: BMapVar, me_object: BMapVar, me_position: BMapVar, pointer1: BExpr, pointer2: BExpr
+) extends BExpr {
+  override def toString: String = s"$fnName($me_live, $me_live_val, $me_object, $me_position, $pointer1, $pointer2)"
+  val fnName: String = s"disjoint"
+
+  override val getType: BType = BoolBType
+  val inputs = List(me_live, me_live_val, me_object, me_position, pointer1, pointer2)
+
+  override def functionOps: Set[FunctionOp] =
+    inputs.flatMap(i => i.functionOps).toSet + Disjoint()
+  override def locals: Set[BVar] = inputs.flatMap(i => i.locals).toSet
+  override def globals: Set[BVar] = inputs.flatMap(i => i.globals).toSet
+  override def params: Set[BVar] = inputs.flatMap(i => i.params).toSet
+  override def loads: Set[BExpr] = inputs.flatMap(i => i.loads).toSet
+}
+
 /** Utility to extract a particular byte from a bitvector.
   */
 case class ByteExtract(valueSize: Int, offsetSize: Int) extends FunctionOp {
