@@ -11,7 +11,8 @@ class MemoryEncodingTransform() extends CILVisitor {
   // Helpful variables to have
   private val r0 = BVariable("R0", BitVecBType(64), Scope.Global)
   private val r0_gamma = BVariable("Gamma_R0", BoolBType, Scope.Global)
-  private val offset = BVariable("offset", BitVecBType(64), Scope.Local)
+  private val i = BVariable("i", BitVecBType(64), Scope.Local)
+  private val o = BVariable("o", IntBType, Scope.Local)
   
   // Counter of allocations for getting a fresh id on new allocation
   private val me_alloc_counter = BVariable("me_alloc_counter", IntBType, Scope.Global)
@@ -31,6 +32,34 @@ class MemoryEncodingTransform() extends CILVisitor {
   private val me_live_gamma = BMapVar("Gamma_me_live", MapBType(IntBType, BoolBType), Scope.Global)
   private val me_live_val = BMapVar("me_live_val", MapBType(IntBType, BitVecBType(64)), Scope.Global)
   private val me_live_val_gamma = BMapVar("Gamma_me_live_val", MapBType(IntBType, BoolBType), Scope.Global)
+
+  private def transform_free(p: Procedure) = {
+    val obj = MapAccess(me_object, Old(r0));
+
+    p.requires = p.requires ++ List(
+      // Pointer must at base of allocation for free (no offset)
+      BinaryBExpr(EQ, MapAccess(me_position, Old(r0)), BitVecBLiteral(0,64)),
+      // Pointer must be live to free
+      BinaryBExpr(EQ, MapAccess(me_live, obj), BitVecBLiteral(1,8))
+    )
+
+    p.ensures = p.ensures ++ List(
+      // Sets the old live value to dead
+      ForAll(
+        List(o),
+        BinaryBExpr(BoolAND,
+          BinaryBExpr(BoolIMPLIES,
+            BinaryBExpr(EQ, o, obj),
+            BinaryBExpr(EQ, MapAccess(me_live, o), BitVecBLiteral(0, 8)),
+          ),
+          BinaryBExpr(BoolIMPLIES,
+            BinaryBExpr(NEQ, o, obj),
+            BinaryBExpr(EQ, MapAccess(me_live, o), Old(MapAccess(me_live, o))),
+          )
+        )
+      ),
+    )
+  }
   
   private def transform_malloc(p: Procedure) = {
     p.requires = p.requires ++ List(
@@ -41,42 +70,53 @@ class MemoryEncodingTransform() extends CILVisitor {
 
     p.ensures = p.ensures ++ List(
       // Alloc count is bumped up by 1 after every allocation
+      // me_alloc_counter := Old(me_alloc_counter) + 1
       BinaryBExpr(EQ, me_alloc_counter, BinaryBExpr(IntADD, Old(me_alloc_counter), IntBLiteral(BigInt(1)))),
 
-      // Updates object mapping for all bytes in our allocated object
-      // forall offset: bv64 :: (0 <= offset < 2^(64-M) /\ offset < R0) => me_object[Old(R0) + offset] = Old(me_alloc_counter)
+      // Updates object mapping for all bytes in our allocated object and keeps others the same
+      // forall i: bv64 ::
+      //      (r0 <= i /\ i <  r0 + Old(r0)) => object[i] := Old(me_alloc_counter)
+      //   /\ (r0 >  i \/ i >= r0 + Old(r0)) => object[i] := Old(object[i])
       ForAll(
-        List(offset),
-        BinaryBExpr(BoolIMPLIES,
-          BinaryBExpr(BoolAND,
+        List(i),
+        BinaryBExpr(BoolAND,
+          BinaryBExpr(BoolIMPLIES,
             BinaryBExpr(BoolAND,
-              BinaryBExpr(BVULE, BitVecBLiteral(0,64), offset),
-              BinaryBExpr(BVULT, offset, Old(r0))
+              BinaryBExpr(BVULE, r0, i),
+              BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, r0, Old(r0)))
             ),
-            BinaryBExpr(BVULT, offset, BitVecBLiteral(scala.math.BigInt(2).pow(64-m), 64))
+            BinaryBExpr(EQ, MapAccess(me_object, i), Old(me_alloc_counter))
           ),
-          BinaryBExpr(EQ,
-            MapAccess(me_object, BinaryBExpr(BVADD, r0, offset)),
-            Old(me_alloc_counter)
+          BinaryBExpr(BoolIMPLIES,
+            BinaryBExpr(BoolOR,
+              BinaryBExpr(BVUGT, r0, i),
+              BinaryBExpr(BVUGE, i, BinaryBExpr(BVADD, r0, Old(r0)))
+            ),
+            BinaryBExpr(EQ, MapAccess(me_object, i), Old(MapAccess(me_object, i)))
           )
         )
       ),
 
-      // Updates position mapping for all bytes in our allocated position
-      // forall offset: bv64 :: (0 <= offset < 2^(64-M) /\ offset < R0) => me_position[Old(R0) + offset] = offset
+      // Updates position mapping for all bytes in our allocated position and keeps others the same
+      // forall i: bv64 ::
+      //      (r0 <= i /\ i <  r0 + Old(r0)) => position[i] := i - r0
+      //   /\ (r0 >  i \/ i >= r0 + Old(r0)) => position[i] := Old(position[i])
       ForAll(
-        List(offset),
-        BinaryBExpr(BoolIMPLIES,
-          BinaryBExpr(BoolAND,
+        List(i),
+        BinaryBExpr(BoolAND,
+          BinaryBExpr(BoolIMPLIES,
             BinaryBExpr(BoolAND,
-              BinaryBExpr(BVULE, BitVecBLiteral(0,64), offset),
-              BinaryBExpr(BVULT, offset, Old(r0))
+              BinaryBExpr(BVULE, r0, i),
+              BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, r0, Old(r0)))
             ),
-            BinaryBExpr(BVULT, offset, BitVecBLiteral(scala.math.BigInt(2).pow(64-m), 64))
+            BinaryBExpr(EQ, MapAccess(me_position, i), BinaryBExpr(BVSUB, i, r0))
           ),
-          BinaryBExpr(EQ,
-            MapAccess(me_position, BinaryBExpr(BVADD, r0, offset)),
-            offset
+          BinaryBExpr(BoolIMPLIES,
+            BinaryBExpr(BoolOR,
+              BinaryBExpr(BVUGT, r0, i),
+              BinaryBExpr(BVUGE, i, BinaryBExpr(BVADD, r0, Old(r0)))
+            ),
+            BinaryBExpr(EQ, MapAccess(me_position, i), Old(MapAccess(me_position, i)))
           )
         )
       ),
@@ -87,17 +127,30 @@ class MemoryEncodingTransform() extends CILVisitor {
         BitVecBLiteral(2,8)
       ),
 
-      // Immediately make it Live now that its allocated
-      BinaryBExpr(EQ,
-        MapAccess(me_live, Old(me_alloc_counter)),
-        BitVecBLiteral(1,8)
+      // Guarantee the object is live and has correct liveness
+      // live = old(live)( Old(me_alloc_counter) := 1)
+      // live = old(live_val)( Old(me_alloc_counter) := Old(r0))
+      ForAll(
+        List(o),
+        BinaryBExpr(BoolAND,
+          BinaryBExpr(BoolIMPLIES,
+            BinaryBExpr(EQ, o, Old(me_alloc_counter)),
+            BinaryBExpr(BoolAND,
+              // Make live
+              BinaryBExpr(EQ, MapAccess(me_live, o), BitVecBLiteral(1, 8)),
+              // Update live allocation size
+              BinaryBExpr(EQ, MapAccess(me_live_val, o), Old(r0)),
+            )
+          ),
+          BinaryBExpr(BoolIMPLIES,
+            BinaryBExpr(NEQ, o, Old(me_alloc_counter)),
+            BinaryBExpr(BoolAND,
+              BinaryBExpr(EQ, MapAccess(me_live, o), Old(MapAccess(me_live, o))),
+              BinaryBExpr(EQ, MapAccess(me_live_val, o), Old(MapAccess(me_live_val, o))),
+            )
+          )
+        )
       ),
-
-      // And give it the associated allocation size
-      BinaryBExpr(EQ,
-        MapAccess(me_live_val, Old(me_alloc_counter)),
-        Old(r0)
-      )
     )
   }
 
@@ -115,6 +168,7 @@ class MemoryEncodingTransform() extends CILVisitor {
   override def vproc(p: Procedure) = {
     p.procName match {
       case "malloc" => transform_malloc(p)
+      case "free" => transform_free(p)
       case _ => { }
     }
 
