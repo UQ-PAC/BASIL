@@ -233,7 +233,8 @@ object Main {
     memoryRegions: Option[String],
     @arg(
       name = "no-irreducible-loops",
-      doc = "Transforms irreducible loops when --analyse is passed (does nothing without --analyse)"
+      doc =
+        "Ensures there are no irreducible loops by transforming them when --analyse is passed (does nothing without --analyse)"
     )
     noIrreducibleLoops: Flag,
     @arg(name = "dsa", doc = "Perform Data Structure Analysis (implies --simplify flag) (pre|local|bu|td). Note: --dsa= is equivalent to --dsa=td.")
