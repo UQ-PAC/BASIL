@@ -1,5 +1,7 @@
 package ir.transforms
 
+var breakTransform = false
+
 import ir.*
 import ir.cilvisitor.*
 import ir.eval.{AlgebraicSimplifications, AssumeConditionSimplifications, simplifyExprFixpoint}
@@ -1358,9 +1360,11 @@ object OffsetProp {
 
         b.statements.foreach(transfer)
 
-        if (stSequenceNo != seq || seq == 0) {
-          lastUpdate(b) = stSequenceNo
-          worklist.addAll(b.nextBlocks)
+        if (!breakTransform) {
+          if (stSequenceNo != seq || seq == 0) {
+            lastUpdate(b) = stSequenceNo
+            worklist.addAll(b.nextBlocks)
+          }
         }
       }
 
@@ -1482,7 +1486,7 @@ object MinCopyProp {
         b.statements.foreach(transfer)
 
         if (stSequenceNo != seq || seq == 0) {
-          lastUpdate(b) = stSequenceNo
+          //lastUpdate(b) = stSequenceNo
           worklist.addAll(b.nextBlocks)
         }
       }

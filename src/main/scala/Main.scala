@@ -261,7 +261,9 @@ object Main {
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
     noif: Flag,
     @arg(name = "nodebug", doc = "Disable runtime debug assertions")
-    noDebug: Flag
+    noDebug: Flag,
+    @arg(name = "test-beak-ssa-tx", doc = "Introduce a bug in the dynamic single assignment transform pass to test the SSA transform")
+    breakDSA: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -463,6 +465,10 @@ object Main {
       case (_, Some(d), _) => SimplifyMode.ValidatedSimplify(None, Some(d), dryRun = conf.tvDryRun.value)
       case (true, None, _) => SimplifyMode.Simplify
       case _ => SimplifyMode.Disabled
+    }
+
+    if (conf.breakDSA.value) {
+      ir.transforms.breakTransform = true
     }
 
     val q = BASILConfig(
