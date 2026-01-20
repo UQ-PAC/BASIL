@@ -76,9 +76,7 @@ class ExprBNFCVisitor[A](val decls: Declarations)
   override def visit(x: syntax.Expr_Extract, arg: A) =
     ir.Extract(x.intval_1.accept(this, arg).toInt, x.intval_2.accept(this, arg).toInt, x.expr_.accept(this, arg))
   override def visit(x: syntax.Expr_Concat, arg: A) =
-    println(exprs(x.listexpr_, arg))
-    // ir.AssocExpr(ir.BVCONCAT, x.expr_1.accept(this, arg), x.expr_2.accept(this, arg))
-    ???
+    exprs(x.listexpr_, arg).reduce(ir.BinaryExpr(ir.BVCONCAT, _, _))
 
   override def visit(x: syntax.Expr_Assoc, arg: A) =
     ir.AssocExpr(x.boolbinop_.accept(this, arg), x.listexpr_.asScala.map(_.accept(this, arg)).toList)
