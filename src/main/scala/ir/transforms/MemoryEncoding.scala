@@ -72,12 +72,25 @@ class MemoryEncodingTransform() extends CILVisitor {
       GlobalVar("me_live_val", MapType(IntType, BitVecType(64))),
       GlobalVar("me_position", MapType(BitVecType(64), BitVecType(64))),
       GlobalVar("me_object", MapType(BitVecType(64), IntType)),
+      GlobalVar("R0", BitVecType(64))
     );
     
     p.requires = p.requires ++ List(
       // Cant malloc 0 or less bytes
       BinaryBExpr(BVUGT, r0, BitVecBLiteral(0, 64)),
-      BinaryBExpr(EQ, r0_gamma, TrueBLiteral)
+      BinaryBExpr(EQ, r0_gamma, TrueBLiteral),
+
+      // Can only allocate into previously dead space:
+      // ForAll(
+      //   List(i),
+      //   BinaryBExpr(BoolIMPLIES,
+      //     BinaryBExpr(BoolAND,
+      //       BinaryBExpr(BVULE, r0, i),
+      //       BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, r0, Old(r0)))
+      //     ),
+      //     BinaryBExpr(EQ, MapAccess(me_object, i), Old(me_alloc_counter))
+      //   )
+      // )
     )
 
     p.ensures = p.ensures ++ List(
@@ -87,8 +100,8 @@ class MemoryEncodingTransform() extends CILVisitor {
 
       // Updates object mapping for all bytes in our allocated object and keeps others the same
       // forall i: bv64 ::
-      //      (r0 <= i /\ i <  r0 + Old(r0)) => object[i] := Old(me_alloc_counter)
-      //   /\ (r0 >  i \/ i >= r0 + Old(r0)) => object[i] := Old(object[i])
+      //      (r0 <= i /\ i <  r0 + Old(r0)) => object[i] == Old(me_alloc_counter)
+      //   /\ (r0 >  i \/ i >= r0 + Old(r0)) => object[i] == Old(object[i])
       ForAll(
         List(i),
         BinaryBExpr(BoolAND,
@@ -111,8 +124,8 @@ class MemoryEncodingTransform() extends CILVisitor {
 
       // Updates position mapping for all bytes in our allocated position and keeps others the same
       // forall i: bv64 ::
-      //      (r0 <= i /\ i <  r0 + Old(r0)) => position[i] := i - r0
-      //   /\ (r0 >  i \/ i >= r0 + Old(r0)) => position[i] := Old(position[i])
+      //      (r0 <= i /\ i <  r0 + Old(r0)) => position[i] == i - r0
+      //   /\ (r0 >  i \/ i >= r0 + Old(r0)) => position[i] == Old(position[i])
       ForAll(
         List(i),
         BinaryBExpr(BoolAND,
@@ -134,14 +147,38 @@ class MemoryEncodingTransform() extends CILVisitor {
       ),
 
       // Ensures the object was fresh in the old live mapping
-      BinaryBExpr(EQ,
-        Old(MapAccess(me_live, Old(me_alloc_counter))),
-        BitVecBLiteral(2,8)
+      // BinaryBExpr(EQ,
+      //   Old(MapAccess(me_live, Old(me_alloc_counter))),
+      //   BitVecBLiteral(2,8)
+      // ),
+
+      // ensures (forall #i: bv64 :: (
+      //   (($me_live[$me_object[#i]] != 0bv8) ==> $R0 != #i)
+      // ));
+      ForAll(
+        List(i),
+        BinaryBExpr(BoolIMPLIES,
+          // Not dead:
+          BinaryBExpr(NEQ,
+            Old(MapAccess(me_live, Old(MapAccess(me_object, i)))),
+            BitVecBLiteral(0,8)
+          ),
+          // Implies R0 is not this:
+          // BinaryBExpr(NEQ,
+          //   MapAccess(me_object, r0),
+          //   MapAccess(me_object, i)
+          // )
+          // Implies unchanged (ideally same meaning as above?):
+          BinaryBExpr(EQ,
+            MapAccess(me_object, i),
+            Old(MapAccess(me_object, i))
+          )
+        )
       ),
 
       // Guarantee the object is live and has correct liveness
-      // live = old(live)( Old(me_alloc_counter) := 1)
-      // live = old(live_val)( Old(me_alloc_counter) := Old(r0))
+      // live = old(live)( Old(me_alloc_counter) -= 1)
+      // live = old(live_val)( Old(me_alloc_counter) == Old(r0))
       ForAll(
         List(o),
         BinaryBExpr(BoolAND,
@@ -166,36 +203,46 @@ class MemoryEncodingTransform() extends CILVisitor {
 
       // Guarantee that newly generated pointer is initially disjoint with all other live/fresh ptrs
       // Forall i: bv64 ::
-      //   live(object(i)) /\ r0 <= i < r0 + Old(r0) => !disjoint(i, old(me_alloc_counter))
-      //   otherwise                                 =>  disjoint(i, old(me_alloc_counter))
-      {
-        val cond = BinaryBExpr(BoolAND,
-          BinaryBExpr(NEQ, MapAccess(me_live, MapAccess(me_object, i)), BitVecBLiteral(0,8)),
-          BinaryBExpr(BoolAND,
-            BinaryBExpr(BVULE, r0, i),
-            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, r0, Old(r0))),
-          )
-        )
-        ForAll(
-          List(i),
-          BinaryBExpr(BoolAND,
-            BinaryBExpr(BoolIMPLIES,
-              cond,
-              UnaryBExpr(BoolNOT, BDisjoint(me_live, me_live_val, me_object, me_position, i, r0))
-            ),
-            BinaryBExpr(BoolIMPLIES,
-              UnaryBExpr(BoolNOT, cond),
-              BDisjoint(me_live, me_live_val, me_object, me_position, i, r0)
-            )
-          )
-        )
-      }
+      //   live(object(i)) /\ r0 <= i < r0 + Old(r0) => !disjoint(i, r0)
+      //   otherwise                                 =>  disjoint(i, r0)
+      // {
+      //   val cond = BinaryBExpr(BoolAND,
+      //     BinaryBExpr(NEQ, MapAccess(me_live, MapAccess(me_object, i)), BitVecBLiteral(0,8)),
+      //     BinaryBExpr(BoolAND,
+      //       BinaryBExpr(BVULE, r0, i),
+      //       BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, r0, Old(r0))),
+      //     )
+      //   )
+      //   ForAll(
+      //     List(i),
+      //     BinaryBExpr(BoolAND,
+      //       BinaryBExpr(BoolIMPLIES,
+      //         UnaryBExpr(BoolNOT, BDisjoint(me_live, me_live_val, me_object, me_position, i, r0)),
+      //         cond,
+      //       ),
+      //       BinaryBExpr(BoolIMPLIES,
+      //         BDisjoint(me_live, me_live_val, me_object, me_position, i, r0),
+      //         UnaryBExpr(BoolNOT, cond),
+      //       )
+      //     )
+      //   )
+      // }
     )
   }
 
   private def transform_main(p: Procedure) = {
     p.requires = p.requires ++ List(
-      BinaryBExpr(EQ, me_alloc_counter, IntBLiteral(0))
+      // Allocation counter starts at 0
+      BinaryBExpr(EQ, me_alloc_counter, IntBLiteral(0)),
+
+      // All objects start dead
+      ForAll(
+        List(o),
+        BinaryBExpr(EQ,
+          MapAccess(me_live, o),
+          BitVecBLiteral(0, 8)
+        )
+      )
     )
   }
 
