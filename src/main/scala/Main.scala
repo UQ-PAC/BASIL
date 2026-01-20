@@ -123,7 +123,7 @@ object Main {
 
   @main(name = programNameVersionHeader + System.lineSeparator())
   case class Config(
-    @arg(name = "load-directory-bap", doc = "Load relf, adt, and bir from directory (and spec from parent directory)")
+    @arg(name = "load-directory-bap", doc = "Load relf, adt, and bir from directory (and spec from parent directory) [deprecated]")
     bapInputDirName: Option[String],
     @arg(name = "load-directory-gtirb", doc = "Load relf and gts from directory (and spec from parent directory)")
     gtirbInputDirName: Option[String],
@@ -134,7 +134,7 @@ object Main {
     @arg(
       name = "relf",
       short = 'r',
-      doc = "Name of the file containing the output of 'readelf -s -r -W'  (required for most uses)"
+      doc = "Name of the file containing the output of 'readelf -s -r -W'  (required for .bap inputs)"
     )
     relfFileName: Option[String],
     @arg(name = "spec", short = 's', doc = "BASIL specification file (requires --relf).")
@@ -161,7 +161,7 @@ object Main {
       doc = s"Show extra debugging logs for a specific logger (${Logger.allLoggers.map(_.name).mkString(", ")})."
     )
     verboseLog: Seq[String] = Seq(),
-    @arg(name = "analyse", doc = "Run static analysis pass.")
+    @arg(name = "analyse", doc = "Run static analysis pass. [deprecated]")
     analyse: Flag,
     @arg(name = "interpret", doc = "Run BASIL IL interpreter.")
     interpret: Flag,
@@ -172,7 +172,7 @@ object Main {
     @arg(name = "main-procedure-name", short = 'm', doc = "Name of the main procedure to begin analysis at.")
     mainProcedureName: String = "main",
     @arg(
-      name = "procedure-call-depth",
+      name = "trim-depth",
       doc = "Cull procedures beyond this call depth from the main function (defaults to Int.MaxValue)"
     )
     procedureDepth: Int = Int.MaxValue,
@@ -192,9 +192,9 @@ object Main {
       doc = "Separates threads into multiple .bpl files with given output filename as prefix (requires --analyse flag)"
     )
     threadSplit: Flag,
-    @arg(name = "parameter-form", doc = "Lift registers to local variables passed by parameter")
+    @arg(name = "generate-parameters", doc = "Lift registers to local variables passed by parameter")
     parameterForm: Flag,
-    @arg(name = "summarise-procedures", doc = "Generates summaries of procedures which are used in pre/post-conditions")
+    @arg(name = "generate-procedure-summaries", doc = "Generates summaries of procedures which are used in pre/post-conditions")
     summariseProcedures: Flag,
     @arg(
       name = "generate-loop-invariants",
@@ -206,7 +206,7 @@ object Main {
       doc = "Generates rely-guarantee conditions for each procedure that contains a return node."
     )
     generateRelyGuarantees: Flag,
-    @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (implies --parameter-form)")
+    @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (implies --generate-parameters)")
     simplify: Flag,
     @arg(name = "simplify-tv", doc = "Simplify pass with translation validation, takes smt file output directory")
     tvSimp: Option[String],
@@ -235,19 +235,19 @@ object Main {
     @arg(
       name = "memory-regions",
       doc =
-        "Performs static analysis to separate memory into discrete regions in Boogie output (requires --analyse flag) (mra|dsa) (dsa is recommended over mra)"
+        "Performs static analysis to separate memory into discrete regions in Boogie output (requires --analyse flag) (mra|dsa) (dsa is recommended over mra) [deprecated]"
     )
     memoryRegions: Option[String],
     @arg(
       name = "no-irreducible-loops",
-      doc = "Disable producing irreducible loops when --analyse is passed (does nothing without --analyse)"
+      doc = "Transforms irreducible loops when --analyse is passed (does nothing without --analyse)"
     )
     noIrreducibleLoops: Flag,
-    @arg(name = "dsa", doc = "Perform Data Structure Analysis (requires --simplify flag) (pre|local|bu|td)")
+    @arg(name = "dsa", doc = "Perform Data Structure Analysis (implies --simplify flag) (pre|local|bu|td) Note that --dsa= defaults to td.")
     dsaType: Option[String],
     @arg(name = "dsa-checks", doc = "Perform additional dsa checks (requires --dsa (local|bu|td)")
     dsaChecks: Flag,
-    @arg(name = "dsa-split", doc = "split the globals for dsa (requires --dsa (pre|local|bu|td)")
+    @arg(name = "dsa-split", doc = "split the globals for input to dsa (requires --dsa (pre|local|bu|td))")
     dsaSplitGlobals: Flag,
     @arg(
       name = "dsa-eqv",
@@ -256,7 +256,7 @@ object Main {
     dsaEqCells: Flag,
     @arg(name = "dsa-assert", doc = "insert assertions to check globals offset to top fall within global region bounds")
     dsaAssert: Flag,
-    @arg(name = "memory-transform", doc = "Transform memory access to region accesses")
+    @arg(name = "memory-transform", doc = "Transform memory accesses to region accesses (requires --dsa=td)")
     memoryTransform: Flag,
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
     noif: Flag,
@@ -266,7 +266,7 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     val parser = ParserForClass[Config]
-    val parsed = parser.constructEither(args.toSeq)
+    val parsed = parser.constructEither(args.toSeq) // prints sorted help if --help is given!
 
     val conf = parsed match {
       case Right(r) => r
@@ -277,6 +277,11 @@ object Main {
 
     if (conf.help.value) {
       println(parser.helpText(sorted = false))
+      println("Examples:")
+      println("  basil --input prog.gts --relf prog.relf --spec prog.spec  # output basil-out.bpl")
+      println("  basil -i prog.gtirb --lifter --verify -o prog.bpl         # run Boogie on prog.bpl")
+      println("  basil -i prog.gtirb --lifter --dsa= --memory-transform    # simplify and partition mem into regions")
+      println("  basil --load-directory-gtirb <dir> --interpret            # interpret the program")
       return
     }
 
@@ -350,17 +355,17 @@ object Main {
     val dsa: Option[DSConfig] =
       phase match {
         case Some(value) =>
-          if conf.simplify.value then
-            Some(
-              DSConfig(
-                value,
-                conf.dsaSplitGlobals.value,
-                conf.dsaAssert.value,
-                conf.dsaEqCells.value,
-                conf.dsaChecks.value
-              )
+          // this will turn on --simplify
+          Some(
+            DSConfig(
+              value,
+              conf.dsaSplitGlobals.value,
+              conf.dsaAssert.value,
+              conf.dsaEqCells.value,
+              conf.dsaChecks.value
             )
-          else throw new IllegalArgumentException(s"enabling --dsa requires --simplify")
+          )
+        //  else throw new IllegalArgumentException(s"enabling --dsa requires --simplify")
         case _ => None
       }
 
@@ -462,6 +467,7 @@ object Main {
       case (_, d, true) => SimplifyMode.ValidatedSimplify(Some(util.SMT.Solver.Z3), d, dryRun = conf.tvDryRun.value)
       case (_, Some(d), _) => SimplifyMode.ValidatedSimplify(None, Some(d), dryRun = conf.tvDryRun.value)
       case (true, None, _) => SimplifyMode.Simplify
+      case _ if dsa.isDefined => SimplifyMode.Simplify
       case _ => SimplifyMode.Disabled
     }
 
@@ -476,7 +482,6 @@ object Main {
         gtirbLiftOffline = conf.liftOffline.value
       ),
       runInterpret = conf.interpret.value,
-      simplify = simplifyMode,
       validateSimp = conf.validateSimplify.value,
       summariseProcedures = conf.summariseProcedures.value,
       generateLoopInvariants = conf.generateLoopInvariants.value,
