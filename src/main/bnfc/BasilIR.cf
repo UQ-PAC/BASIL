@@ -8,7 +8,6 @@ position token BVTYPE ('b' 'v' digit+) ;
 position token INTTYPE {"int"} ;
 position token BOOLTYPE {"bool"} ;
 
-
 {- position token UserIdent '`' ((upper | letter | '_' | '#')(upper | letter | digit | ["_.$#"])*) '`'; -}
 position token BIdent '.'((upper | letter | '_')(upper | letter | digit | ["_.$#~"])*) ;
 
@@ -76,23 +75,40 @@ Endian_Big . Endian ::= "be" ;
 
 rules Assignment ::= LVar ":=" Expr ;
 
+Stmt_Nop . Stmt ::= "nop";
 Stmt_SingleAssign . Stmt ::= Assignment ;
 
 separator nonempty Assignment ",";
 Stmt_MultiAssign . Stmt ::= "(" [Assignment]  ")" ;
 
-Stmt_Load . Stmt ::= LVar ":=" "load" Endian GlobalIdent Expr IntVal;
-Stmt_Store . Stmt ::= "store" Endian GlobalIdent Expr Expr IntVal;
 
 rules LocalVar ::= LocalIdent ":" Type ;
 rules GlobalVar ::= GlobalIdent ":" Type ;
 separator nonempty LocalVar ",";
+rules Var ::= LocalVar | GlobalVar ;
+
+
+Stmt_Load_Deprecated . Stmt ::= LVar ":=" "load" Endian GlobalIdent Expr IntVal;
+Stmt_Store_Deprecated . Stmt ::= "store" Endian GlobalIdent Expr Expr IntVal;
+
+Stmt_Load_Var . Stmt ::= LVar ":=" "load" Endian Var Expr IntVal;
+Stmt_Store_Var . Stmt ::= LVar ":="  "store" Endian Var Expr Expr IntVal;
+
+rules NamedCallReturn ::= LVar "=" LocalIdent;
+separator NamedCallReturn "," ;
 
 LVars_Empty . LVars ::= "";
 LVars_LocalList . LVars ::= "var" "(" [ LocalVar ] ")" ":=" ;
-LVars_List . LVars ::= "(" [ LVar ] ")" ":=";
+LVars_List . LVars ::= "(" [ LVar ]  ")" ":=";
+LVars_NamedList. LVars ::= "(" [NamedCallReturn]  ")" ":=";
 
-Stmt_DirectCall . Stmt ::= LVars "call" ProcIdent "(" [Expr] ")" ;
+rules NamedCallArg ::= LocalIdent "=" Expr;
+separator NamedCallArg "," ;
+
+CallParams_Exprs . CallParams ::= [Expr];
+CallParams_Named . CallParams ::= [NamedCallArg];
+
+Stmt_DirectCall . Stmt ::= LVars "call" ProcIdent "(" CallParams ")" ;
 Stmt_IndirectCall . Stmt ::= "indirect" "call" Expr ;
 
 Stmt_Assume . Stmt ::= "assume" Expr ;
@@ -102,6 +118,7 @@ Stmt_Assert . Stmt ::= "assert" Expr ;
 Jump_GoTo . Jump ::= "goto" "(" [BlockIdent] ")" ;
 Jump_Unreachable . Jump ::= "unreachable" ;
 Jump_Return . Jump ::= "return" "(" [Expr] ")" ;
+Jump_ProcReturn. Jump ::= "return"  ;
 
 LVar_Local . LVar ::= "var" LocalVar;
 LVar_Global . LVar ::= GlobalVar;
@@ -115,7 +132,19 @@ terminator StmtWithAttrib ";";
 
 rules JumpWithAttrib ::= Jump AttribSet ;
 
-rules Block ::= "block" BlockIdent AttribSet BeginList 
+rules PhiExpr ::= BlockIdent "->" Var ;
+separator PhiExpr "," ;
+
+rules PhiAssign ::= LVar ":=" "phi" "(" [ PhiExpr ] ")";
+separator PhiAssign ",";
+
+
+Block_NoPhi . Block ::= "block" BlockIdent AttribSet BeginList 
+  [StmtWithAttrib] JumpWithAttrib ";"
+  EndList ;
+
+Block_Phi . Block ::= "block" BlockIdent AttribSet BeginList 
+  "(" [PhiAssign] ")" ";"
   [StmtWithAttrib] JumpWithAttrib ";"
   EndList ;
 
@@ -161,6 +190,7 @@ Expr_FunctionOp . Expr       ::= GlobalIdent "(" [Expr] ")";
 
 rules BinOp ::= BVBinOp | BVLogicalBinOp | BoolBinOp | IntLogicalBinOp | IntBinOp | EqOp ;
 Expr_Binary . Expr       ::= BinOp "(" Expr "," Expr ")" ;
+Expr_Assoc . Expr       ::= BoolBinOp "(" [Expr] ")" ;
 
 rules UnOp ::= BVUnOp | "boolnot" | "intneg" | "booltobv1";
 Expr_Unary . Expr       ::= UnOp "(" Expr ")" ;
@@ -168,7 +198,7 @@ Expr_Unary . Expr       ::= UnOp "(" Expr ")" ;
 Expr_ZeroExtend . Expr ::= "zero_extend" "(" IntVal "," Expr ")" ;
 Expr_SignExtend . Expr ::= "sign_extend" "(" IntVal "," Expr ")" ;
 Expr_Extract    . Expr ::= "extract" "(" IntVal "," IntVal "," Expr ")" ;
-Expr_Concat     . Expr ::= "bvconcat"  "(" Expr "," Expr ")" ;
+Expr_Concat     . Expr ::= "bvconcat"  "(" [Expr]  ")" ;
 
 -- operators
 
