@@ -251,6 +251,8 @@ case class EventuallyBlock(
   label: String,
   sl: Iterable[EventuallyStatement],
   var j: EventuallyJump,
+  phiAssigns: List[] // TODO:
+
   meta: Metadata = Metadata()
 ) extends DeepEquality {
 
