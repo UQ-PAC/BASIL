@@ -236,7 +236,7 @@ object Main {
       doc = "Transforms irreducible loops when --analyse is passed (does nothing without --analyse)"
     )
     noIrreducibleLoops: Flag,
-    @arg(name = "dsa", doc = "Perform Data Structure Analysis (implies --simplify flag) (pre|local|bu|td) Note that --dsa= defaults to td.")
+    @arg(name = "dsa", doc = "Perform Data Structure Analysis (implies --simplify flag) (pre|local|bu|td). Note: --dsa= is equivalent to --dsa=td.")
     dsaType: Option[String],
     @arg(name = "dsa-checks", doc = "Perform additional dsa checks (requires --dsa (local|bu|td)")
     dsaChecks: Flag,
