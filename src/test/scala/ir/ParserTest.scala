@@ -36,4 +36,21 @@ proc @main_1812 () -> ()
       declare-fun $FPToFixed_bv64_bv1123_bool_bv32_bv1123_bv32 : (bv64, bv1123, bool, bv32, bv1123) -> bv32;
     """)
   }
+
+  test("named memory") {
+    ParseBasilIL.loadILString("""
+memory $stack:(bv64->bv8);
+
+proc @main_1876()
+    -> ()
+[
+    block %main_entry [
+      $stack:(bv64->bv8) := store le $stack:(bv64->bv8) 0xffffffffffffffe0:bv64 0xffffffffffffffe0:bv64 64;
+      var load18:bv32 := load le $stack:(bv64->bv8) 0xffffffffffffffe0:bv64 32;
+      return;
+    ];
+];
+    """);
+
+  }
 }

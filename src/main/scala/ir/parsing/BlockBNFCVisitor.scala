@@ -98,14 +98,14 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
 
   override def visit(x: syntax.Stmt_Load_Var, arg: A) = ir.MemoryLoad(
     x.lvar_.accept(this, arg),
-    decls.memories(x.lvar_.accept(this, arg).name),
+    decls.memories(x.var_.accept(this, arg).name),
     x.expr_.accept(this, arg),
     x.endian_.accept(this, arg),
     x.intval_.accept(this, arg).toInt
   )
 
   override def visit(x: syntax.Stmt_Store_Var, arg: A) = ir.MemoryStore(
-    decls.memories(x.lvar_.accept(this, arg).name),
+    decls.memories(x.var_.accept(this, arg).name),
     x.expr_1.accept(this, arg),
     x.expr_2.accept(this, arg),
     x.endian_.accept(this, arg),
