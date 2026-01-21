@@ -3,8 +3,9 @@ package ir.transforms
 import boogie.*
 import ir.cilvisitor.*
 import ir.*
+import specification.*
 
-class MemoryEncodingTransform() extends CILVisitor {
+class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
   // first m bits of pointer are for offset
   private val m = 32
   
@@ -27,7 +28,7 @@ class MemoryEncodingTransform() extends CILVisitor {
   private val me_position_gamma = BMapVar("Gamma_me_position", MapBType(BitVecBType(64), BoolBType), Scope.Global)
 
   // Live is a mapping from allocation id to liveness
-  // 0=Dead, 1=Live, 2=Fresh
+  // 0=Dead, 1=Live, 2=Fresh, 3=Unallocated (global)
   // if live, find allocation size in me_live_vals
   private val me_live = BMapVar("me_live", MapBType(IntBType, BitVecBType(8)), Scope.Global)
   private val me_live_gamma = BMapVar("Gamma_me_live", MapBType(IntBType, BoolBType), Scope.Global)
@@ -83,18 +84,6 @@ class MemoryEncodingTransform() extends CILVisitor {
       // Cant malloc 0 or less bytes
       BinaryBExpr(BVUGT, r0, BitVecBLiteral(0, 64)),
       BinaryBExpr(EQ, r0_gamma, TrueBLiteral),
-
-      // Can only allocate into previously dead space:
-      // ForAll(
-      //   List(i),
-      //   BinaryBExpr(BoolIMPLIES,
-      //     BinaryBExpr(BoolAND,
-      //       BinaryBExpr(BVULE, r0, i),
-      //       BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, r0, Old(r0)))
-      //     ),
-      //     BinaryBExpr(EQ, MapAccess(me_object, i), Old(me_alloc_counter))
-      //   )
-      // )
     )
 
     p.ensures = p.ensures ++ List(
@@ -159,30 +148,6 @@ class MemoryEncodingTransform() extends CILVisitor {
         ))
       ),
 
-      // ForAll(
-      //   List(i),
-      //   BinaryBExpr(BoolIMPLIES,
-      //     // Not dead:
-      //     BinaryBExpr(NEQ,
-      //       Old(MapAccess(me_live, Old(MapAccess(me_object, i)))),
-      //       BitVecBLiteral(0,8)
-      //     ),
-      //     // Implies R0 is not this:
-      //     // BinaryBExpr(NEQ,
-      //     //   MapAccess(me_object, r0),
-      //     //   MapAccess(me_object, i)
-      //     // )
-      //     // Implies unchanged (ideally same meaning as above?):
-      //     BinaryBExpr(EQ,
-      //       MapAccess(me_object, i),
-      //       Old(MapAccess(me_object, i))
-      //     )
-      //   ),
-      //   List(
-      //     MapAccess(me_object, i),
-      //   )
-      // ),
-
       // Guarantee the object is live and has correct liveness
       // live = old(live)( Old(me_alloc_counter) -= 1)
       // live = old(live_val)( Old(me_alloc_counter) == Old(r0))
@@ -232,38 +197,7 @@ class MemoryEncodingTransform() extends CILVisitor {
           MapAccess(me_object, i)
         ))
       ),
-      
-
-      // Guarantee that newly generated pointer is initially disjoint with all other live/fresh ptrs
-      // Forall i: bv64 ::
-      //   live(object(i)) /\ r0 <= i < r0 + Old(r0) => !disjoint(i, r0)
-      //   otherwise                                 =>  disjoint(i, r0)
-      // {
-      //   val cond = BinaryBExpr(BoolAND,
-      //     BinaryBExpr(NEQ, MapAccess(me_live, MapAccess(me_object, i)), BitVecBLiteral(0,8)),
-      //     BinaryBExpr(BoolAND,
-      //       BinaryBExpr(BVULE, r0, i),
-      //       BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, r0, Old(r0))),
-      //     )
-      //   )
-      //   ForAll(
-      //     List(i),
-      //     BinaryBExpr(BoolAND,
-      //       BinaryBExpr(BoolIMPLIES,
-      //         UnaryBExpr(BoolNOT, BDisjoint(me_live, me_live_val, me_object, me_position, i, r0)),
-      //         cond,
-      //       ),
-      //       BinaryBExpr(BoolIMPLIES,
-      //         BDisjoint(me_live, me_live_val, me_object, me_position, i, r0),
-      //         UnaryBExpr(BoolNOT, cond),
-      //       )
-      //     ),
-      //     // List(
-      //     //   MapAccess(me_object, i),
-      //     //   MapAccess(me_live, MapAccess(me_object, i))
-      //     // )
-      //   )
-      // }
+     
     )
   }
 
@@ -287,6 +221,7 @@ class MemoryEncodingTransform() extends CILVisitor {
     // TODO: datatypes would clean liveness up a bit in future. Something like this:
     // https://github.com/boogie-org/boogie/blob/master/Test/datatypes/is-cons.bpl
 
+    println(ctx.symbols.mkString("\n"))
    
     DoChildren()
   }
