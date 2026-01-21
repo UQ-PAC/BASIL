@@ -174,13 +174,14 @@ object RunUtils {
         analysisManager
       )
 
-    if (!conf.staticAnalysis.exists(!_.irreducibleLoops) && conf.generateLoopInvariants) {
-      if (!conf.staticAnalysis.exists(_.irreducibleLoops)) {
-        AnalysisPipelineMRA.reducibleLoops(ctx.program)
-      }
+    if (conf.transformIrreducibleLoops) {
+      StaticAnalysisLogger.info("[!] Transforming Irreducible Loops")
+      IrreducibleLoops.transform_all_and_update(ctx.program)
 
-      StaticAnalysisLogger.info("[!] Generating Loop Invariants")
-      FullLoopInvariantGenerator(ctx.program).addInvariants()
+      if (conf.generateLoopInvariants) {
+        StaticAnalysisLogger.info("[!] Generating Loop Invariants")
+        FullLoopInvariantGenerator(ctx.program).addInvariants()
+      }
     }
 
     if (q.runInterpret) {
