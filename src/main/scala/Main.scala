@@ -246,8 +246,7 @@ object Main {
     memoryRegions: Option[String],
     @arg(
       name = "transform-irreducible-loops",
-      doc =
-        "Transforms irreducible loops into natural loops with control flags"
+      doc = "Transforms irreducible loops into natural loops with control flags"
     )
     transformIrreducibleLoops: Flag,
     @arg(
@@ -341,7 +340,7 @@ object Main {
           conf.analysisResultsDot,
           conf.threadSplit.value,
           memoryRegionsMode,
-          !conf.transformIrreducibleLoops.value  // deprecated (a copy of the global configuration flag)
+          !conf.transformIrreducibleLoops.value // deprecated (a copy of the global configuration flag)
         )
       )
     } else {
