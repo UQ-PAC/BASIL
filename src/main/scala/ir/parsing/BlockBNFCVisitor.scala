@@ -31,6 +31,8 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
     with syntax.LVar.Visitor[ir.Variable, A]
     with syntax.NamedCallReturn.Visitor[(ir.Variable, String), A]
     with syntax.NamedCallArg.Visitor[(String, ir.Expr), A]
+    with syntax.PhiAssign.Visitor[(ir.Variable, List[(String, ir.Variable)]), A]
+    with syntax.PhiExpr.Visitor[(String, ir.Variable), A]
     with AttributeListBNFCVisitor[A] {
 
   val procSpec = decls.procSpecs(procName)
@@ -55,8 +57,24 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
 
     ir.dsl.block(unsigilBlock(x.blockident_), body: _*).copy(meta = meta)
 
-  // TODO: block_phi - we need to push phi assignments into the preceding blocks??!
-  override def visit(x: syntax.Block_Phi, arg: A): ir.dsl.EventuallyBlock = ???
+  override def visit(x: syntax.Block_Phi, arg: A): ir.dsl.EventuallyBlock =
+    val block = new syntax.Block_NoPhi(
+      x.blockident_,
+      x.attribset_,
+      x.beginlist_,
+      x.liststmtwithattrib_,
+      x.jumpwithattrib_,
+      x.endlist_
+    ).accept(this, arg)
+    val phiAssigns = x.listphiassign_.asScala.map(_.accept(this, arg))
+    block.copy(phiAssigns = phiAssigns.toMap)
+
+  // Members declared in PhiAssign.Visitor
+  def visit(x: basil_ir.Absyn.PhiAssign1, arg: A) =
+    (x.lvar_.accept(this, arg), x.listphiexpr_.asScala.map(_.accept(this, arg)).toList)
+
+  // Members declared in PhiExpr.Visitor
+  def visit(x: syntax.PhiExpr1, arg: A) = (unsigilBlock(x.blockident_), x.var_.accept(this, arg))
 
   private def stmtAttrs(x: syntax.AttribSet, arg: A) =
     val attrs = x.accept(this, arg)
