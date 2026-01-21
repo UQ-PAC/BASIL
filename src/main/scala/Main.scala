@@ -136,7 +136,7 @@ object Main {
     @arg(
       name = "relf",
       short = 'r',
-      doc = "Name of the file containing the output of 'readelf -s -r -W'  (required for .bap inputs)"
+      doc = "Name of the file containing the output of 'readelf -s -r -W'  (required for BAP inputs)"
     )
     relfFileName: Option[String],
     @arg(name = "spec", short = 's', doc = "BASIL specification file (requires --relf).")
@@ -270,7 +270,7 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     val parser = ParserForClass[Config]
-    val parsed = parser.constructEither(args.toSeq) // prints sorted help if --help is given!
+    val parsed = parser.constructEither(args.toSeq, autoPrintHelpAndExit = None)
 
     val conf = parsed match {
       case Right(r) => r
@@ -391,12 +391,10 @@ object Main {
 
     var loadingInputs = if (conf.bapInputDirName.isDefined) then {
       loadDirectory(ChooseInput.Bap, conf.bapInputDirName.get)
-
     } else if (conf.gtirbInputDirName.isDefined) then {
       loadDirectory(ChooseInput.Gtirb, conf.gtirbInputDirName.get)
     } else if (conf.inputFileName.isDefined) then {
       ILLoadingConfig(conf.inputFileName.get, conf.relfFileName, conf.specFileName)
-
     } else {
       throw IllegalArgumentException(
         "\nRequires --load-directory-gtirb, --load-directory-bap OR --input\n\n" + parser
