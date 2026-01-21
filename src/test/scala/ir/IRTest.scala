@@ -548,7 +548,7 @@ class IRTest extends AnyFunSuite with CaptureOutput {
     ),
     block("retblock", ret)
   )
-)""") {
+)""".replace("\\r", "")) {
       p.toScala
     }
 

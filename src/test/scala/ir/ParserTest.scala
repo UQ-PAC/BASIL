@@ -97,7 +97,7 @@ proc @main_1876
   block %inputs3 [
     goto(%inputs, %inputs2);
   ]
-];""") { p.program.toString.trim }
+];""".replace("\\r", "")) { p.program.toString.trim }
 
   }
 
@@ -147,7 +147,7 @@ proc @main_1876
 proc @puts_1584
   (CF_in:bv1, NF_in:bv1, R0_in:bv64, R1_in:bv64, R29_in:bv64, R30_in:bv64, R31_in:bv64, VF_in:bv1, ZF_in:bv1)
     -> (CF_out:bv1, NF_out:bv1, R0_out:bv64, R1_out:bv64, R29_out:bv64, R30_out:bv64, R31_out:bv64, VF_out:bv1, ZF_out:bv1)
-  { .name = "puts_1584" };""") {
+  { .name = "puts_1584" };""".replace("\\r", "")) {
       p.program.toString.trim
     }
 
