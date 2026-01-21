@@ -271,8 +271,26 @@ case class EventuallyBlock(
       debugAssert(tempBlock.statements.isEmpty)
       val resolved = sl.map(_.resolve(prog))
       debugAssert(tempBlock.statements.isEmpty)
-      tempBlock.statements.addAll(resolved)
+      tempBlock.statements.prependAll(resolved)
       tempBlock.replaceJump(j.resolve(prog, proc))
+
+      phiAssigns.foreach { (phiVar, assigns) =>
+        assigns.foreach { (predBlockLabel, predVar) =>
+          val predBlock = prog.blocks(proc)(predBlockLabel)
+
+          val simulAssign = predBlock.statements.lastElem match {
+            case Some(assign: SimulAssign) if assign.label == Some("phi") => assign
+            case _ =>
+              val assign = SimulAssign(Vector(), Some("phi"))
+              predBlock.statements.append(assign)
+              assign
+          }
+
+          simulAssign.assignments :+= (phiVar -> predVar)
+        }
+      }
+
+      tempBlock
     }
 
     (tempBlock, cont)
@@ -288,17 +306,8 @@ case class EventuallyBlock(
   def cloneable = this.copy(sl = sl.map(_.cloneable))
 }
 
-def block(label: String, sl: (NonCallStatement | EventuallyStatement | EventuallyJump)*): EventuallyBlock = {
-  val statements: Seq[EventuallyStatement] = sl.flatMap {
-    case s: NonCallStatement => Some(IdentityStatement(s))
-    case o: EventuallyStatement => Some(o)
-    case g: EventuallyJump => None
-  }
-  val jump = sl.collect { case j: EventuallyJump => j }
-  require(jump.length <= 1, s"DSL block '$label' must contain no more than one jump statement")
-  val rjump = if (jump.isEmpty) then unreachable else jump.head
-  EventuallyBlock(label, statements, rjump, Map())
-}
+def block(label: String, sl: (NonCallStatement | EventuallyStatement | EventuallyJump)*): EventuallyBlock =
+  block(label)()(sl: _*)
 
 def block(label: String)(
   phis: (Variable, Iterable[(String, Variable)])*
