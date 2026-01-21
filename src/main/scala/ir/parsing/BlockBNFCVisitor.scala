@@ -61,10 +61,10 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
     val block = new syntax.Block_NoPhi(
       x.blockident_,
       x.attribset_,
-      x.beginlist_,
+      x.beginlist_1,
       x.liststmtwithattrib_,
       x.jumpwithattrib_,
-      x.endlist_
+      x.endlist_2
     ).accept(this, arg)
     val phiAssigns = x.listphiassign_.asScala.map(_.accept(this, arg))
     block.copy(phiAssigns = phiAssigns.toMap)

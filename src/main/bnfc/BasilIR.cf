@@ -144,7 +144,7 @@ Block_NoPhi . Block ::= "block" BlockIdent AttribSet BeginList
   EndList ;
 
 Block_Phi . Block ::= "block" BlockIdent AttribSet BeginList 
-  "(" [PhiAssign] ")" ";"
+  BeginList [PhiAssign] EndList ";"
   [StmtWithAttrib] JumpWithAttrib ";"
   EndList ;
 
