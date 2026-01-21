@@ -136,10 +136,10 @@ object Main {
     @arg(
       name = "relf",
       short = 'r',
-      doc = "Name of the file containing the output of 'readelf -s -r -W'  (required for BAP inputs)"
+      doc = "Name of the file containing the output of 'readelf -s -r -W'  (required for .adt inputs)"
     )
     relfFileName: Option[String],
-    @arg(name = "spec", short = 's', doc = "BASIL specification file (requires --relf).")
+    @arg(name = "spec", short = 's', doc = "BASIL specification file.")
     specFileName: Option[String],
     @arg(name = "output", short = 'o', doc = "Boogie output destination file.")
     outFileName: String = "basil-out.bpl",
