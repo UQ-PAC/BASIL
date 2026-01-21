@@ -122,13 +122,13 @@ object Main {
 
   @main(name = programNameVersionHeader + System.lineSeparator())
   case class Config(
+    @arg(name = "load-directory-gtirb", doc = "Load relf and gts from directory (and spec from parent directory)")
+    gtirbInputDirName: Option[String],
     @arg(
       name = "load-directory-bap",
       doc = "Load relf, adt, and bir from directory (and spec from parent directory) [deprecated]"
     )
     bapInputDirName: Option[String],
-    @arg(name = "load-directory-gtirb", doc = "Load relf and gts from directory (and spec from parent directory)")
-    gtirbInputDirName: Option[String],
     @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file (.adt requires --relf)")
     inputFileName: Option[String],
     @arg(name = "lifter", doc = "Use builtin aslp lifter (only supports gtirb input)")
@@ -211,7 +211,7 @@ object Main {
       doc = "Generates rely-guarantee conditions for each procedure that contains a return node."
     )
     generateRelyGuarantees: Flag,
-    @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (implies --generate-parameters)")
+    @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (implies --transform-parameters)")
     simplify: Flag,
     @arg(
       name = "pc",
@@ -229,7 +229,7 @@ object Main {
       doc = "Emit SMT2 check for validation of simplification expression rewrites 'rewrites.smt2'"
     )
     validateSimplify: Flag,
-    @arg(name = "verify", doc = "Run boogie on the resulting file")
+    @arg(name = "verify", doc = "Run Boogie on the resulting file")
     verify: Flag,
     @arg(
       name = "memory-regions",
@@ -248,13 +248,13 @@ object Main {
         "Perform Data Structure Analysis (implies --simplify flag) (pre|local|bu|td). Note: --dsa= is equivalent to --dsa=td."
     )
     dsaType: Option[String],
-    @arg(name = "dsa-checks", doc = "Perform additional dsa checks (requires --dsa (local|bu|td)")
+    @arg(name = "dsa-checks", doc = "Perform additional dsa checks (requires --dsa (local|bu|td))")
     dsaChecks: Flag,
     @arg(name = "dsa-split", doc = "split the globals for input to dsa (requires --dsa (pre|local|bu|td))")
     dsaSplitGlobals: Flag,
     @arg(
       name = "dsa-eqv",
-      doc = "allow cells from same node to be merged without collapsing (requires --dsa (local|bu|td)"
+      doc = "allow cells from same node to be merged without collapsing (requires --dsa (local|bu|td))"
     )
     dsaEqCells: Flag,
     @arg(name = "dsa-assert", doc = "insert assertions to check globals offset to top fall within global region bounds")
@@ -333,7 +333,7 @@ object Main {
           conf.analysisResultsDot,
           conf.threadSplit.value,
           memoryRegionsMode,
-          !conf.transformIrreducibleLoops.value // deprecated (a copy of the global configuration flag)
+          conf.transformIrreducibleLoops.value // deprecated (a copy of the global configuration flag)
         )
       )
     } else {
