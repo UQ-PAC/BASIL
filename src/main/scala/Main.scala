@@ -122,7 +122,10 @@ object Main {
 
   @main(name = programNameVersionHeader + System.lineSeparator())
   case class Config(
-    @arg(name = "load-directory-bap", doc = "Load relf, adt, and bir from directory (and spec from parent directory) [deprecated]")
+    @arg(
+      name = "load-directory-bap",
+      doc = "Load relf, adt, and bir from directory (and spec from parent directory) [deprecated]"
+    )
     bapInputDirName: Option[String],
     @arg(name = "load-directory-gtirb", doc = "Load relf and gts from directory (and spec from parent directory)")
     gtirbInputDirName: Option[String],
@@ -193,7 +196,10 @@ object Main {
     threadSplit: Flag,
     @arg(name = "generate-parameters", doc = "Lift registers to local variables passed by parameter")
     parameterForm: Flag,
-    @arg(name = "generate-procedure-summaries", doc = "Generates summaries of procedures which are used in pre/post-conditions")
+    @arg(
+      name = "generate-procedure-summaries",
+      doc = "Generates summaries of procedures which are used in pre/post-conditions"
+    )
     summariseProcedures: Flag,
     @arg(
       name = "generate-loop-invariants",
@@ -237,7 +243,11 @@ object Main {
         "Ensures there are no irreducible loops by transforming them when --analyse is passed (does nothing without --analyse)"
     )
     noIrreducibleLoops: Flag,
-    @arg(name = "dsa", doc = "Perform Data Structure Analysis (implies --simplify flag) (pre|local|bu|td). Note: --dsa= is equivalent to --dsa=td.")
+    @arg(
+      name = "dsa",
+      doc =
+        "Perform Data Structure Analysis (implies --simplify flag) (pre|local|bu|td). Note: --dsa= is equivalent to --dsa=td."
+    )
     dsaType: Option[String],
     @arg(name = "dsa-checks", doc = "Perform additional dsa checks (requires --dsa (local|bu|td)")
     dsaChecks: Flag,
@@ -271,11 +281,11 @@ object Main {
 
     if (conf.help.value) {
       println(parser.helpText(sorted = false))
-      println("Examples:")
-      println("  basil --input prog.gts --relf prog.relf --spec prog.spec  # output basil-out.bpl")
-      println("  basil -i prog.gtirb --lifter --verify -o prog.bpl         # run Boogie on prog.bpl")
-      println("  basil -i prog.gtirb --lifter --dsa= --memory-transform    # simplify and partition mem into regions")
-      println("  basil --load-directory-gtirb <dir> --interpret            # interpret the program")
+      println("Example runs:")
+      println("  --input prog.gts --spec prog.spec                   # output basil-out.bpl")
+      println("  -i prog.gtirb --lifter --verify -o prog.bpl         # output prog.bpl and run Boogie")
+      println("  -i prog.gtirb --lifter --dsa= --memory-transform    # simplify and partition mem into regions")
+      println("  --load-directory-gtirb <dir> --interpret            # interpret the program")
       return
     }
 
