@@ -300,7 +300,9 @@ def block(label: String, sl: (NonCallStatement | EventuallyStatement | Eventuall
   EventuallyBlock(label, statements, rjump, Map())
 }
 
-def block(label: String)(phis: (Variable, Iterable[(String, Variable)])*)(sl: (NonCallStatement | EventuallyStatement | EventuallyJump)*): EventuallyBlock = {
+def block(label: String)(
+  phis: (Variable, Iterable[(String, Variable)])*
+)(sl: (NonCallStatement | EventuallyStatement | EventuallyJump)*): EventuallyBlock = {
   val statements: Seq[EventuallyStatement] = sl.flatMap {
     case s: NonCallStatement => Some(IdentityStatement(s))
     case o: EventuallyStatement => Some(o)
@@ -309,7 +311,7 @@ def block(label: String)(phis: (Variable, Iterable[(String, Variable)])*)(sl: (N
   val jump = sl.collect { case j: EventuallyJump => j }
   require(jump.length <= 1, s"DSL block '$label' must contain no more than one jump statement")
   val rjump = if (jump.isEmpty) then unreachable else jump.head
-  EventuallyBlock(label, statements, rjump, phis.toMap.map { (x, y) => (x, y.toList)})
+  EventuallyBlock(label, statements, rjump, phis.toMap.map { (x, y) => (x, y.toList) })
 }
 
 /**

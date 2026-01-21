@@ -48,7 +48,6 @@ class ExprBNFCVisitor[A](val decls: Declarations)
     ir.FApplyExpr(n, args, rt)
   }
 
-
   def visit(x: syntax.VarLocalVar, arg: A) = x.localvar_.accept(this, arg)
   def visit(x: syntax.VarGlobalVar, arg: A) = x.globalvar_.accept(this, arg)
 
