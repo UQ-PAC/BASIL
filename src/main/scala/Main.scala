@@ -283,7 +283,7 @@ object Main {
       println("Example runs:")
       println("  --input prog.gts --spec prog.spec                   # output basil-out.bpl")
       println("  -i prog.gtirb --lifter --verify -o prog.bpl         # output prog.bpl and run Boogie")
-      println("  -i prog.gtirb --lifter --dsa= --memory-transform    # simplify and partition mem into regions")
+      println("  -i prog.gtirb --lifter --dsa= --transform-memory    # simplify and partition mem into regions")
       println("  --load-directory-gtirb <dir> --interpret            # interpret the program")
       return
     }
