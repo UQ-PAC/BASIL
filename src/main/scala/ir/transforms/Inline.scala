@@ -87,6 +87,7 @@ def convertBlockRenaming(varRenamer: CILVisitor, blockName: String => String)(x:
     blockName(x.label),
     x.statements.to(ArraySeq).map(convertStatementRenaming(varRenamer)),
     convertJumpRenaming(blockName, varRenamer, x.jump),
+    Map(),
     x.meta
   )
 }

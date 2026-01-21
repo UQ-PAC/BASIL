@@ -251,13 +251,12 @@ case class EventuallyBlock(
   label: String,
   sl: Iterable[EventuallyStatement],
   var j: EventuallyJump,
-  phiAssigns: List[] // TODO:
-
+  phiAssigns: Map[Variable, List[(String, Variable)]],
   meta: Metadata = Metadata()
 ) extends DeepEquality {
 
   override def deepEquals(o: Object) = o match {
-    case EventuallyBlock(`label`, osl, oj, `meta`) =>
+    case EventuallyBlock(`label`, osl, oj, `phiAssigns`, `meta`) =>
       j.deepEquals(oj) && sl.size == osl.size && osl.toList.zip(sl).forall { case (l, r) =>
         l.deepEquals(r)
       }
@@ -298,7 +297,19 @@ def block(label: String, sl: (NonCallStatement | EventuallyStatement | Eventuall
   val jump = sl.collect { case j: EventuallyJump => j }
   require(jump.length <= 1, s"DSL block '$label' must contain no more than one jump statement")
   val rjump = if (jump.isEmpty) then unreachable else jump.head
-  EventuallyBlock(label, statements, rjump)
+  EventuallyBlock(label, statements, rjump, Map())
+}
+
+def block(label: String)(phis: (Variable, Iterable[(String, Variable)])*)(sl: (NonCallStatement | EventuallyStatement | EventuallyJump)*): EventuallyBlock = {
+  val statements: Seq[EventuallyStatement] = sl.flatMap {
+    case s: NonCallStatement => Some(IdentityStatement(s))
+    case o: EventuallyStatement => Some(o)
+    case g: EventuallyJump => None
+  }
+  val jump = sl.collect { case j: EventuallyJump => j }
+  require(jump.length <= 1, s"DSL block '$label' must contain no more than one jump statement")
+  val rjump = if (jump.isEmpty) then unreachable else jump.head
+  EventuallyBlock(label, statements, rjump, phis.toMap.map { (x, y) => (x, y.toList)})
 }
 
 /**
