@@ -66,6 +66,7 @@ def genValidFunction(v: Valid) = {
       BinaryBExpr(BVULE, BitVecBLiteral(0, 64), pos),
       BinaryBExpr(BVULE, BinaryBExpr(BVADD, pos, n), size),
     )
+    // TrueBLiteral
   )
 
   val in = List(me_live, me_live_val, me_object, me_position, pointer, n)

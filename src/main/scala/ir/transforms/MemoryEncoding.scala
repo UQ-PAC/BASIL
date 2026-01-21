@@ -12,6 +12,7 @@ class MemoryEncodingTransform() extends CILVisitor {
   private val r0 = BVariable("R0", BitVecBType(64), Scope.Global)
   private val r0_gamma = BVariable("Gamma_R0", BoolBType, Scope.Global)
   private val i = BVariable("i", BitVecBType(64), Scope.Local)
+  private val j = BVariable("j", BitVecBType(64), Scope.Local)
   private val o = BVariable("o", IntBType, Scope.Local)
   
   // Counter of allocations for getting a fresh id on new allocation
@@ -60,6 +61,9 @@ class MemoryEncodingTransform() extends CILVisitor {
             BinaryBExpr(NEQ, o, obj),
             BinaryBExpr(EQ, MapAccess(me_live, o), Old(MapAccess(me_live, o))),
           )
+        ),
+        List(
+          List(MapAccess(me_live, o))
         )
       ),
     )
@@ -98,6 +102,9 @@ class MemoryEncodingTransform() extends CILVisitor {
       // me_alloc_counter := Old(me_alloc_counter) + 1
       BinaryBExpr(EQ, me_alloc_counter, BinaryBExpr(IntADD, Old(me_alloc_counter), IntBLiteral(BigInt(1)))),
 
+      // Ensure that there is not an overflow
+      BinaryBExpr(BVUGT, BinaryBExpr(BVADD, r0, Old(r0)), r0),
+
       // Updates object mapping for all bytes in our allocated object and keeps others the same
       // forall i: bv64 ::
       //      (r0 <= i /\ i <  r0 + Old(r0)) => object[i] == Old(me_alloc_counter)
@@ -110,7 +117,7 @@ class MemoryEncodingTransform() extends CILVisitor {
               BinaryBExpr(BVULE, r0, i),
               BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, r0, Old(r0)))
             ),
-            BinaryBExpr(EQ, MapAccess(me_object, i), Old(me_alloc_counter))
+            BinaryBExpr(EQ, MapAccess(me_object, i), Old(me_alloc_counter)),
           ),
           BinaryBExpr(BoolIMPLIES,
             BinaryBExpr(BoolOR,
@@ -118,8 +125,11 @@ class MemoryEncodingTransform() extends CILVisitor {
               BinaryBExpr(BVUGE, i, BinaryBExpr(BVADD, r0, Old(r0)))
             ),
             BinaryBExpr(EQ, MapAccess(me_object, i), Old(MapAccess(me_object, i)))
-          )
-        )
+          ),
+        ),
+        List(List(
+          MapAccess(me_object, i),
+        ))
       ),
 
       // Updates position mapping for all bytes in our allocated position and keeps others the same
@@ -130,51 +140,48 @@ class MemoryEncodingTransform() extends CILVisitor {
         List(i),
         BinaryBExpr(BoolAND,
           BinaryBExpr(BoolIMPLIES,
-            BinaryBExpr(BoolAND,
-              BinaryBExpr(BVULE, r0, i),
-              BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, r0, Old(r0)))
+            BinaryBExpr(EQ,
+              MapAccess(me_object, r0),
+              MapAccess(me_object, i)
             ),
             BinaryBExpr(EQ, MapAccess(me_position, i), BinaryBExpr(BVSUB, i, r0))
           ),
           BinaryBExpr(BoolIMPLIES,
-            BinaryBExpr(BoolOR,
-              BinaryBExpr(BVUGT, r0, i),
-              BinaryBExpr(BVUGE, i, BinaryBExpr(BVADD, r0, Old(r0)))
+            BinaryBExpr(NEQ,
+              MapAccess(me_object, r0),
+              MapAccess(me_object, i)
             ),
             BinaryBExpr(EQ, MapAccess(me_position, i), Old(MapAccess(me_position, i)))
           )
-        )
+        ),
+        List(List(
+          MapAccess(me_position, i),
+        ))
       ),
 
-      // Ensures the object was fresh in the old live mapping
-      // BinaryBExpr(EQ,
-      //   Old(MapAccess(me_live, Old(me_alloc_counter))),
-      //   BitVecBLiteral(2,8)
+      // ForAll(
+      //   List(i),
+      //   BinaryBExpr(BoolIMPLIES,
+      //     // Not dead:
+      //     BinaryBExpr(NEQ,
+      //       Old(MapAccess(me_live, Old(MapAccess(me_object, i)))),
+      //       BitVecBLiteral(0,8)
+      //     ),
+      //     // Implies R0 is not this:
+      //     // BinaryBExpr(NEQ,
+      //     //   MapAccess(me_object, r0),
+      //     //   MapAccess(me_object, i)
+      //     // )
+      //     // Implies unchanged (ideally same meaning as above?):
+      //     BinaryBExpr(EQ,
+      //       MapAccess(me_object, i),
+      //       Old(MapAccess(me_object, i))
+      //     )
+      //   ),
+      //   List(
+      //     MapAccess(me_object, i),
+      //   )
       // ),
-
-      // ensures (forall #i: bv64 :: (
-      //   (($me_live[$me_object[#i]] != 0bv8) ==> $R0 != #i)
-      // ));
-      ForAll(
-        List(i),
-        BinaryBExpr(BoolIMPLIES,
-          // Not dead:
-          BinaryBExpr(NEQ,
-            Old(MapAccess(me_live, Old(MapAccess(me_object, i)))),
-            BitVecBLiteral(0,8)
-          ),
-          // Implies R0 is not this:
-          // BinaryBExpr(NEQ,
-          //   MapAccess(me_object, r0),
-          //   MapAccess(me_object, i)
-          // )
-          // Implies unchanged (ideally same meaning as above?):
-          BinaryBExpr(EQ,
-            MapAccess(me_object, i),
-            Old(MapAccess(me_object, i))
-          )
-        )
-      ),
 
       // Guarantee the object is live and has correct liveness
       // live = old(live)( Old(me_alloc_counter) -= 1)
@@ -197,9 +204,35 @@ class MemoryEncodingTransform() extends CILVisitor {
               BinaryBExpr(EQ, MapAccess(me_live, o), Old(MapAccess(me_live, o))),
               BinaryBExpr(EQ, MapAccess(me_live_val, o), Old(MapAccess(me_live_val, o))),
             )
-          )
+          ),
+        ),
+        List(
+          List(MapAccess(me_live, o)),
+          List(MapAccess(me_live_val, o))
         )
       ),
+
+      // The constraints provided above guarantee the changes we want,
+      // but they do not ensure that R0 was allocated into fresh memory, so it can just
+      // overwrite any existing pointer.
+      // It was written as ensures old(live(obj)) = Fresh; in the spec which seems a bit confusing
+      // Importantly because it enumerated objects, impossible to set up a trigger for object map
+      // access.
+      // but I have implemented the same outcome as follows, enumerating pointers and slightly
+      // re-ordered.
+      ForAll(
+        List(i),
+        BinaryBExpr(BoolIMPLIES,
+          // For all pointers which in the new state have the same object as r0 (aka belong to this allocation)
+          BinaryBExpr(EQ, MapAccess(me_object, r0), MapAccess(me_object, i)),
+          // They must have previously been fresh in the old state
+          BinaryBExpr(EQ, Old(MapAccess(me_live, Old(MapAccess(me_object, i)))), BitVecBLiteral(2,8)),
+        ),
+        List(List(
+          MapAccess(me_object, i)
+        ))
+      ),
+      
 
       // Guarantee that newly generated pointer is initially disjoint with all other live/fresh ptrs
       // Forall i: bv64 ::
@@ -224,7 +257,11 @@ class MemoryEncodingTransform() extends CILVisitor {
       //         BDisjoint(me_live, me_live_val, me_object, me_position, i, r0),
       //         UnaryBExpr(BoolNOT, cond),
       //       )
-      //     )
+      //     ),
+      //     // List(
+      //     //   MapAccess(me_object, i),
+      //     //   MapAccess(me_live, MapAccess(me_object, i))
+      //     // )
       //   )
       // }
     )
@@ -235,12 +272,12 @@ class MemoryEncodingTransform() extends CILVisitor {
       // Allocation counter starts at 0
       BinaryBExpr(EQ, me_alloc_counter, IntBLiteral(0)),
 
-      // All objects start dead
+      // All objects start fresh
       ForAll(
         List(o),
         BinaryBExpr(EQ,
           MapAccess(me_live, o),
-          BitVecBLiteral(0, 8)
+          BitVecBLiteral(2, 8)
         )
       )
     )
