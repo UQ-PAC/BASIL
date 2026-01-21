@@ -203,7 +203,7 @@ object Main {
     summariseProcedures: Flag,
     @arg(
       name = "generate-loop-invariants",
-      doc = "Generates loop invariants on loop headers (will not run with --no-irreducible-loops)"
+      doc = "Generates loop invariants on loop headers (implies --transform-irreducible-loops)"
     )
     generateLoopInvariants: Flag,
     @arg(
@@ -238,11 +238,11 @@ object Main {
     )
     memoryRegions: Option[String],
     @arg(
-      name = "no-irreducible-loops",
+      name = "transform-irreducible-loops",
       doc =
-        "Ensures there are no irreducible loops by transforming them when --analyse is passed (does nothing without --analyse)"
+        "Transforms irreducible loops into natural loops with control flags"
     )
-    noIrreducibleLoops: Flag,
+    transformIrreducibleLoops: Flag,
     @arg(
       name = "dsa",
       doc =
@@ -334,7 +334,7 @@ object Main {
           conf.analysisResultsDot,
           conf.threadSplit.value,
           memoryRegionsMode,
-          !conf.noIrreducibleLoops.value
+          !conf.transformIrreducibleLoops.value  // deprecated (a copy of the global configuration flag)
         )
       )
     } else {
@@ -478,6 +478,7 @@ object Main {
       runInterpret = conf.interpret.value,
       simplify = conf.simplify.value || dsa.isDefined,
       validateSimp = conf.validateSimplify.value,
+      transformIrreducibleLoops = conf.transformIrreducibleLoops.value || conf.generateLoopInvariants.value,
       summariseProcedures = conf.summariseProcedures.value,
       generateLoopInvariants = conf.generateLoopInvariants.value,
       generateRelyGuarantees = conf.generateRelyGuarantees.value,
