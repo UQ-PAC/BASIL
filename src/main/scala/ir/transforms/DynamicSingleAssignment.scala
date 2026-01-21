@@ -9,6 +9,7 @@ import util.assertion.*
 
 import scala.collection.mutable
 
+
 val phiAssignLabel = Some("phi")
 
 /** This transforms the program by adding no-op copies and renaming local variable indices to establish the property
@@ -346,7 +347,6 @@ class OnePassDSA(
           b.statements.clear()
           b.statements.prepend(ns)
         }
-
       }
     }
 
