@@ -1,5 +1,4 @@
-//| mill-version: 1.1.0-RC4-jvm
-//| mill-jvm-version: system
+//| mill-version: 1.0.3-jvm
 //| mvnDeps:
 //| - org.antlr:antlr4:4.9.3
 //| - com.goyeau::mill-scalafix::0.6.0
