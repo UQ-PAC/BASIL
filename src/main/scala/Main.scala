@@ -194,7 +194,7 @@ object Main {
       doc = "Separates threads into multiple .bpl files with given output filename as prefix (requires --analyse flag)"
     )
     threadSplit: Flag,
-    @arg(name = "generate-parameters", doc = "Lift registers to local variables passed by parameter")
+    @arg(name = "transform-parameters", doc = "Lift registers to local variables passed by parameter")
     parameterForm: Flag,
     @arg(
       name = "generate-procedure-summaries",
@@ -260,7 +260,7 @@ object Main {
     dsaEqCells: Flag,
     @arg(name = "dsa-assert", doc = "insert assertions to check globals offset to top fall within global region bounds")
     dsaAssert: Flag,
-    @arg(name = "memory-transform", doc = "Transform memory accesses to region accesses (requires --dsa=td)")
+    @arg(name = "transform-memory", doc = "Transform memory accesses to region accesses (requires --dsa=td)")
     memoryTransform: Flag,
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
     noif: Flag,
