@@ -2,8 +2,8 @@ import analysis.*
 import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.CaptureOutput
 import test_util.BASILTest.programToContext
+import test_util.CaptureOutput
 import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, RunUtils}
 
 @test_util.tags.UnitTest
@@ -66,24 +66,18 @@ class ProcedureAnnotationTests extends AnyFunSuite, CaptureOutput {
     // There was a bug where the wp dual domain was requiring false! This should hopefully catch that (though it's unlikely to happen again)
     val a = LocalVar("a", BitVecType(64), 0)
     val program = prog(
-      proc(
-        "main",
-        returnBlockLabel = Some("return_main")
-      )(
-        block("entry_main",
-          directCall("assert"),
-          goto ("return_main")
-          ),
+      proc("main", returnBlockLabel = Some("return_main"))(
+        block("entry_main", directCall("assert"), goto("return_main")),
         block("return_main", ret())
       ),
-      proc(
-        "assert",
-        returnBlockLabel = Some("return_assert")
-      )(
-        block("entry_assert",
+      proc("assert", returnBlockLabel = Some("return_assert"))(
+        block(
+          "entry_assert",
           // Predicate translater couldn't read this expression
           LocalAssign(a, OldExpr(BitVecLiteral(BigInt(2), 64))),
-          Assert(BinaryExpr(EQ, a, BitVecLiteral(BigInt("2"), 64))), goto("return_assert")),
+          Assert(BinaryExpr(EQ, a, BitVecLiteral(BigInt("2"), 64))),
+          goto("return_assert")
+        ),
         block("return_assert", ret())
       )
     )
