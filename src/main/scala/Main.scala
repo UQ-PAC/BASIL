@@ -453,12 +453,10 @@ object Main {
       loadingInputs = loadingInputs.copy(relfFile = Some(loadingInputs.inputFile))
     }
 
-    if (loadingInputs.specFile.isDefined && loadingInputs.relfFile.isEmpty) {
-      throw IllegalArgumentException("--spec requires --relf")
-    }
     if (loadingInputs.inputFile.endsWith(".adt") && loadingInputs.relfFile.isEmpty) {
       throw IllegalArgumentException("BAP ADT input requires --relf")
     }
+    assert(!(loadingInputs.specFile.isDefined && loadingInputs.relfFile.isEmpty), "--spec requires --relf")
 
     if (conf.noDebug.value) {
       util.assertion.disableAssertions = true
