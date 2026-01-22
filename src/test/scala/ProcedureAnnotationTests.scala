@@ -3,6 +3,8 @@ import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.CaptureOutput
+import test_util.BASILTest.programToContext
+import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, RunUtils}
 
 @test_util.tags.UnitTest
 class ProcedureAnnotationTests extends AnyFunSuite, CaptureOutput {
@@ -12,6 +14,7 @@ class ProcedureAnnotationTests extends AnyFunSuite, CaptureOutput {
 
     val summaryGenerator = SummaryGenerator(program, true)
     program.procedures
+      .filter(proc => program.mainProcedure != proc)
       .foreach { procedure =>
         {
           procedure.requires = summaryGenerator.generateRequires(procedure)
@@ -57,5 +60,51 @@ class ProcedureAnnotationTests extends AnyFunSuite, CaptureOutput {
     annotateProgram(program)
 
     // TODO run boogie once gamma constraints on the loop guard variables can be added in a loop invariant.
+  }
+
+  test("wp-dual-works") {
+    // There was a bug where the wp dual domain was requiring false! This should hopefully catch that (though it's unlikely to happen again)
+    val a = LocalVar("a", BitVecType(64), 0)
+    val program = prog(
+      proc(
+        "main",
+        returnBlockLabel = Some("return_main")
+      )(
+        block("entry_main",
+          directCall("assert"),
+          goto ("return_main")
+          ),
+        block("return_main", ret())
+      ),
+      proc(
+        "assert",
+        returnBlockLabel = Some("return_assert")
+      )(
+        block("entry_assert",
+          // Predicate translater couldn't read this expression
+          LocalAssign(a, OldExpr(BitVecLiteral(BigInt(2), 64))),
+          Assert(BinaryExpr(EQ, a, BitVecLiteral(BigInt("2"), 64))), goto("return_assert")),
+        block("return_assert", ret())
+      )
+    )
+
+    annotateProgram(program)
+    val context = programToContext(program)
+    val basilOut = RunUtils.loadAndTranslate(
+      BASILConfig(
+        context = Some(context),
+        loading = ILLoadingConfig(inputFile = "", relfFile = None),
+        simplify = true,
+        generateLoopInvariants = true,
+        staticAnalysis = None,
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+        dsaConfig = None // Some(DSAConfig(Set.empty))
+      )
+    )
+    val results = basilOut.boogie.map(_.verifyBoogie())
+    assertResult(true) {
+      results.forall(_.kind.isVerified)
+    }
   }
 }
