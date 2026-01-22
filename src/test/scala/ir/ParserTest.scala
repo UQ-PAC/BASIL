@@ -65,13 +65,15 @@ proc @main_1876(ZF_in:bv1, VF_in:bv1, R31_in:bv64, R30_in:bv64, R29_in:bv64,
     goto (%inputs2, %inputs3);
   ];
 
-  block %inputs2 [
-    [var R29:bv64 := phi(%inputs -> R29_in:bv64, %inputs2 -> R30_in:bv64)];
+  block %inputs2
+    (var R29:bv64 := (%inputs -> R29_in:bv64, %inputs2 -> R30_in:bv64))
+  [
     goto (%inputs);
   ];
 
-  block %inputs3 [
-    [var x:bv64 := phi(%inputs -> R31_in:bv64)];
+  block %inputs3
+    (var x:bv64 := (%inputs -> R31_in:bv64))
+  [
     goto (%inputs, %inputs2);
   ];
 ];

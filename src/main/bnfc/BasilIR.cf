@@ -135,7 +135,7 @@ rules JumpWithAttrib ::= Jump AttribSet ;
 rules PhiExpr ::= BlockIdent "->" Var ;
 separator PhiExpr "," ;
 
-rules PhiAssign ::= LVar ":=" "phi" "(" [ PhiExpr ] ")";
+rules PhiAssign ::= LVar ":=" "(" [ PhiExpr ] ")";
 separator PhiAssign ",";
 
 
@@ -143,8 +143,9 @@ Block_NoPhi . Block ::= "block" BlockIdent AttribSet BeginList
   [StmtWithAttrib] JumpWithAttrib ";"
   EndList ;
 
-Block_Phi . Block ::= "block" BlockIdent AttribSet BeginList 
-  BeginList [PhiAssign] EndList ";"
+Block_Phi . Block ::= "block" BlockIdent AttribSet 
+  "(" [PhiAssign] ")"
+  BeginList
   [StmtWithAttrib] JumpWithAttrib ";"
   EndList ;
 
