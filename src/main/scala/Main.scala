@@ -340,7 +340,7 @@ object Main {
           conf.analysisResultsDot,
           conf.threadSplit.value,
           memoryRegionsMode,
-          conf.transformIrreducibleLoops.value // deprecated (a copy of the global configuration flag)
+          !conf.transformIrreducibleLoops.value // deprecated (a copy of the global configuration flag)
         )
       )
     } else {
