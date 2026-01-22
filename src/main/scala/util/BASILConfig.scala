@@ -50,7 +50,7 @@ case class StaticAnalysisConfig(
   analysisDotPath: Option[String] = None,
   threadSplit: Boolean = false,
   memoryRegions: MemoryRegionsMode = MemoryRegionsMode.Disabled,
-  irreducibleLoops: Boolean = true // true means remove irreducible loops
+  removeIrreducibleLoops: Boolean = true
 )
 
 enum DSAPhase {
