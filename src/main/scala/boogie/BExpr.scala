@@ -591,13 +591,19 @@ case class Valid() extends FunctionOp {
 }
 
 case class BValid(
-  me_live: BMapVar, me_live_val: BMapVar, me_object: BMapVar, me_position: BMapVar, pointer: BExpr, n: BExpr
+  me_live: BMapVar,
+  me_live_val: BMapVar,
+  me_object: BMapVar,
+  me_position: BMapVar,
+  me_unallocated: BMapVar,
+  pointer: BExpr,
+  n: BExpr
 ) extends BExpr {
-  override def toString: String = s"$fnName($me_live, $me_live_val, $me_object, $me_position, $pointer, $n)"
+  override def toString: String = s"$fnName($me_live, $me_live_val, $me_object, $me_position, $me_unallocated, $pointer, $n)"
   val fnName: String = s"valid"
 
   override val getType: BType = BoolBType
-  val inputs = List(me_live, me_live_val, me_object, me_position, pointer, n)
+  val inputs = List(me_live, me_live_val, me_object, me_position, me_unallocated, pointer, n)
 
   override def functionOps: Set[FunctionOp] =
     inputs.flatMap(i => i.functionOps).toSet + Valid()

@@ -883,8 +883,9 @@ class IRToBoogie(
           val me_position = BMapVar("me_position", MapBType(BitVecBType(64), BitVecBType(64)), Scope.Global)
           val me_live = BMapVar("me_live", MapBType(IntBType, BitVecBType(8)), Scope.Global)
           val me_live_val = BMapVar("me_live_val", MapBType(IntBType, BitVecBType(64)), Scope.Global)
+          val me_unallocated = BMapVar("me_unallocated", MapBType(BitVecBType(64), BoolBType), Scope.Global)
           val validCheck = BAssert(BValid(
-            me_live, me_live_val, me_object, me_position, m.index.toBoogie, BitVecBLiteral(m.size / 8, 64)
+            me_live, me_live_val, me_object, me_position, me_unallocated, m.index.toBoogie, BitVecBLiteral(m.size / 8, 64)
           ))
 
           val gammaValueCheck = BAssert(BinaryBExpr(BoolIMPLIES, L(LArgs, rhs.index), exprToGamma(m.value)))

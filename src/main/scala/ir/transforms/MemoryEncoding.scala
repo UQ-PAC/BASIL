@@ -3,7 +3,6 @@ package ir.transforms
 import boogie.*
 import ir.cilvisitor.*
 import ir.*
-import specification.*
 
 class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
   // first m bits of pointer are for offset
@@ -28,12 +27,15 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
   private val me_position_gamma = BMapVar("Gamma_me_position", MapBType(BitVecBType(64), BoolBType), Scope.Global)
 
   // Live is a mapping from allocation id to liveness
-  // 0=Dead, 1=Live, 2=Fresh, 3=Unallocated (global)
+  // 0=Dead, 1=Live, 2=Fresh
   // if live, find allocation size in me_live_vals
   private val me_live = BMapVar("me_live", MapBType(IntBType, BitVecBType(8)), Scope.Global)
   private val me_live_gamma = BMapVar("Gamma_me_live", MapBType(IntBType, BoolBType), Scope.Global)
   private val me_live_val = BMapVar("me_live_val", MapBType(IntBType, BitVecBType(64)), Scope.Global)
   private val me_live_val_gamma = BMapVar("Gamma_me_live_val", MapBType(IntBType, BoolBType), Scope.Global)
+
+  // Mapping for unallocated pointers
+  private val me_unallocated = BMapVar("me_unallocated", MapBType(BitVecBType(64), BoolBType), Scope.Global)
 
   private def transform_free(p: Procedure) = {
     p.modifies ++= Set(
@@ -197,10 +199,23 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
           MapAccess(me_object, i)
         ))
       ),
-     
+
+      // Whatever pointer is produced, it shouldnt overlap one of the existing unallocated vars from the symbol
+      // table.
+      ForAll(
+        List(i),
+        BinaryBExpr(BoolIMPLIES,
+          BinaryBExpr(EQ, MapAccess(me_unallocated, i), TrueBLiteral),
+          BinaryBExpr(NEQ, i, r0)
+        ),
+        List(
+          List(MapAccess(me_object, i)),
+          List(MapAccess(me_position, i))
+        )
+      )
     )
   }
-
+ 
   private def transform_main(p: Procedure) = {
     p.requires = p.requires ++ List(
       // Allocation counter starts at 0
@@ -213,15 +228,36 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
           MapAccess(me_live, o),
           BitVecBLiteral(2, 8)
         )
+      ),
+
+      // TODO: replace me_unallocated with a set to clean this all up
+      ForAll(
+        List(i),
+        BinaryBExpr(BoolIMPLIES,
+          ctx.symbols.map(s => s.value).toSet.map(v => {
+            BinaryBExpr(NEQ, i, BitVecBLiteral(v, 64))
+          }).fold(TrueBLiteral)((acc, v) => {
+            BinaryBExpr(BoolAND, acc, v)
+          }),
+          BinaryBExpr(EQ,
+            MapAccess(me_unallocated, i),
+            FalseBLiteral
+          )
+        ),
+        List(List(MapAccess(me_unallocated, i)))
       )
-    )
+    ) ++ ctx.symbols.map(s => s.value).toSet.map(v => {
+      // All ctx provided symbols are unallocated (true) otherwise false
+      BinaryBExpr(EQ,
+        MapAccess(me_unallocated, BitVecBLiteral(v, 64)),
+        TrueBLiteral
+      )
+    })
   }
 
   override def vprog(p: Program) = {
     // TODO: datatypes would clean liveness up a bit in future. Something like this:
     // https://github.com/boogie-org/boogie/blob/master/Test/datatypes/is-cons.bpl
-
-    println(ctx.symbols.mkString("\n"))
    
     DoChildren()
   }
