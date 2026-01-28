@@ -139,6 +139,13 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
 
   private var atTop = Set[Block]()
 
+  private def expectPredicate(orig: Expr): Predicate = {
+    exprToPredicate(orig) match {
+      case Some(p) => p
+      case None => top
+    }
+  }
+
   def join(a: Predicate, b: Predicate, pos: Block): Predicate =
     if a.size + b.size > 100 then atTop += pos
     if atTop.contains(pos) then top else or(a, b).simplify
@@ -193,13 +200,6 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
   override def fromPred(p: Predicate): Predicate = p
 }
 
-private def expectPredicate(orig: Expr): Predicate = {
-  exprToPredicate(orig) match {
-    case Some(p) => p
-    case None => throw Exception(s"Expected to be able to construct predicate for: $orig")
-  }
-}
-
 /**
  * An abstract domain which computes conditions (as predicates) for assertions (including the check that gammas are low on branches) to be violated.
  *
@@ -209,6 +209,13 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
   import Predicate.*
 
   private var atTop = Set[Block]()
+
+  private def expectPredicate(orig: Expr): Predicate = {
+    exprToPredicate(orig) match {
+      case Some(p) => p
+      case None => not(top)
+    }
+  }
 
   def join(a: Predicate, b: Predicate, pos: Block): Predicate =
     if a.size + b.size > 100 then atTop += pos
