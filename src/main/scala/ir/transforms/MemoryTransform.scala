@@ -6,8 +6,6 @@ import ir.cilvisitor.{CILVisitor, ChangeTo, SkipChildren}
 import util.Counter
 import util.assertion.*
 
-import util.{Logger}
-
 import scala.collection.mutable
 
 class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalNode, IntervalNode]) extends CILVisitor {
