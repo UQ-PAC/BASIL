@@ -34,8 +34,13 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
   private val me_live_val = BMapVar("me_live_val", MapBType(IntBType, BitVecBType(64)), Scope.Global)
   private val me_live_val_gamma = BMapVar("Gamma_me_live_val", MapBType(IntBType, BoolBType), Scope.Global)
 
-  // Mapping for unallocated pointers
-  private val me_unallocated = BMapVar("me_unallocated", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+  // Mapping for global pointers
+  private val me_global = BMapVar("me_global", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+
+  private val gamma_mem = BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global);
+  private val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global);
+
+  private var global_addresses = ctx.symbols.flatMap(s => Range(s.value.intValue, s.value.intValue + s.size)).toSet
 
   private def transform_free(p: Procedure) = {
     p.modifies ++= Set(
@@ -48,7 +53,9 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
       // Pointer must at base of allocation for free (no offset)
       BinaryBExpr(EQ, MapAccess(me_position, r0), BitVecBLiteral(0,64)),
       // Pointer must be live to free
-      BinaryBExpr(EQ, MapAccess(me_live, obj), BitVecBLiteral(1,8))
+      BinaryBExpr(EQ, MapAccess(me_live, obj), BitVecBLiteral(1,8)),
+      // The pointer being freed must not be global
+      UnaryBExpr(BoolNOT, MapAccess(me_global, r0))
     )
 
     p.ensures = p.ensures ++ List(
@@ -179,80 +186,83 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
         )
       ),
 
-      // The constraints provided above guarantee the changes we want,
-      // but they do not ensure that R0 was allocated into fresh memory, so it can just
-      // overwrite any existing pointer.
-      // It was written as ensures old(live(obj)) = Fresh; in the spec which seems a bit confusing
-      // Importantly because it enumerated objects, impossible to set up a trigger for object map
-      // access.
-      // but I have implemented the same outcome as follows, enumerating pointers and slightly
-      // re-ordered.
+      // Ensure that the full allocation of R0 is in fresh memory
+      // and that it is not overlapping a global var
       ForAll(
         List(i),
         BinaryBExpr(BoolIMPLIES,
           // For all pointers which in the new state have the same object as r0 (aka belong to this allocation)
           BinaryBExpr(EQ, MapAccess(me_object, r0), MapAccess(me_object, i)),
-          // They must have previously been fresh in the old state
-          BinaryBExpr(EQ, Old(MapAccess(me_live, Old(MapAccess(me_object, i)))), BitVecBLiteral(2,8)),
+          BinaryBExpr(BoolAND,
+            // They must have previously been fresh in the old state
+            BinaryBExpr(EQ, Old(MapAccess(me_live, Old(MapAccess(me_object, i)))), BitVecBLiteral(2,8)),
+            // And they must not be a global variable
+            UnaryBExpr(BoolNOT, Old(MapAccess(me_global, i))),
+          )
         ),
-        List(List(
-          MapAccess(me_object, i)
-        ))
+        List(List(MapAccess(me_object, i)))
       ),
-
-      // Whatever pointer is produced, it shouldnt overlap one of the existing unallocated vars from the symbol
-      // table.
-      ForAll(
-        List(i),
-        BinaryBExpr(BoolIMPLIES,
-          BinaryBExpr(EQ, MapAccess(me_unallocated, i), TrueBLiteral),
-          BinaryBExpr(NEQ, i, r0)
-        ),
-        List(
-          List(MapAccess(me_object, i)),
-          List(MapAccess(me_position, i))
-        )
-      )
     )
   }
  
   private def transform_main(p: Procedure) = {
     p.requires = p.requires ++ List(
-      // Allocation counter starts at 0
-      BinaryBExpr(EQ, me_alloc_counter, IntBLiteral(0)),
+      // Allocation counter starts at 1
+      BinaryBExpr(EQ, me_alloc_counter, IntBLiteral(1)),
 
-      // All objects start fresh
+      // All objects start fresh ...
       ForAll(
         List(o),
         BinaryBExpr(EQ,
           MapAccess(me_live, o),
           BitVecBLiteral(2, 8)
-        )
+        ),
+        List(List(MapAccess(me_live, o)))
       ),
 
-      // TODO: replace me_unallocated with a set to clean this all up
+      // ... with id 0
       ForAll(
         List(i),
-        BinaryBExpr(BoolIMPLIES,
-          ctx.symbols.map(s => s.value).toSet.map(v => {
-            BinaryBExpr(NEQ, i, BitVecBLiteral(v, 64))
-          }).fold(TrueBLiteral)((acc, v) => {
-            BinaryBExpr(BoolAND, acc, v)
-          }),
-          BinaryBExpr(EQ,
-            MapAccess(me_unallocated, i),
-            FalseBLiteral
-          )
+        BinaryBExpr(EQ,
+          MapAccess(me_object, i),
+          IntBLiteral(0)
         ),
-        List(List(MapAccess(me_unallocated, i)))
+        List(List(MapAccess(me_object, i)))
+      ),
+
+      ForAll(
+        List(i),
+        BinaryBExpr(EQ,
+          MapAccess(me_global, i),
+          BinaryBExpr(BVULE, i, BitVecBLiteral(global_addresses.max, 64)),
+        ),
+        List(List(MapAccess(me_global, i)))
       )
-    ) ++ ctx.symbols.map(s => s.value).toSet.map(v => {
-      // All ctx provided symbols are unallocated (true) otherwise false
-      BinaryBExpr(EQ,
-        MapAccess(me_unallocated, BitVecBLiteral(v, 64)),
-        TrueBLiteral
-      )
-    })
+
+      // // TODO: replace me_unallocated with a set to clean this all up
+      // ForAll(
+      //   List(i),
+      //   BinaryBExpr(BoolIMPLIES,
+      //     unallocated_addresses.map(v => {
+      //       BinaryBExpr(NEQ, i, BitVecBLiteral(v, 64))
+      //     }).fold(TrueBLiteral)((acc, v) => {
+      //       BinaryBExpr(BoolAND, acc, v)
+      //     }),
+      //     BinaryBExpr(EQ,
+      //       MapAccess(me_unallocated, i),
+      //       FalseBLiteral
+      //     )
+      //   ),
+      //   List(List(MapAccess(me_unallocated, i)))
+      // )
+    )
+    // ++ unallocated_addresses.map(v => {
+    //   // All ctx provided symbols are unallocated (true) otherwise false
+    //   BinaryBExpr(EQ,
+    //     MapAccess(me_unallocated, BitVecBLiteral(v, 64)),
+    //     TrueBLiteral
+    //   )
+    // })
   }
 
   override def vprog(p: Program) = {
