@@ -257,7 +257,7 @@ class IRToBoogie(
     val functionsUsed = (functionsUsed2 ++ functionsUsed3 ++ functionsUsed4 ++ functionsUsed5).toList.sorted
 
     val globalVars = procedures.flatMap(_.globals) ++ rgProcs.flatMap(_.globals)
-    val globalDecls = globalVars.distinctBy(b => b.name).map(b => BVarDecl(b, List(externAttr))).sorted.toList
+    val globalDecls = globalVars.distinctBy(b => b.name).map(b => BVarDecl(b, List(externAttr))).distinct.sorted.toList
 
     val globalConsts: List[BConstAxiomPair] = globals
       .map { g =>

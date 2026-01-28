@@ -65,7 +65,7 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
         BinaryBExpr(BoolAND,
           BinaryBExpr(BoolIMPLIES,
             BinaryBExpr(EQ, o, obj),
-            BinaryBExpr(EQ, MapAccess(me_live, o), BitVecBLiteral(0, 8)),
+            BinaryBExpr(EQ, MapAccess(me_live, o), BitVecBLiteral(2, 8)),
           ),
           BinaryBExpr(BoolIMPLIES,
             BinaryBExpr(NEQ, o, obj),
@@ -86,7 +86,8 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
       GlobalVar("me_live_val", MapType(IntType, BitVecType(64))),
       GlobalVar("me_position", MapType(BitVecType(64), BitVecType(64))),
       GlobalVar("me_object", MapType(BitVecType(64), IntType)),
-      GlobalVar("R0", BitVecType(64))
+      GlobalVar("R0", BitVecType(64)),
+      // SharedMemory("mem", 64, 8)
     );
     
     p.requires = p.requires ++ List(
@@ -96,6 +97,8 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
     )
 
     p.ensures = p.ensures ++ List(
+      BinaryBExpr(EQ, r0_gamma, TrueBLiteral),
+
       // Alloc count is bumped up by 1 after every allocation
       // me_alloc_counter := Old(me_alloc_counter) + 1
       BinaryBExpr(EQ, me_alloc_counter, BinaryBExpr(IntADD, Old(me_alloc_counter), IntBLiteral(BigInt(1)))),
@@ -200,7 +203,10 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
             UnaryBExpr(BoolNOT, Old(MapAccess(me_global, i))),
           )
         ),
-        List(List(MapAccess(me_object, i)))
+        List(
+          List(MapAccess(me_object, i)),
+          List(MapAccess(me_global, i))
+        )
       ),
     )
   }
@@ -237,7 +243,17 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
           BinaryBExpr(BVULE, i, BitVecBLiteral(global_addresses.max, 64)),
         ),
         List(List(MapAccess(me_global, i)))
-      )
+      ),
+
+      // And have a true gamma for all malloc candidates initially
+      ForAll(
+        List(i),
+        BinaryBExpr(BoolIMPLIES,
+          UnaryBExpr(BoolNOT, MapAccess(me_global, i)),
+          BinaryBExpr(EQ, MapAccess(gamma_mem, i), TrueBLiteral)
+        ),
+        List(List(MapAccess(gamma_mem, i)))
+      ),
 
       // // TODO: replace me_unallocated with a set to clean this all up
       // ForAll(
