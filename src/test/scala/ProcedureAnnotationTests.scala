@@ -63,7 +63,8 @@ class ProcedureAnnotationTests extends AnyFunSuite, CaptureOutput {
   }
 
   test("wp-dual-works") {
-    // There was a bug where the wp dual domain was requiring false! This should hopefully catch that (though it's unlikely to happen again)
+    // There was a bug where the wp dual domain was requiring false when it couldn't read a bitvector expression as a BVTerm.
+    // This should hopefully catch that (though it's unlikely to happen again)
     val a = LocalVar("a", BitVecType(64), 0)
     val program = prog(
       proc("main", returnBlockLabel = Some("return_main"))(
