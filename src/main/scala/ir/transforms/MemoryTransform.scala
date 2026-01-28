@@ -44,7 +44,6 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
             val index = indices.head
             val flag = index.node.flags
             val value = index.getPointee
-            Logger.info(stackVars)
             if isGlobal(flag) && index.node.bases.keys.count(_.isInstanceOf[GlobSym]) == 1 && !index.node.isCollapsed
             then ChangeTo(List(LocalAssign(load.lhs, Register(scalarName(index), load.size), load.label)))
             else if isLocal(flag) && !index.node.isCollapsed && !flag.escapes && index.node.bases.contains(Stack(proc))
@@ -54,25 +53,26 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
                 case BoolType => 1
                 case IntType => 32
                 case BitVecType(size) => size
-                case CustomSort(_) | MapType(_, _) => -1 // Above my pay grade
+                case CustomSort(_) | MapType(_, _) => -1 // TODO: no clue what these types mean in terms of IR
               val stackType = stackVars.get(name)
               val (loadSize, stype) = stackType match
-                case Some(t @ BoolType)         => (1, t)
-                case Some(t @ IntType)          => (32, t)
+                case Some(t @ BoolType) => (1, t)
+                case Some(t @ IntType) => (32, t)
                 case Some(t @ BitVecType(size)) => (size, t)
-                case Some(t @ CustomSort(_))    => (-1, t)
-                case Some(t @ MapType(_, _))    => (-1, t)
-                case None =>
-                  Logger.info(name)
-                  (32, BitVecType(32)) // Why does Stack_0_8 come here?
-              if typeSize != loadSize // Needs to be the actual Variable type not just the load.size as this will be correct
+                case Some(t @ CustomSort(_)) => (-1, t)
+                case Some(t @ MapType(_, _)) => (-1, t)
+                case None => (-1, BoolType)
+              if typeSize != loadSize && loadSize > 0
               then
-                val start = 0 // Index is an Expr so might be cooked chat
                 ChangeTo(
                   List(
                     LocalAssign(
                       load.lhs,
-                      Extract(start + load.size, start, LocalVar(scalarName(index, Some(proc)), stype)),
+                      Extract(
+                        load.size,
+                        0,
+                        BinaryExpr(BVSHL, LocalVar(scalarName(index, Some(proc)), stype), load.index)
+                      ),
                       load.label
                     )
                   )
@@ -111,19 +111,58 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
               val stackType = stackVars.getOrElseUpdate(name, store.value.getType)
               val lhs = LocalVar(name, stackType)
               val totalSize = stackType match
-                case BoolType         => 1
-                case IntType          => 32
+                case BoolType => 1
+                case IntType => 32
                 case BitVecType(size) => size
-                case CustomSort(_)    => -1
-                case MapType(_, _)    => -1
-              val startBV = Extract(0 + 0, 0, lhs) // First arg should be addr
-              val endBV = Extract(totalSize, 0 + store.size, lhs)
-              val resBV = BinaryExpr(BVCONCAT, startBV, BinaryExpr(BVCONCAT, store.value, endBV))
-              ChangeTo(
-                List(
-                  LocalAssign(lhs, resBV, store.label)
+                case CustomSort(_) => -1
+                case MapType(_, _) => -1
+              val totalSize2 = store.index.getType match
+                case BoolType => 1
+                case IntType => 32
+                case BitVecType(size) => size
+                case CustomSort(_) => -1
+                case MapType(_, _) => -1
+              if totalSize != store.size
+              then
+                /*
+                  If the size of the value you are entering into the stack variable is not the same type
+                   i.e. bitvector size mismatch you need to do the below steps
+
+                  We seperate the variable into three sections, start, end and the value we are chucking in.
+                    For example for the assignment
+
+                    var a = b;
+                    where,
+                      a = 000100101010
+                      b = 0101
+                    and we want to put b 4 bits into b
+                    i.e.
+                      a= 0001(0101)1010
+
+                    start = 0001
+                    b / value = 0101
+                    end = 1010
+                 */
+                val bitvectorTotalSize = BitVecLiteral(totalSize, totalSize2)
+                val bitvectorStoreSize = BitVecLiteral(store.size, totalSize2)
+
+                val extendedStoreValue = BinaryExpr(BVSHL, ZeroExtend(totalSize - store.size, store.value), store.index)
+
+                val startShift = BinaryExpr(BVSUB, bitvectorTotalSize, store.index)
+                val endShift = BinaryExpr(BVADD, bitvectorStoreSize, store.index)
+
+                val startBV = BinaryExpr(BVSHL, BinaryExpr(BVLSHR, extendedStoreValue, startShift), startShift)
+                val endBV = BinaryExpr(BVLSHR, BinaryExpr(BVSHL, extendedStoreValue, endShift), endShift)
+
+                val resBV = BinaryExpr(BVXOR, startBV, BinaryExpr(BVXOR, extendedStoreValue, endBV))
+
+                ChangeTo(List(LocalAssign(lhs, resBV, store.label)))
+              else
+                ChangeTo(
+                  List(
+                    LocalAssign(LocalVar(scalarName(index, Some(proc)), store.value.getType), store.value, store.label)
+                  )
                 )
-              )
             else if !flag.escapes || isGlobal(flag) then
               val memName =
                 if isGlobal(flag) then "Global"
