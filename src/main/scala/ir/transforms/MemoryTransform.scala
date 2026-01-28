@@ -56,30 +56,32 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
                 case CustomSort(_) | MapType(_, _) => -1 // TODO: no clue what these types mean in terms of IR
               val stackType = stackVars.get(name)
               val (loadSize, stype) = stackType match
-                case Some(t @ BoolType) => (1, t)
-                case Some(t @ IntType) => (32, t)
-                case Some(t @ BitVecType(size)) => (size, t)
-                case Some(t @ CustomSort(_)) => (-1, t)
-                case Some(t @ MapType(_, _)) => (-1, t)
-                case None => (-1, BoolType)
-              if typeSize != loadSize && loadSize > 0
-              then
-                ChangeTo(
-                  List(
-                    LocalAssign(
-                      load.lhs,
-                      Extract(
-                        load.size,
-                        0,
-                        BinaryExpr(BVSHL, LocalVar(scalarName(index, Some(proc)), stype), load.index)
-                      ),
-                      load.label
+                case t @ Some(BoolType) => (1, t)
+                case t @ Some(IntType) => (32, t)
+                case t @ Some(BitVecType(size)) => (size, t)
+                case t @ Some(CustomSort(_)) => (-1, t)
+                case t @ Some(MapType(_, _)) => (-1, t)
+                case None => (-1, None) // Was not in map
+              stype match
+                case Some(t) if typeSize != loadSize => (
+                  ChangeTo(
+                    List(
+                      LocalAssign(
+                        load.lhs,
+                        Extract(
+                          load.size,
+                          0,
+                          BinaryExpr(BVSHL, LocalVar(scalarName(index, Some(proc)), t), load.index)
+                        ),
+                        load.label
+                      )
                     )
                   )
                 )
-              else
-                ChangeTo(
-                  List(LocalAssign(load.lhs, LocalVar(scalarName(index, Some(proc)), load.lhs.getType), load.label))
+                case _ => (
+                  ChangeTo(
+                    List(LocalAssign(load.lhs, LocalVar(scalarName(index, Some(proc)), load.lhs.getType), load.label))
+                  )
                 )
             else if !flag.escapes || isGlobal(flag) then
               val memName =
@@ -139,9 +141,40 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
                     i.e.
                       a= 0001(0101)1010
 
-                    start = 0001
-                    b / value = 0101
-                    end = 1010
+                    start-section = 0001
+                    b / value     = 0101
+                    end-section   = 1010
+
+                    == to get start
+                    shift lhs left total size - index = 12 - 4 = 8
+                    000100101010
+                    000000000001
+                    shift right back
+                    000100000000
+
+                    == to get end
+                    shift lhs right store size + index = 4 + 4 + 8
+                    000100101010
+                    101000000000
+                    shift left back
+                    000000001010
+
+                    == to extend value
+                    0101
+                    zero extend total size - store.size = 12 - 4 = 8
+                    000000000101
+                    shift left index total size - index = 12 - 4 = 8
+                    000001010000
+
+                    xor those
+
+                    000001010000
+                    000000001010
+                    000100000000
+
+                    gives
+                    000101011010
+                    tada
                  */
                 val bitvectorTotalSize = BitVecLiteral(totalSize, totalSize2)
                 val bitvectorStoreSize = BitVecLiteral(store.size, totalSize2)
