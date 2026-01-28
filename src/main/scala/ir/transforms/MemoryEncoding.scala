@@ -42,6 +42,74 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
 
   private var global_addresses = ctx.symbols.flatMap(s => Range(s.value.intValue, s.value.intValue + s.size)).toSet
 
+  private def R(n: Int) = BVariable(s"R$n", BitVecBType(64), Scope.Global);
+  private def Gamma_R(n: Int) = BVariable(s"Gamma_R$n", BoolBType, Scope.Global);
+
+  private def transform_memset(p: Procedure) = {
+    // FIXME: memsetting a stack variable probably doesnt need verification.
+     
+    val dest = Old(R(0)); // Destination pointer
+    val gamma_dest = Old(Gamma_R(0)); // Destination pointer
+
+    val c = BVExtract(8,0,R(1)); // Character to set entries to
+    val gamma_c = Gamma_R(1);
+
+    val n = R(2); // Number of characters to set
+
+    val ret = R(0); // Should be equal to dest
+    val gamma_ret = Gamma_R(0);
+    
+    p.modifies ++= Set(
+      GlobalVar("R0", BitVecType(64)),
+      SharedMemory("mem", 64, 8)
+    );
+
+    p.requires = p.requires ++ List(
+      ForAll(
+        List(i),
+        BinaryBExpr(BoolIMPLIES,
+          BinaryBExpr(BoolAND,
+            BinaryBExpr(BVULE, R(0), i),
+            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, R(0), n))
+          ),
+          // Check each byte is valid individually as they might not all belong to the same object.
+          // TODO: this is probably never desirable behaviour anyway.
+          BValid(me_live, me_live_val, me_object, me_position, me_global, i, BitVecBLiteral(1,64))
+        )
+      )
+    );
+
+    p.ensures = p.ensures ++ List(
+      // return value is equal to input destination
+      BinaryBExpr(EQ, ret, dest),
+      BinaryBExpr(EQ, gamma_ret, gamma_dest),
+      ForAll(
+        List(i),
+        IfThenElse(
+          BinaryBExpr(BoolAND,
+            BinaryBExpr(BVULE, dest, i),
+            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, n))
+          ),
+          BinaryBExpr(EQ, MapAccess(mem, i), c),
+          BinaryBExpr(EQ, MapAccess(mem, i), Old(MapAccess(mem, i))),
+        ),
+        List(List(MapAccess(mem, i)))
+      ),
+      ForAll(
+        List(i),
+        IfThenElse(
+          BinaryBExpr(BoolAND,
+            BinaryBExpr(BVULE, dest, i),
+            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, n))
+          ),
+          BinaryBExpr(EQ, MapAccess(gamma_mem, i), gamma_c),
+          BinaryBExpr(EQ, MapAccess(gamma_mem, i), Old(MapAccess(gamma_mem, i)))
+        ),
+        List(List(MapAccess(gamma_mem, i)))
+      )
+    );
+  }
+
   private def transform_free(p: Procedure) = {
     p.modifies ++= Set(
       GlobalVar("me_live", MapType(IntType, BitVecType(8))),
@@ -87,7 +155,6 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
       GlobalVar("me_position", MapType(BitVecType(64), BitVecType(64))),
       GlobalVar("me_object", MapType(BitVecType(64), IntType)),
       GlobalVar("R0", BitVecType(64)),
-      // SharedMemory("mem", 64, 8)
     );
     
     p.requires = p.requires ++ List(
@@ -293,6 +360,7 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
       case "malloc" => transform_malloc(p)
       case "free" => transform_free(p)
       case "main" => transform_main(p)
+      case "memset" => transform_memset(p)
       case _ => { }
     }
 
