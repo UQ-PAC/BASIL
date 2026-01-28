@@ -82,13 +82,16 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
       BinaryBExpr(EQ, gamma_ret, gamma_dest),
       ForAll(
         List(i),
-        IfThenElse(
-          BinaryBExpr(BoolAND,
-            BinaryBExpr(BVULE, dest, i),
-            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, n))
+        BinaryBExpr(EQ,
+          MapAccess(mem,i),
+          IfThenElse(
+            BinaryBExpr(BoolAND,
+              BinaryBExpr(BVULE, dest, i),
+              BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, n))
+            ),
+            c,
+            Old(MapAccess(mem, i)),
           ),
-          BinaryBExpr(EQ, MapAccess(mem, i), c),
-          BinaryBExpr(EQ, MapAccess(mem, i), Old(MapAccess(mem, i))),
         ),
         List(List(MapAccess(mem, i)))
       ),
@@ -104,6 +107,78 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
         ),
         List(List(MapAccess(gamma_mem, i)))
       )
+    );
+  }
+
+  private def transform_memcpy(p: Procedure) = {
+    val dest = R(0);
+    val gamma_dest = Gamma_R(0);
+
+    val src = R(1);
+    val gamma_src = Gamma_R(1);
+
+    val n = R(2);
+    val gamma_n = Gamma_R(2);
+    
+    p.modifies ++= Set(
+      GlobalVar("R0", BitVecType(64)),
+      SharedMemory("mem", 64, 8)
+    );
+
+    p.requires = p.requires ++ List(
+      BinaryBExpr(EQ, gamma_n, TrueBLiteral),
+      ForAll(
+        List(i),
+        BinaryBExpr(BoolIMPLIES,
+          BinaryBExpr(BoolAND,
+            BinaryBExpr(BVULE, src, i),
+            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, src, n))
+          ),
+          BValid(me_live, me_live_val, me_object, me_position, me_global, i, BitVecBLiteral(1,64)),
+        )
+      ),
+      ForAll(
+        List(i),
+        BinaryBExpr(BoolIMPLIES,
+          BinaryBExpr(BoolAND,
+            BinaryBExpr(BVULE, dest, i),
+            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, n))
+          ),
+          BValid(me_live, me_live_val, me_object, me_position, me_global, i, BitVecBLiteral(1,64)),
+        )
+      )
+    );
+
+    p.ensures = p.ensures ++ List(
+      // return value is equal to input... this is a bit silly but its how memcpy is defined
+      BinaryBExpr(EQ, dest, Old(dest)),
+      BinaryBExpr(EQ, gamma_dest, Old(gamma_dest)),
+
+      ForAll(
+        List(i),
+        IfThenElse(
+          BinaryBExpr(BoolAND,
+            BinaryBExpr(BVULE, dest, i),
+            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, n))
+          ),
+          BinaryBExpr(EQ, MapAccess(mem, i), MapAccess(mem, BinaryBExpr(BVADD,BinaryBExpr(BVSUB,i,dest),src))),
+          BinaryBExpr(EQ, MapAccess(mem, i), Old(MapAccess(mem, i)))
+        ),
+        List(List(MapAccess(mem,i)))
+      ),
+
+      ForAll(
+        List(i),
+        IfThenElse(
+          BinaryBExpr(BoolAND,
+            BinaryBExpr(BVULE, dest, i),
+            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, n))
+          ),
+          BinaryBExpr(EQ, MapAccess(gamma_mem, i), MapAccess(gamma_mem, BinaryBExpr(BVADD,BinaryBExpr(BVSUB,i,dest),src))),
+          BinaryBExpr(EQ, MapAccess(gamma_mem, i), Old(MapAccess(gamma_mem, i)))
+        ),
+        List(List(MapAccess(gamma_mem,i)))
+      ),
     );
   }
 
@@ -127,10 +202,14 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
             BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, Old(r0), r0))
           ),
           BinaryBExpr(BoolAND,
+            BinaryBExpr(NEQ, MapAccess(mem, i), BitVecBLiteral(0,8)),
             BValid(me_live, me_live_val, me_object, me_position, me_global, i, BitVecBLiteral(1,64)),
-            BinaryBExpr(NEQ, MapAccess(mem, i), BitVecBLiteral(0,8))
           )
         ),
+        // List(
+        //   List(MapAccess(mem, i)),
+        //   List(BValid(me_live, me_live_val, me_object, me_position, me_global, i, BitVecBLiteral(1,64)))
+        // )
       ),
       BinaryBExpr(EQ, MapAccess(mem, BinaryBExpr(BVADD, Old(r0), r0)), BitVecBLiteral(0,8)),
       BinaryBExpr(BVULE, Old(r0), BinaryBExpr(BVADD, Old(r0), r0))
@@ -389,6 +468,7 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
       case "main" => transform_main(p)
       case "memset" => transform_memset(p)
       case "strlen" => transform_strlen(p)
+      case "memcpy" => transform_memcpy(p)
       case _ => { }
     }
 
