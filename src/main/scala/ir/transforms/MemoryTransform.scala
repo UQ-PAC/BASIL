@@ -103,11 +103,11 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
             val index = indices.head
             val flag = index.node.flags
             val content = index.getPointee
-            val name = scalarName(index, Some(proc))
             if isGlobal(flag) && index.node.bases.keys.count(_.isInstanceOf[GlobSym]) == 1 && !index.node.isCollapsed
             then ChangeTo(List(MemoryAssign(Register(scalarName(index), store.size), store.value, store.label)))
             else if isLocal(flag) && !index.node.isCollapsed && !flag.escapes && index.node.bases.contains(Stack(proc))
             then
+              val name = scalarName(index, Some(proc))
               val stackType = stackVars.getOrElseUpdate(name, store.value.getType)
               val lhs = LocalVar(name, stackType)
               val totalSize = stackType match
@@ -191,13 +191,14 @@ class MemoryTransform(dsa: Map[Procedure, IntervalGraph], globals: Map[IntervalN
               else
                 ChangeTo(
                   List(
-                    LocalAssign(LocalVar(scalarName(index, Some(proc)), store.value.getType), store.value, store.label)
+                    LocalAssign(LocalVar(name, store.value.getType), store.value, store.label)
                   )
                 )
             else if !flag.escapes || isGlobal(flag) then
               val memName =
                 if isGlobal(flag) then "Global"
                 else if isLocal(flag) then
+                  val name = scalarName(index, Some(proc))
                   val stackType = stackVars.getOrElseUpdate(name, store.value.getType)
                   "Stack"
                 else
