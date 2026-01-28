@@ -46,8 +46,6 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
   private def Gamma_R(n: Int) = BVariable(s"Gamma_R$n", BoolBType, Scope.Global);
 
   private def transform_memset(p: Procedure) = {
-    // FIXME: memsetting a stack variable probably doesnt need verification.
-     
     val dest = Old(R(0)); // Destination pointer
     val gamma_dest = Old(Gamma_R(0)); // Destination pointer
 
@@ -73,7 +71,6 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
             BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, R(0), n))
           ),
           // Check each byte is valid individually as they might not all belong to the same object.
-          // TODO: this is probably never desirable behaviour anyway.
           BValid(me_live, me_live_val, me_object, me_position, me_global, i, BitVecBLiteral(1,64))
         )
       )
@@ -107,6 +104,36 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
         ),
         List(List(MapAccess(gamma_mem, i)))
       )
+    );
+  }
+
+  private def transform_strlen(p: Procedure) = {
+    p.modifies ++= Set(
+      GlobalVar("R0", BitVecType(64)),
+    );
+
+    p.requires = p.requires ++ List(
+      // Can only reason about input R0, dont know size here
+      BValid(me_live, me_live_val, me_object, me_position, me_global, r0, BitVecBLiteral(1,64))
+    );
+
+    p.ensures = p.ensures ++ List(
+      BinaryBExpr(EQ, r0_gamma, TrueBLiteral),
+      ForAll(
+        List(i),
+        BinaryBExpr(BoolIMPLIES,
+          BinaryBExpr(BoolAND,
+            BinaryBExpr(BVULE, Old(r0), i),
+            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, Old(r0), r0))
+          ),
+          BinaryBExpr(BoolAND,
+            BValid(me_live, me_live_val, me_object, me_position, me_global, i, BitVecBLiteral(1,64)),
+            BinaryBExpr(NEQ, MapAccess(mem, i), BitVecBLiteral(0,8))
+          )
+        ),
+      ),
+      BinaryBExpr(EQ, MapAccess(mem, BinaryBExpr(BVADD, Old(r0), r0)), BitVecBLiteral(0,8)),
+      BinaryBExpr(BVULE, Old(r0), BinaryBExpr(BVADD, Old(r0), r0))
     );
   }
 
@@ -361,6 +388,7 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
       case "free" => transform_free(p)
       case "main" => transform_main(p)
       case "memset" => transform_memset(p)
+      case "strlen" => transform_strlen(p)
       case _ => { }
     }
 
