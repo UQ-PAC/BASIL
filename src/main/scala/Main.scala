@@ -456,7 +456,7 @@ object Main {
     if (loadingInputs.inputFile.endsWith(".adt") && loadingInputs.relfFile.isEmpty) {
       throw IllegalArgumentException("BAP ADT input requires --relf")
     }
-    assert(!(loadingInputs.specFile.isDefined && loadingInputs.relfFile.isEmpty), "--spec requires --relf")
+    assert(!(loadingInputs.specFile.isDefined && loadingInputs.relfFile.isEmpty), ".il input with --spec requires --relf")
 
     if (conf.noDebug.value) {
       util.assertion.disableAssertions = true
