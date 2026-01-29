@@ -131,7 +131,7 @@ object Main {
     bapInputDirName: Option[String],
     @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file (.adt requires --relf)")
     inputFileName: Option[String],
-    @arg(name = "lifter", doc = "Use builtin aslp lifter (only supports gtirb input)")
+    @arg(name = "lifter", doc = "Use builtin aslp lifter (only supports gtirb input).  Enabled for .gtirb inputs")
     liftOffline: Flag,
     @arg(
       name = "relf",
@@ -470,7 +470,7 @@ object Main {
         parameterForm = conf.parameterForm.value,
         trimEarly = conf.trimEarly.value,
         pcTracking = PCTrackingOption.valueOf(conf.pcTracking.getOrElse("none").capitalize),
-        gtirbLiftOffline = conf.liftOffline.value
+        gtirbLiftOffline = conf.liftOffline.value || loadingInputs.inputFile.endsWith(".gtirb")
       ),
       runInterpret = conf.interpret.value,
       simplify = conf.simplify.value || dsa.isDefined,
