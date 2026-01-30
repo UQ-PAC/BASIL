@@ -100,7 +100,18 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
       .flatMap(p => wpDomain.toPred(p).simplify.split)
       .map(Condition(_, Some("Weakest precondition")))
 
-    val requires = (curRequires ++ mustGammasWithConditions ++ wp).filter(_ != TrueBLiteral).distinct
+    // Branch assertion domain
+    Logger.debug(s"Generating preconditions of branch condition security for $procedure")
+    val baDomain = BranchAssertionDomain(map, 5)
+    val (baDomainResults, _) = worklistSolver(baDomain, widen = true).solveProc(procedure, true)
+
+    val ba = procedure.entryBlock
+      .flatMap(b => baDomainResults.get(b))
+      .toList
+      .flatMap(p => baDomain.toPred(p).simplify.split)
+      .map(Condition(_, Some("Branch security")))
+
+    val requires = (curRequires ++ mustGammasWithConditions ++ wp ++ ba).filter(_ != TrueBLiteral).distinct
 
     /* Forwards variable dependency
      *
@@ -192,6 +203,7 @@ class SummaryGenerator(program: Program, parameterForm: Boolean = false) {
         expr
       })
       .filter(_ != TrueBLiteral)
+      .distinct
   }
 
   /**
@@ -207,6 +219,7 @@ class SummaryGenerator(program: Program, parameterForm: Boolean = false) {
         expr
       })
       .filter(_ != TrueBLiteral)
+      .distinct
   }
 }
 

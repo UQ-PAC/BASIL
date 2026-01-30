@@ -97,6 +97,44 @@ class MustGammaDomain(initialState: VarGammaMap)
   def botTerm: LatticeSet[Variable] = LatticeSet.Top()
 }
 
+class BackwardsGammaDomain extends PredicateEncodingDomain[LatticeSet[Variable]] {
+  def join(a: LatticeSet[Variable], b: LatticeSet[Variable], p: Block) = a.meet(b)
+
+  import LatticeSet.*
+
+  def transfer(b: LatticeSet[Variable], c: Command) = c match {
+    case c: LocalAssign => if b.contains(c.lhs) then (b - c.lhs).union(FiniteSet(c.rhs.variables)) else b
+    case c: SimulAssign =>
+      c.assignments.foldLeft(b) { case (b, (lhs, rhs)) =>
+        if b.contains(lhs) then (b - lhs).union(FiniteSet(rhs.variables)) else b
+      }
+    case c: MemoryAssign => if b.contains(c.lhs) then (b - c.lhs).union(FiniteSet(c.rhs.variables)) else b
+    case c: MemoryLoad => b - c.lhs
+    case c: MemoryStore => b
+    case c: Assume if c.checkSecurity => b.union(FiniteSet(c.body.variables))
+    case c: IndirectCall => top
+    case c: DirectCall => top
+    case c: Assume => b
+    case c: Assert => b
+    case c: GoTo => b
+    case c: Return =>
+      c.outParams.foldLeft(b) { case (b, (lhs, rhs)) =>
+        if b.contains(lhs) then (b - lhs).union(FiniteSet(rhs.variables)) else b
+      }
+    case c: Unreachable => b
+    case c: NOP => b
+  }
+  def top: LatticeSet[Variable] = Bottom()
+  def bot: LatticeSet[Variable] = Top()
+  def toPred(x: LatticeSet[Variable]): Predicate = {
+    x match {
+      case FiniteSet(s) => Predicate.GammaCmp(BoolIMPLIES, GammaTerm.Low, GammaTerm.Join(s.map(GammaTerm.Var(_))))
+      case Bottom() => Predicate.True
+      case Top() | DiffSet(_) => Predicate.False
+    }
+  }
+}
+
 /**
  * Computes sufficient conditions for a block to be reached. Currently, we only know that the blocks
  * prior to a branch are definitely reachable, and (soundly) assume everything else might not be
@@ -148,7 +186,7 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
 
   def join(a: Predicate, b: Predicate, pos: Block): Predicate =
     if a.size + b.size > 100 then atTop += pos
-    if atTop.contains(pos) then top else or(a, b).simplify
+    if atTop.contains(pos) then top else and(a, b).simplify
 
   private def lowExpr(e: Expr): Predicate =
     gammaLeq(GammaTerm.Join(e.variables.map(v => GammaTerm.Var(v))), GammaTerm.Low)
@@ -156,13 +194,19 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
       case SimulAssign(assignments, label) =>
-        val vs = assignments.map((lhs, rhs) => BVTerm.Var(lhs) -> exprToBVTerm(rhs).get)
-        val gamms = assignments.map((lhs, rhs) => GammaTerm.Var(lhs) -> exprToGammaTerm(rhs).get)
+        val vs = assignments.map((lhs, rhs) => BVTerm.Var(lhs) -> exprToBVTerm(rhs))
+        val gamms = assignments.map((lhs, rhs) => GammaTerm.Var(lhs) -> exprToGammaTerm(rhs))
         val nb = vs.foldLeft(b) { case (a, (l, r)) =>
-          a.replace(l, r)
+          r match {
+            case Some(r) => a.replace(l, r)
+            case None => a.remove(l, top)
+          }
         }
         gamms.foldLeft(nb) { case (a, (l, r)) =>
-          a.replace(l, r)
+          r match {
+            case Some(r) => a.replace(l, r)
+            case None => a.remove(l, top)
+          }
         }
       case a: MemoryAssign =>
         b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get)
@@ -170,13 +214,7 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
           .simplify
       case a: MemoryLoad => b.remove(BVTerm.Var(a.lhs), True).remove(GammaTerm.Var(a.lhs), True).simplify
       case m: MemoryStore => b
-      case a: Assume => {
-        if (a.checkSecurity) {
-          and(b, expectPredicate(a.body), lowExpr(a.body)).simplify
-        } else {
-          and(b, expectPredicate(a.body)).simplify
-        }
-      }
+      case a: Assume => and(b, expectPredicate(a.body)).simplify
       case a: Assert => and(b, expectPredicate(a.body)).simplify
       case i: IndirectCall => top
       case c: DirectCall =>
@@ -190,11 +228,8 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
     }
   }
 
-  override def init(b: Block): Predicate =
-    if b.isReturn then /*Conj(summaries(b.parent).ensures.map(_.pred).toSet)*/ top else bot
-
-  def top: Predicate = True
-  def bot: Predicate = False
+  def top: Predicate = False
+  def bot: Predicate = True
 
   def toPred(x: Predicate): Predicate = x
   override def fromPred(p: Predicate): Predicate = p
@@ -276,4 +311,60 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
 
   def toPred(x: Predicate): Predicate = not(x)
   override def fromPred(p: Predicate): Predicate = not(p)
+}
+
+import collection.immutable.ListSet
+
+class AssertionDomain[D1, D2](r: PredicateEncodingDomain[D1], d: PredicateEncodingDomain[D2], bound: Int)
+    extends PredicateEncodingDomain[ListSet[(D1, D2)]] {
+  def filter(r: D1, x: D2): Boolean = true
+  def bound(x: ListSet[(D1, D2)]): ListSet[(D1, D2)] = x.filter((r, x) => filter(r, x)).take(bound)
+  def join(a: ListSet[(D1, D2)], b: ListSet[(D1, D2)], pos: Block): ListSet[(D1, D2)] = bound(a.union(b))
+  override def widen(a: ListSet[(D1, D2)], b: ListSet[(D1, D2)], pos: Block): ListSet[(D1, D2)] = bound(a.union(b))
+  def transfer(x: ListSet[(D1, D2)], c: Command): ListSet[(D1, D2)] = {
+    c match {
+      case a: Assert => {
+        bound(x + ((r.bot, d.transfer(d.top, c))))
+      }
+      case a: Assume => {
+        x.map((d1, d2) => (r.transfer(d1, Assert(a.body)), d.transfer(d2, c)))
+      }
+      case c => x.map((d1, d2) => (r.transfer(d1, c), d.transfer(d2, c)))
+    }
+  }
+
+  def top = ListSet((r.bot, d.top))
+  def bot = ListSet()
+
+  import Predicate.*
+
+  def toPred(x: ListSet[(D1, D2)]): Predicate = x.foldLeft(True) { case (p, (d1, d2)) =>
+    and(p, implies(r.toPred(d1), d.toPred(d2)))
+  }
+}
+
+class BranchAssertionDomain(summaries: Procedure => ProcedureSummary, bound: Int) extends AssertionDomain(PredicateDomain(summaries), BackwardsGammaDomain(), bound) {
+  override def filter(r: Predicate, x: LatticeSet[Variable]): Boolean = r != Predicate.False && x != LatticeSet.Bottom()
+
+  override def transfer(
+    x: ListSet[(Predicate, LatticeSet[Variable])],
+    c: Command
+  ): ListSet[(Predicate, LatticeSet[Variable])] = {
+    c match {
+      case c: Assume if c.checkSecurity =>
+        val y = super.transfer(x, c)
+        y + ((Predicate.True, LatticeSet.FiniteSet(c.body.variables)))
+      case c: Assert => x
+      case c => super.transfer(x, c)
+    }
+  }
+  import Predicate.*
+  override def toPred(x: ListSet[(Predicate, LatticeSet[Variable])]): Predicate =
+    x.foldLeft(Map[LatticeSet[Variable], Predicate]()) { case (m, (d1, d2)) =>
+      val cur = m.getOrElse(d2, Predicate.False)
+      m + (d2 -> (Predicate.or(cur,d1)))
+    }
+    .foldLeft(True) { case (p, (d2, d1)) =>
+    and(p, implies(d1, BackwardsGammaDomain().toPred(d2)))
+  }
 }
