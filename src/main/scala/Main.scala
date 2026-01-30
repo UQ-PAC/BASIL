@@ -122,21 +122,24 @@ object Main {
 
   @main(name = programNameVersionHeader + System.lineSeparator())
   case class Config(
-    @arg(name = "load-directory-bap", doc = "Load relf, adt, and bir from directory (and spec from parent directory)")
-    bapInputDirName: Option[String],
     @arg(name = "load-directory-gtirb", doc = "Load relf and gts from directory (and spec from parent directory)")
     gtirbInputDirName: Option[String],
+    @arg(
+      name = "load-directory-bap",
+      doc = "Load relf, adt, and bir from directory (and spec from parent directory) [deprecated]"
+    )
+    bapInputDirName: Option[String],
     @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file (.adt requires --relf)")
     inputFileName: Option[String],
-    @arg(name = "lifter", doc = "Use builtin aslp lifter (only supports gtirb input)")
+    @arg(name = "lifter", doc = "Use builtin aslp lifter (only supports gtirb input).  Enabled for .gtirb inputs")
     liftOffline: Flag,
     @arg(
       name = "relf",
       short = 'r',
-      doc = "Name of the file containing the output of 'readelf -s -r -W'  (required for most uses)"
+      doc = "Name of the file containing the output of 'readelf -s -r -W'  (required for .adt inputs)"
     )
     relfFileName: Option[String],
-    @arg(name = "spec", short = 's', doc = "BASIL specification file (requires --relf).")
+    @arg(name = "spec", short = 's', doc = "BASIL specification file.")
     specFileName: Option[String],
     @arg(name = "output", short = 'o', doc = "Boogie output destination file.")
     outFileName: String = "basil-out.bpl",
@@ -160,7 +163,7 @@ object Main {
       doc = s"Show extra debugging logs for a specific logger (${Logger.allLoggers.map(_.name).mkString(", ")})."
     )
     verboseLog: Seq[String] = Seq(),
-    @arg(name = "analyse", doc = "Run static analysis pass.")
+    @arg(name = "analyse", doc = "Run static analysis pass. [deprecated]")
     analyse: Flag,
     @arg(name = "interpret", doc = "Run BASIL IL interpreter.")
     interpret: Flag,
@@ -171,7 +174,7 @@ object Main {
     @arg(name = "main-procedure-name", short = 'm', doc = "Name of the main procedure to begin analysis at.")
     mainProcedureName: String = "main",
     @arg(
-      name = "procedure-call-depth",
+      name = "trim-depth",
       doc = "Cull procedures beyond this call depth from the main function (defaults to Int.MaxValue)"
     )
     procedureDepth: Int = Int.MaxValue,
@@ -191,13 +194,16 @@ object Main {
       doc = "Separates threads into multiple .bpl files with given output filename as prefix (requires --analyse flag)"
     )
     threadSplit: Flag,
-    @arg(name = "parameter-form", doc = "Lift registers to local variables passed by parameter")
+    @arg(name = "transform-parameters", doc = "Lift registers to local variables passed by parameter")
     parameterForm: Flag,
-    @arg(name = "summarise-procedures", doc = "Generates summaries of procedures which are used in pre/post-conditions")
+    @arg(
+      name = "generate-procedure-summaries",
+      doc = "Generates summaries of procedures which are used in pre/post-conditions"
+    )
     summariseProcedures: Flag,
     @arg(
       name = "generate-loop-invariants",
-      doc = "Generates loop invariants on loop headers (will not run with --no-irreducible-loops)"
+      doc = "Generates loop invariants on loop headers (implies --transform-irreducible-loops)"
     )
     generateLoopInvariants: Flag,
     @arg(
@@ -205,7 +211,7 @@ object Main {
       doc = "Generates rely-guarantee conditions for each procedure that contains a return node."
     )
     generateRelyGuarantees: Flag,
-    @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (implies --parameter-form)")
+    @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (implies --transform-parameters)")
     simplify: Flag,
     @arg(
       name = "pc",
@@ -223,33 +229,37 @@ object Main {
       doc = "Emit SMT2 check for validation of simplification expression rewrites 'rewrites.smt2'"
     )
     validateSimplify: Flag,
-    @arg(name = "verify", doc = "Run boogie on the resulting file")
+    @arg(name = "verify", doc = "Run Boogie on the resulting file")
     verify: Flag,
     @arg(
       name = "memory-regions",
       doc =
-        "Performs static analysis to separate memory into discrete regions in Boogie output (requires --analyse flag) (mra|dsa) (dsa is recommended over mra)"
+        "Performs static analysis to separate memory into discrete regions in Boogie output (requires --analyse flag) (mra|dsa) (dsa is recommended over mra) [deprecated]"
     )
     memoryRegions: Option[String],
     @arg(
-      name = "no-irreducible-loops",
-      doc = "Disable producing irreducible loops when --analyse is passed (does nothing without --analyse)"
+      name = "transform-irreducible-loops",
+      doc = "Transforms irreducible loops into natural loops with control flags"
     )
-    noIrreducibleLoops: Flag,
-    @arg(name = "dsa", doc = "Perform Data Structure Analysis (requires --simplify flag) (pre|local|bu|td)")
+    transformIrreducibleLoops: Flag,
+    @arg(
+      name = "dsa",
+      doc =
+        "Perform Data Structure Analysis (implies --simplify flag) (pre|local|bu|td). Note: --dsa= is equivalent to --dsa=td."
+    )
     dsaType: Option[String],
-    @arg(name = "dsa-checks", doc = "Perform additional dsa checks (requires --dsa (local|bu|td)")
+    @arg(name = "dsa-checks", doc = "Perform additional dsa checks (requires --dsa (local|bu|td))")
     dsaChecks: Flag,
-    @arg(name = "dsa-split", doc = "split the globals for dsa (requires --dsa (pre|local|bu|td)")
+    @arg(name = "dsa-split", doc = "split the globals for input to dsa (requires --dsa (pre|local|bu|td))")
     dsaSplitGlobals: Flag,
     @arg(
       name = "dsa-eqv",
-      doc = "allow cells from same node to be merged without collapsing (requires --dsa (local|bu|td)"
+      doc = "allow cells from same node to be merged without collapsing (requires --dsa (local|bu|td))"
     )
     dsaEqCells: Flag,
     @arg(name = "dsa-assert", doc = "insert assertions to check globals offset to top fall within global region bounds")
     dsaAssert: Flag,
-    @arg(name = "memory-transform", doc = "Transform memory access to region accesses")
+    @arg(name = "transform-memory", doc = "Transform memory accesses to region accesses (requires --dsa=td)")
     memoryTransform: Flag,
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
     noif: Flag,
@@ -259,7 +269,7 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     val parser = ParserForClass[Config]
-    val parsed = parser.constructEither(args.toSeq)
+    val parsed = parser.constructEither(args.toSeq, autoPrintHelpAndExit = None)
 
     val conf = parsed match {
       case Right(r) => r
@@ -270,6 +280,11 @@ object Main {
 
     if (conf.help.value) {
       println(parser.helpText(sorted = false))
+      println("Example runs:")
+      println("  --input prog.gts --spec prog.spec                   # output basil-out.bpl")
+      println("  -i prog.gtirb --lifter --verify -o prog.bpl         # output prog.bpl and run Boogie")
+      println("  -i prog.gtirb --lifter --dsa= --transform-memory    # simplify and partition mem into regions")
+      println("  --load-directory-gtirb <dir> --interpret            # interpret the program")
       return
     }
 
@@ -318,7 +333,7 @@ object Main {
           conf.analysisResultsDot,
           conf.threadSplit.value,
           memoryRegionsMode,
-          !conf.noIrreducibleLoops.value
+          !conf.transformIrreducibleLoops.value // deprecated (a copy of the global configuration flag)
         )
       )
     } else {
@@ -343,17 +358,17 @@ object Main {
     val dsa: Option[DSConfig] =
       phase match {
         case Some(value) =>
-          if conf.simplify.value then
-            Some(
-              DSConfig(
-                value,
-                conf.dsaSplitGlobals.value,
-                conf.dsaAssert.value,
-                conf.dsaEqCells.value,
-                conf.dsaChecks.value
-              )
+          // this will turn on --simplify
+          Some(
+            DSConfig(
+              value,
+              conf.dsaSplitGlobals.value,
+              conf.dsaAssert.value,
+              conf.dsaEqCells.value,
+              conf.dsaChecks.value
             )
-          else throw new IllegalArgumentException(s"enabling --dsa requires --simplify")
+          )
+        //  else throw new IllegalArgumentException(s"enabling --dsa requires --simplify")
         case _ => None
       }
 
@@ -375,12 +390,10 @@ object Main {
 
     var loadingInputs = if (conf.bapInputDirName.isDefined) then {
       loadDirectory(ChooseInput.Bap, conf.bapInputDirName.get)
-
     } else if (conf.gtirbInputDirName.isDefined) then {
       loadDirectory(ChooseInput.Gtirb, conf.gtirbInputDirName.get)
     } else if (conf.inputFileName.isDefined) then {
       ILLoadingConfig(conf.inputFileName.get, conf.relfFileName, conf.specFileName)
-
     } else {
       throw IllegalArgumentException(
         "\nRequires --load-directory-gtirb, --load-directory-bap OR --input\n\n" + parser
@@ -440,12 +453,13 @@ object Main {
       loadingInputs = loadingInputs.copy(relfFile = Some(loadingInputs.inputFile))
     }
 
-    if (loadingInputs.specFile.isDefined && loadingInputs.relfFile.isEmpty) {
-      throw IllegalArgumentException("--spec requires --relf")
-    }
     if (loadingInputs.inputFile.endsWith(".adt") && loadingInputs.relfFile.isEmpty) {
       throw IllegalArgumentException("BAP ADT input requires --relf")
     }
+    assert(
+      !(loadingInputs.specFile.isDefined && loadingInputs.relfFile.isEmpty),
+      ".il input with --spec requires --relf"
+    )
 
     if (conf.noDebug.value) {
       util.assertion.disableAssertions = true
@@ -459,11 +473,12 @@ object Main {
         parameterForm = conf.parameterForm.value,
         trimEarly = conf.trimEarly.value,
         pcTracking = PCTrackingOption.valueOf(conf.pcTracking.getOrElse("none").capitalize),
-        gtirbLiftOffline = conf.liftOffline.value
+        gtirbLiftOffline = conf.liftOffline.value || loadingInputs.inputFile.endsWith(".gtirb")
       ),
       runInterpret = conf.interpret.value,
-      simplify = conf.simplify.value,
+      simplify = conf.simplify.value || dsa.isDefined,
       validateSimp = conf.validateSimplify.value,
+      transformIrreducibleLoops = conf.transformIrreducibleLoops.value || conf.generateLoopInvariants.value,
       summariseProcedures = conf.summariseProcedures.value,
       generateLoopInvariants = conf.generateLoopInvariants.value,
       generateRelyGuarantees = conf.generateRelyGuarantees.value,
