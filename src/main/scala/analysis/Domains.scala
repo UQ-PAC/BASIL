@@ -49,15 +49,8 @@ import collection.mutable
 class DisjunctiveCompletion[L](d: AbstractDomain[L]) extends AbstractDomain[Set[L]] {
   def collapse(a: Set[L], pos: Block): Set[L] = Set(a.foldLeft(d.bot) { (a, b) => d.join(a, b, pos) })
 
-  private var joinCount: mutable.HashMap[Block, Int] = mutable.HashMap()
-
   def join(a: Set[L], b: Set[L], pos: Block): Set[L] =
-    joinCount += pos -> (joinCount.getOrElse(pos, 0) + 1)
-    if a.contains(d.top) || b.contains(d.top) then top
-    else {
-      // TODO this is manual widening, maybe widening should be added to the solver instead
-      if pos.isLoopHeader() || joinCount(pos) > 20 then widen(a, b, pos) else a.union(b)
-    }
+    a.union(b)
 
   override def widen(a: Set[L], b: Set[L], pos: Block): Set[L] =
     for {
@@ -93,20 +86,17 @@ class PredDisjunctiveCompletion[L](d: PredicateEncodingDomain[L])
 class BoundedDisjunctiveCompletion[L](d: AbstractDomain[L], bound: Int) extends AbstractDomain[Set[L]] {
   debugAssert(bound > 0)
 
-  def collapse(a: Set[L], pos: Block): Set[L] = Set(a.foldLeft(d.bot) { (a, b) => d.join(a, b, pos) })
+  private var collapsePoints: mutable.Set[Block] = mutable.Set()
+
+  def collapse(a: Set[L], pos: Block): Set[L] =
+    collapsePoints += pos
+    Set(a.foldLeft(d.bot) { (a, b) => d.join(a, b, pos) })
 
   def bound(a: Set[L], pos: Block): Set[L] =
-    if a.size > bound then collapse(a, pos) else a
-
-  private var joinCount: mutable.Map[Block, Int] = mutable.Map()
+    if collapsePoints.contains(pos) || a.size > bound then collapse(a, pos) else a
 
   def join(a: Set[L], b: Set[L], pos: Block): Set[L] =
-    joinCount += pos -> (joinCount.getOrElse(pos, 0) + 1)
-    bound(
-      if a.contains(d.top) || b.contains(d.top) then top
-      else a.union(b),
-      pos
-    )
+    bound(a.union(b), pos)
 
   override def widen(a: Set[L], b: Set[L], pos: Block): Set[L] =
     for {

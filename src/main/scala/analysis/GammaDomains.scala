@@ -139,6 +139,13 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
 
   private var atTop = Set[Block]()
 
+  private def expectPredicate(orig: Expr): Predicate = {
+    exprToPredicate(orig) match {
+      case Some(p) => p
+      case None => top
+    }
+  }
+
   def join(a: Predicate, b: Predicate, pos: Block): Predicate =
     if a.size + b.size > 100 then atTop += pos
     if atTop.contains(pos) then top else or(a, b).simplify
@@ -193,13 +200,6 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
   override def fromPred(p: Predicate): Predicate = p
 }
 
-private def expectPredicate(orig: Expr): Predicate = {
-  exprToPredicate(orig) match {
-    case Some(p) => p
-    case None => throw Exception(s"Expected to be able to construct predicate for: $orig")
-  }
-}
-
 /**
  * An abstract domain which computes conditions (as predicates) for assertions (including the check that gammas are low on branches) to be violated.
  *
@@ -209,6 +209,13 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
   import Predicate.*
 
   private var atTop = Set[Block]()
+
+  private def expectPredicate(orig: Expr): Predicate = {
+    exprToPredicate(orig) match {
+      case Some(p) => p
+      case None => not(top)
+    }
+  }
 
   def join(a: Predicate, b: Predicate, pos: Block): Predicate =
     if a.size + b.size > 100 then atTop += pos
@@ -225,13 +232,13 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
         val nb = terms.foldLeft(b) { case (acc, (l, r)) =>
           r match {
             case Some(rhs) => acc.replace(l, rhs)
-            case None => acc.remove(l, Predicate.True) // TODO verify soundness
+            case None => acc.remove(l, top)
           }
         }
         gammas.foldLeft(nb) { case (acc, (l, r)) =>
           r match {
             case Some(rhs) => acc.replace(l, rhs)
-            case None => acc.remove(l, Predicate.True) // TODO verify soundness
+            case None => acc.remove(l, top)
           }
         }
       }
@@ -239,7 +246,7 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
         b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get)
           .replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get)
           .simplify
-      case a: MemoryLoad => b.remove(BVTerm.Var(a.lhs), False).remove(GammaTerm.Var(a.lhs), False).simplify
+      case a: MemoryLoad => b.remove(BVTerm.Var(a.lhs), top).remove(GammaTerm.Var(a.lhs), top).simplify
       case m: MemoryStore => b
       case a: Assume => {
         if (a.checkSecurity) {
@@ -249,7 +256,7 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
         }
       }
       case a: Assert => or(b, not(expectPredicate(a.body))).simplify
-      case i: IndirectCall => bot
+      case i: IndirectCall => top
       case c: DirectCall =>
         not(c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>
           p.replace(BVTerm.Var(v), exprToBVTerm(e).get).replace(GammaTerm.Var(v), exprToGammaTerm(e).get).simplify
@@ -261,11 +268,12 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
     }
   }
 
-  override def init(b: Block): Predicate = bot
+  // We annotate the return block as unreachable as we only want to know conditions for paths that reach failing assertions.
+  override def init(b: Block): Predicate = if b.isReturn then False else bot
 
-  def top: Predicate = True
-  def bot: Predicate = False
+  def top: Predicate = False
+  def bot: Predicate = True
 
-  def toPred(x: Predicate): Predicate = x
-  override def fromPred(p: Predicate): Predicate = p
+  def toPred(x: Predicate): Predicate = not(x)
+  override def fromPred(p: Predicate): Predicate = not(p)
 }
