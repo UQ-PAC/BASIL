@@ -117,26 +117,8 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
 
     p.requires = p.requires ++ List(
       BinaryBExpr(EQ, gamma_n, TrueBLiteral),
-      ForAll(
-        List(i),
-        BinaryBExpr(BoolIMPLIES,
-          BinaryBExpr(BoolAND,
-            BinaryBExpr(BVULE, src, i),
-            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, src, n))
-          ),
-          BValid(me_live, me_live_val, me_object, me_position, me_global, i, BitVecBLiteral(1,64)),
-        )
-      ),
-      ForAll(
-        List(i),
-        BinaryBExpr(BoolIMPLIES,
-          BinaryBExpr(BoolAND,
-            BinaryBExpr(BVULE, dest, i),
-            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, n))
-          ),
-          BValid(me_live, me_live_val, me_object, me_position, me_global, i, BitVecBLiteral(1,64)),
-        )
-      )
+      BValid(me_live, me_live_val, me_object, me_position, me_global, src, n),
+      BValid(me_live, me_live_val, me_object, me_position, me_global, dest, n),
     );
 
     p.ensures = p.ensures ++ List(
@@ -146,13 +128,15 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
 
       ForAll(
         List(i),
-        IfThenElse(
-          BinaryBExpr(BoolAND,
-            BinaryBExpr(BVULE, dest, i),
-            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, n))
+        BinaryBExpr(EQ, MapAccess(mem, i),
+          IfThenElse(
+            BinaryBExpr(EQ,
+              MapAccess(me_object, i),
+              MapAccess(me_object, dest)
+            ),
+            MapAccess(mem, BinaryBExpr(BVADD, MapAccess(me_position, i), src)),
+            Old(MapAccess(mem, i))
           ),
-          BinaryBExpr(EQ, MapAccess(mem, i), MapAccess(mem, BinaryBExpr(BVADD,BinaryBExpr(BVSUB,i,dest),src))),
-          BinaryBExpr(EQ, MapAccess(mem, i), Old(MapAccess(mem, i)))
         ),
         List(List(MapAccess(mem,i)))
       ),
@@ -220,7 +204,15 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
       // Pointer must be live to free
       BinaryBExpr(EQ, MapAccess(me_live, obj), BitVecBLiteral(1,8)),
       // The pointer being freed must not be global
-      UnaryBExpr(BoolNOT, MapAccess(me_global, r0))
+      UnaryBExpr(BoolNOT, MapAccess(me_global, r0)),
+      // The pointer being freed must be fully high
+      ForAll(
+        List(i),
+        BinaryBExpr(BoolIMPLIES,
+          BinaryBExpr(EQ, MapAccess(me_object, i), MapAccess(me_object, r0)),
+          BinaryBExpr(EQ, MapAccess(gamma_mem, i), TrueBLiteral)
+        )
+      )
     )
 
     p.ensures = p.ensures ++ List(
