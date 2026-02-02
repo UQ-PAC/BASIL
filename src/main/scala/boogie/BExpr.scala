@@ -584,6 +584,29 @@ case class GammaStoreOp(addressSize: Int, bits: Int, accesses: Int) extends Func
 }
 case class LOp(indexType: BType) extends FunctionOp
 
+case class NextZero() extends FunctionOp {
+  val fnName: String = s"next_zero"
+}
+
+case class BNextZero(
+  mem: BMapVar,
+  me_object: BMapVar,
+  pointer: BExpr,
+) extends BExpr {
+  override def toString: String = s"$fnName($mem, $me_object, $pointer)"
+  val fnName: String = s"next_zero"
+
+  override val getType: BType = BoolBType
+  val inputs = List(mem, me_object, pointer)
+
+  override def functionOps: Set[FunctionOp] =
+    inputs.flatMap(i => i.functionOps).toSet + NextZero()
+  override def locals: Set[BVar] = inputs.flatMap(i => i.locals).toSet
+  override def globals: Set[BVar] = inputs.flatMap(i => i.globals).toSet
+  override def params: Set[BVar] = inputs.flatMap(i => i.params).toSet
+  override def loads: Set[BExpr] = inputs.flatMap(i => i.loads).toSet
+}
+
 /** Utility to check validity of memory encoding pointer.
   */
 case class Valid() extends FunctionOp {

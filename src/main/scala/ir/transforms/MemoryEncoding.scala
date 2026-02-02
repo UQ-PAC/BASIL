@@ -63,17 +63,7 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
     );
 
     p.requires = p.requires ++ List(
-      ForAll(
-        List(i),
-        BinaryBExpr(BoolIMPLIES,
-          BinaryBExpr(BoolAND,
-            BinaryBExpr(BVULE, R(0), i),
-            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, R(0), n))
-          ),
-          // Check each byte is valid individually as they might not all belong to the same object.
-          BValid(me_live, me_live_val, me_object, me_position, me_global, i, BitVecBLiteral(1,64))
-        )
-      )
+      BValid(me_live, me_live_val, me_object, me_position, me_global, ret, n)
     );
 
     p.ensures = p.ensures ++ List(
@@ -87,7 +77,7 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
           IfThenElse(
             BinaryBExpr(BoolAND,
               BinaryBExpr(BVULE, dest, i),
-              BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, n))
+              BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, Old(n)))
             ),
             c,
             Old(MapAccess(mem, i)),
@@ -100,7 +90,7 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
         IfThenElse(
           BinaryBExpr(BoolAND,
             BinaryBExpr(BVULE, dest, i),
-            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, n))
+            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, Old(n)))
           ),
           BinaryBExpr(EQ, MapAccess(gamma_mem, i), gamma_c),
           BinaryBExpr(EQ, MapAccess(gamma_mem, i), Old(MapAccess(gamma_mem, i)))
@@ -189,7 +179,8 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
 
     p.requires = p.requires ++ List(
       // Can only reason about input R0, dont know size here
-      BValid(me_live, me_live_val, me_object, me_position, me_global, r0, BitVecBLiteral(1,64))
+      BValid(me_live, me_live_val, me_object, me_position, me_global, r0, BitVecBLiteral(1,64)),
+      BNextZero(mem, me_object, r0)
     );
 
     p.ensures = p.ensures ++ List(
