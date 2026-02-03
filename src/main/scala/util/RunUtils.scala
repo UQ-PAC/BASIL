@@ -151,14 +151,14 @@ object RunUtils {
     if (conf.transformIrreducibleLoops) {
       StaticAnalysisLogger.info("[!] Transforming Irreducible Loops")
       IrreducibleLoops.transform_all_and_update(ctx.program)
+    }
 
-      if q.summariseProcedures then
-        getGenerateProcedureSummariesTransform(q.loading.parameterForm || q.simplify)(ctx, analysisManager)
+    if q.summariseProcedures then
+      getGenerateProcedureSummariesTransform(q.loading.parameterForm || q.simplify)(ctx, analysisManager)
 
-      if (conf.generateLoopInvariants) {
-        StaticAnalysisLogger.info("[!] Generating Loop Invariants")
-        FullLoopInvariantGenerator(ctx.program).addInvariants()
-      }
+    if (conf.generateLoopInvariants) {
+      StaticAnalysisLogger.info("[!] Generating Loop Invariants")
+      FullLoopInvariantGenerator(ctx.program).addInvariants()
     }
 
     if (q.runInterpret) {
