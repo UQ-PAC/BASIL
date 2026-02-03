@@ -5,6 +5,7 @@ import ir.*
 import ir.transforms.AbstractDomain
 import util.assertion.*
 import util.functional.sequence
+import ir.eval.BitVectorEval.nat2bv
 
 // TODO DAG predicates (don't represent the same subexpression twice)
 
@@ -715,6 +716,14 @@ enum Predicate {
           case (EQ, a, b) if a == b => True
           case (EQ, a, Uop(BVNEG, b)) => BVCmp(EQ, Bop(BVADD, a, b), BVTerm.Lit(BitVecLiteral(0, a.size))).simplify
           case (EQ, l: BVTerm.Lit, v: Var) => BVCmp(EQ, v, l) // Canonical form-ish (to remove duplicate terms
+          case (BVSLE, a, BVTerm.Lit(b)) if b == signedInt2bv(b.size, sInf(b.size)) => True
+          case (BVULE, a, BVTerm.Lit(b)) if b == nat2bv(b.size, uInf(b.size)) => True
+          case (BVSLE, BVTerm.Lit(a), b) if a == signedInt2bv(a.size, sNInf(a.size)) => True
+          case (BVULE, BVTerm.Lit(a), b) if a == nat2bv(a.size, uNInf(a.size)) => True
+          case (BVSGE, a, BVTerm.Lit(b)) if b == signedInt2bv(b.size, sNInf(b.size)) => True
+          case (BVUGE, a, BVTerm.Lit(b)) if b == nat2bv(b.size, uNInf(b.size)) => True
+          case (BVSGE, BVTerm.Lit(a), b) if a == signedInt2bv(a.size, sInf(a.size)) => True
+          case (BVUGE, BVTerm.Lit(a), b) if a == nat2bv(a.size, uInf(a.size)) => True
           case (op, a, b) => BVCmp(op, a, b)
         }
       case GammaCmp(op, a, b) =>

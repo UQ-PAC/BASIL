@@ -98,9 +98,9 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
       .flatMap(b => wpDomainResults.get(b))
       .toList
       .flatMap(p => wpDomain.toPred(p).simplify.split)
-      .map(Condition(_, Some("Weakest precondition")))
+      .map(Condition(_, Some("WP dual")))
 
-    val requires = (curRequires ++ mustGammasWithConditions ++ wp).filter(_ != TrueBLiteral).distinct
+    val requires = (curRequires ++ mustGammasWithConditions ++ wp).filter(_ != TrueBLiteral).distinctBy(_.pred)
 
     /* Forwards variable dependency
      *
@@ -162,7 +162,7 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
       .flatten
       .map(Condition(_, Some("numerical analysis")))
 
-    val ensures = (curEnsures ++ dependencyPreds ++ absIntPreds).filter(_ != True).distinct
+    val ensures = (curEnsures ++ dependencyPreds ++ absIntPreds).filter(_ != True).distinctBy(_.pred)
 
     ProcedureSummary(requires, ensures)
   }

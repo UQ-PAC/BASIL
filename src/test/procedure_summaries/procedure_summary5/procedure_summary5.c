@@ -1,7 +1,5 @@
 long x;
 
-// This doesn't verify due to memory region reasons
-
 long h(long a, long b);
 
 __attribute((noinline)) long g(long a) {
