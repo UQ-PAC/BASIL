@@ -164,7 +164,26 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
     p.requires = p.requires ++ List(
       // Can only reason about input R0, dont know size here
       BValid(me_live, me_live_val, me_object, me_position, me_global, r0, BitVecBLiteral(1,64)),
-      BNextZero(mem, me_object, r0)
+      // BNextZero(mem, me_object, r0)
+      Exists(
+        List(i),
+        BinaryBExpr(BoolAND,
+          BinaryBExpr(BoolAND,
+            BinaryBExpr(BVULE, r0, i),
+            BinaryBExpr(EQ, MapAccess(mem, i), BitVecBLiteral(0,8))
+          ),
+          ForAll(
+            List(j),
+            BinaryBExpr(BoolAND,
+              BinaryBExpr(BoolAND,
+                BinaryBExpr(BVULE, r0, j),
+                BinaryBExpr(BVULT, j, i)
+              ),
+              BinaryBExpr(NEQ, MapAccess(mem, j), BitVecBLiteral(0,8))
+            )
+          )
+        )
+      )
     );
 
     p.ensures = p.ensures ++ List(
@@ -213,6 +232,16 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
           BinaryBExpr(EQ, MapAccess(gamma_mem, i), TrueBLiteral)
         )
       )
+
+      // TODO: replace with a function like this?
+      // function gamma_object(#gammaMap: [bv64]bool, #object: [bv64]int, #index: bv64) returns (bool) {
+      //   #gammaMap[#index] && (
+      //     if (#object[#index] == #object[bvadd64(#index, 1bv64)])
+      //     then (gamma_object(#gammaMap, #object, bvadd64(#index, 1bv64)))
+      //     else true
+      //   )
+      // }
+
     )
 
     p.ensures = p.ensures ++ List(
@@ -361,7 +390,7 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
         ),
         List(
           List(MapAccess(me_object, i)),
-          List(MapAccess(me_global, i))
+          // List(MapAccess(me_global, i))
         )
       ),
     )
@@ -408,7 +437,7 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
           UnaryBExpr(BoolNOT, MapAccess(me_global, i)),
           BinaryBExpr(EQ, MapAccess(gamma_mem, i), TrueBLiteral)
         ),
-        List(List(MapAccess(gamma_mem, i)))
+        List(List(MapAccess(gamma_mem, i)),List(MapAccess(me_global, i)))
       ),
 
       // // TODO: replace me_unallocated with a set to clean this all up
