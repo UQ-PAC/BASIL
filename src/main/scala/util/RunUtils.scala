@@ -148,12 +148,12 @@ object RunUtils {
         memTransferTimer.checkPoint("Performed Memory Transform")
     }
 
-    if q.summariseProcedures then
-      getGenerateProcedureSummariesTransform(q.loading.parameterForm || q.simplify)(ctx, analysisManager)
-
     if (conf.transformIrreducibleLoops) {
       StaticAnalysisLogger.info("[!] Transforming Irreducible Loops")
       IrreducibleLoops.transform_all_and_update(ctx.program)
+
+      if q.summariseProcedures then
+        getGenerateProcedureSummariesTransform(q.loading.parameterForm || q.simplify)(ctx, analysisManager)
 
       if (conf.generateLoopInvariants) {
         StaticAnalysisLogger.info("[!] Generating Loop Invariants")
