@@ -87,13 +87,16 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
       ),
       ForAll(
         List(i),
-        IfThenElse(
-          BinaryBExpr(BoolAND,
-            BinaryBExpr(BVULE, dest, i),
-            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, Old(n)))
+        BinaryBExpr(EQ,
+          MapAccess(gamma_mem,i),
+          IfThenElse(
+            BinaryBExpr(BoolAND,
+              BinaryBExpr(BVULE, dest, i),
+              BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, Old(n)))
+            ),
+            gamma_c,
+            Old(MapAccess(gamma_mem, i))
           ),
-          BinaryBExpr(EQ, MapAccess(gamma_mem, i), gamma_c),
-          BinaryBExpr(EQ, MapAccess(gamma_mem, i), Old(MapAccess(gamma_mem, i)))
         ),
         List(List(MapAccess(gamma_mem, i)))
       )
@@ -130,9 +133,9 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
         List(i),
         BinaryBExpr(EQ, MapAccess(mem, i),
           IfThenElse(
-            BinaryBExpr(EQ,
-              MapAccess(me_object, i),
-              MapAccess(me_object, dest)
+            BinaryBExpr(BoolAND,
+              BinaryBExpr(BVULE, dest, i),
+              BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, n))
             ),
             MapAccess(mem, BinaryBExpr(BVADD, MapAccess(me_position, i), src)),
             Old(MapAccess(mem, i))
@@ -143,13 +146,15 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
 
       ForAll(
         List(i),
-        IfThenElse(
-          BinaryBExpr(BoolAND,
-            BinaryBExpr(BVULE, dest, i),
-            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, n))
+        BinaryBExpr(EQ, MapAccess(gamma_mem, i),
+          IfThenElse(
+            BinaryBExpr(BoolAND,
+              BinaryBExpr(BVULE, dest, i),
+              BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, n))
+            ),
+            MapAccess(gamma_mem, BinaryBExpr(BVADD, MapAccess(me_position, i), src)),
+            Old(MapAccess(gamma_mem, i))
           ),
-          BinaryBExpr(EQ, MapAccess(gamma_mem, i), MapAccess(gamma_mem, BinaryBExpr(BVADD,BinaryBExpr(BVSUB,i,dest),src))),
-          BinaryBExpr(EQ, MapAccess(gamma_mem, i), Old(MapAccess(gamma_mem, i)))
         ),
         List(List(MapAccess(gamma_mem,i)))
       ),
@@ -161,28 +166,20 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
       GlobalVar("R0", BitVecType(64)),
     );
 
+    val dest = BinaryBExpr(BVADD, Old(r0), r0);
+
     p.requires = p.requires ++ List(
-      // Can only reason about input R0, dont know size here
+      // First byte is valid, cant reason about full size in precond
       BValid(me_live, me_live_val, me_object, me_position, me_global, r0, BitVecBLiteral(1,64)),
-      // Exists(
-      //   List(i),
-      //   BinaryBExpr(BoolAND,
-      //     BinaryBExpr(BoolAND,
-      //       BinaryBExpr(BVULE, r0, i),
-      //       BinaryBExpr(EQ, MapAccess(mem, i), BitVecBLiteral(0,8))
-      //     ),
-      //     ForAll(
-      //       List(j),
-      //       BinaryBExpr(BoolAND,
-      //         BinaryBExpr(BoolAND,
-      //           BinaryBExpr(BVULE, r0, j),
-      //           BinaryBExpr(BVULT, j, i)
-      //         ),
-      //         BinaryBExpr(NEQ, MapAccess(mem, j), BitVecBLiteral(0,8))
-      //       )
-      //     )
-      //   )
-      // )
+
+      // Exists some 0 in the allocation:
+      Exists(
+        List(i),
+        BinaryBExpr(BoolAND,
+          BinaryBExpr(EQ, MapAccess(me_object, i), MapAccess(me_object, r0)),
+          BinaryBExpr(EQ, MapAccess(mem, i), BitVecBLiteral(0, 8))
+        ),
+      )
     );
 
     p.ensures = p.ensures ++ List(
@@ -192,20 +189,21 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
         BinaryBExpr(BoolIMPLIES,
           BinaryBExpr(BoolAND,
             BinaryBExpr(BVULE, Old(r0), i),
-            BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, Old(r0), r0))
+            BinaryBExpr(BVULT, i, dest)
           ),
-          BinaryBExpr(BoolAND,
-            BinaryBExpr(NEQ, MapAccess(mem, i), BitVecBLiteral(0,8)),
-            BValid(me_live, me_live_val, me_object, me_position, me_global, i, BitVecBLiteral(1,64)),
-          )
+          BinaryBExpr(NEQ, MapAccess(mem, i), BitVecBLiteral(0,8)),
         ),
-        // List(
-        //   List(MapAccess(mem, i)),
-        //   List(BValid(me_live, me_live_val, me_object, me_position, me_global, i, BitVecBLiteral(1,64)))
-        // )
       ),
-      BinaryBExpr(EQ, MapAccess(mem, BinaryBExpr(BVADD, Old(r0), r0)), BitVecBLiteral(0,8)),
-      BinaryBExpr(BVULE, Old(r0), BinaryBExpr(BVADD, Old(r0), r0))
+      BinaryBExpr(EQ,
+        MapAccess(me_object, dest),
+        MapAccess(me_object, Old(r0))
+      ),
+      BinaryBExpr(EQ,
+        MapAccess(mem, dest),
+        BitVecBLiteral(0,8)
+      ),
+      BValid(me_live, me_live_val, me_object, me_position, me_global, Old(r0), r0),
+      BinaryBExpr(BVULE, Old(r0), dest)
     );
   }
 
@@ -231,30 +229,18 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
           BinaryBExpr(EQ, MapAccess(gamma_mem, i), TrueBLiteral)
         )
       )
-
-      // TODO: replace with a function like this?
-      // function gamma_object(#gammaMap: [bv64]bool, #object: [bv64]int, #index: bv64) returns (bool) {
-      //   #gammaMap[#index] && (
-      //     if (#object[#index] == #object[bvadd64(#index, 1bv64)])
-      //     then (gamma_object(#gammaMap, #object, bvadd64(#index, 1bv64)))
-      //     else true
-      //   )
-      // }
-
     )
 
     p.ensures = p.ensures ++ List(
       // Sets the old live value to dead
       ForAll(
         List(o),
-        BinaryBExpr(BoolAND,
-          BinaryBExpr(BoolIMPLIES,
+        BinaryBExpr(EQ,
+          MapAccess(me_live, o),
+          IfThenElse(
             BinaryBExpr(EQ, o, obj),
-            BinaryBExpr(EQ, MapAccess(me_live, o), BitVecBLiteral(2, 8)),
-          ),
-          BinaryBExpr(BoolIMPLIES,
-            BinaryBExpr(NEQ, o, obj),
-            BinaryBExpr(EQ, MapAccess(me_live, o), Old(MapAccess(me_live, o))),
+            BitVecBLiteral(2, 8),
+            Old(MapAccess(me_live, o)),
           )
         ),
         List(
@@ -291,81 +277,49 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
       BinaryBExpr(BVUGT, BinaryBExpr(BVADD, r0, Old(r0)), r0),
 
       // Updates object mapping for all bytes in our allocated object and keeps others the same
-      // forall i: bv64 ::
-      //      (r0 <= i /\ i <  r0 + Old(r0)) => object[i] == Old(me_alloc_counter)
-      //   /\ (r0 >  i \/ i >= r0 + Old(r0)) => object[i] == Old(object[i])
       ForAll(
         List(i),
-        BinaryBExpr(BoolAND,
-          BinaryBExpr(BoolIMPLIES,
+        BinaryBExpr(EQ,
+          MapAccess(me_object, i),
+          IfThenElse(
             BinaryBExpr(BoolAND,
               BinaryBExpr(BVULE, r0, i),
               BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, r0, Old(r0)))
             ),
-            BinaryBExpr(EQ, MapAccess(me_object, i), Old(me_alloc_counter)),
-          ),
-          BinaryBExpr(BoolIMPLIES,
-            BinaryBExpr(BoolOR,
-              BinaryBExpr(BVUGT, r0, i),
-              BinaryBExpr(BVUGE, i, BinaryBExpr(BVADD, r0, Old(r0)))
-            ),
-            BinaryBExpr(EQ, MapAccess(me_object, i), Old(MapAccess(me_object, i)))
+            Old(me_alloc_counter),
+            Old(MapAccess(me_object, i))
           ),
         ),
-        List(List(
-          MapAccess(me_object, i),
-        ))
+        List(List(MapAccess(me_object, i)))
       ),
 
-      // Updates position mapping for all bytes in our allocated position and keeps others the same
-      // forall i: bv64 ::
-      //      (r0 <= i /\ i <  r0 + Old(r0)) => position[i] == i - r0
-      //   /\ (r0 >  i \/ i >= r0 + Old(r0)) => position[i] == Old(position[i])
+      // Update position mapping
       ForAll(
         List(i),
-        BinaryBExpr(BoolAND,
-          BinaryBExpr(BoolIMPLIES,
-            BinaryBExpr(EQ,
-              MapAccess(me_object, r0),
-              MapAccess(me_object, i)
-            ),
-            BinaryBExpr(EQ, MapAccess(me_position, i), BinaryBExpr(BVSUB, i, r0))
+        IfThenElse(
+          BinaryBExpr(EQ,
+            MapAccess(me_object, r0),
+            MapAccess(me_object, i)
           ),
-          BinaryBExpr(BoolIMPLIES,
-            BinaryBExpr(NEQ,
-              MapAccess(me_object, r0),
-              MapAccess(me_object, i)
-            ),
-            BinaryBExpr(EQ, MapAccess(me_position, i), Old(MapAccess(me_position, i)))
-          )
+          BinaryBExpr(EQ, MapAccess(me_position, i), BinaryBExpr(BVSUB, i, r0)),
+          BinaryBExpr(EQ, MapAccess(me_position, i), Old(MapAccess(me_position, i)))
         ),
-        List(List(
-          MapAccess(me_position, i),
-        ))
+        List(List(MapAccess(me_position, i)))
       ),
 
       // Guarantee the object is live and has correct liveness
-      // live = old(live)( Old(me_alloc_counter) -= 1)
-      // live = old(live_val)( Old(me_alloc_counter) == Old(r0))
       ForAll(
         List(o),
-        BinaryBExpr(BoolAND,
-          BinaryBExpr(BoolIMPLIES,
-            BinaryBExpr(EQ, o, Old(me_alloc_counter)),
-            BinaryBExpr(BoolAND,
-              // Make live
-              BinaryBExpr(EQ, MapAccess(me_live, o), BitVecBLiteral(1, 8)),
-              // Update live allocation size
-              BinaryBExpr(EQ, MapAccess(me_live_val, o), Old(r0)),
-            )
+        IfThenElse(
+          BinaryBExpr(EQ, o, Old(me_alloc_counter)),
+          BinaryBExpr(BoolAND,
+            BinaryBExpr(EQ, MapAccess(me_live, o), BitVecBLiteral(1, 8)),
+            BinaryBExpr(EQ, MapAccess(me_live_val, o), Old(r0)),
           ),
-          BinaryBExpr(BoolIMPLIES,
-            BinaryBExpr(NEQ, o, Old(me_alloc_counter)),
-            BinaryBExpr(BoolAND,
-              BinaryBExpr(EQ, MapAccess(me_live, o), Old(MapAccess(me_live, o))),
-              BinaryBExpr(EQ, MapAccess(me_live_val, o), Old(MapAccess(me_live_val, o))),
-            )
-          ),
+          BinaryBExpr(BoolAND,
+            BinaryBExpr(EQ, MapAccess(me_live, o), Old(MapAccess(me_live, o))),
+            BinaryBExpr(EQ, MapAccess(me_live_val, o), Old(MapAccess(me_live_val, o))),
+          )
         ),
         List(
           List(MapAccess(me_live, o)),
@@ -378,18 +332,20 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
       ForAll(
         List(i),
         BinaryBExpr(BoolIMPLIES,
-          // For all pointers which in the new state have the same object as r0 (aka belong to this allocation)
           BinaryBExpr(EQ, MapAccess(me_object, r0), MapAccess(me_object, i)),
           BinaryBExpr(BoolAND,
             // They must have previously been fresh in the old state
-            BinaryBExpr(EQ, Old(MapAccess(me_live, Old(MapAccess(me_object, i)))), BitVecBLiteral(2,8)),
+            BinaryBExpr(EQ,
+              Old(MapAccess(me_live, Old(MapAccess(me_object, i)))),
+              BitVecBLiteral(2,8)
+            ),
             // And they must not be a global variable
             UnaryBExpr(BoolNOT, Old(MapAccess(me_global, i))),
           )
         ),
         List(
           List(MapAccess(me_object, i)),
-          // List(MapAccess(me_global, i))
+          List(MapAccess(me_global, i))
         )
       ),
     )
@@ -428,41 +384,7 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
         ),
         List(List(MapAccess(me_global, i)))
       ),
-
-      // And have a true gamma for all malloc candidates initially
-      ForAll(
-        List(i),
-        BinaryBExpr(BoolIMPLIES,
-          UnaryBExpr(BoolNOT, MapAccess(me_global, i)),
-          BinaryBExpr(EQ, MapAccess(gamma_mem, i), TrueBLiteral)
-        ),
-        List(List(MapAccess(gamma_mem, i)),List(MapAccess(me_global, i)))
-      ),
-
-      // // TODO: replace me_unallocated with a set to clean this all up
-      // ForAll(
-      //   List(i),
-      //   BinaryBExpr(BoolIMPLIES,
-      //     unallocated_addresses.map(v => {
-      //       BinaryBExpr(NEQ, i, BitVecBLiteral(v, 64))
-      //     }).fold(TrueBLiteral)((acc, v) => {
-      //       BinaryBExpr(BoolAND, acc, v)
-      //     }),
-      //     BinaryBExpr(EQ,
-      //       MapAccess(me_unallocated, i),
-      //       FalseBLiteral
-      //     )
-      //   ),
-      //   List(List(MapAccess(me_unallocated, i)))
-      // )
     )
-    // ++ unallocated_addresses.map(v => {
-    //   // All ctx provided symbols are unallocated (true) otherwise false
-    //   BinaryBExpr(EQ,
-    //     MapAccess(me_unallocated, BitVecBLiteral(v, 64)),
-    //     TrueBLiteral
-    //   )
-    // })
   }
 
   override def vprog(p: Program) = {
