@@ -492,7 +492,8 @@ object Main {
       ),
       runInterpret = conf.interpret.value,
       validateSimp = conf.validateSimplify.value,
-      transformIrreducibleLoops = conf.transformIrreducibleLoops.value || conf.generateLoopInvariants.value,
+      transformIrreducibleLoops =
+        conf.transformIrreducibleLoops.value || conf.summariseProcedures.value || conf.generateLoopInvariants.value,
       summariseProcedures = conf.summariseProcedures.value,
       generateLoopInvariants = conf.generateLoopInvariants.value,
       generateRelyGuarantees = conf.generateRelyGuarantees.value,

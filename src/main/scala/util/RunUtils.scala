@@ -168,20 +168,17 @@ object RunUtils {
         invariant.readUninitialised(ctx.program)
     }
 
-    if q.summariseProcedures then
-      getGenerateProcedureSummariesTransform(q.loading.parameterForm || conf.simplify != SimplifyMode.Disabled)(
-        ctx,
-        analysisManager
-      )
-
     if (conf.transformIrreducibleLoops) {
       StaticAnalysisLogger.info("[!] Transforming Irreducible Loops")
       IrreducibleLoops.transform_all_and_update(ctx.program)
+    }
 
-      if (conf.generateLoopInvariants) {
-        StaticAnalysisLogger.info("[!] Generating Loop Invariants")
-        FullLoopInvariantGenerator(ctx.program).addInvariants()
-      }
+    if q.summariseProcedures then
+      getGenerateProcedureSummariesTransform(q.loading.parameterForm || q.simplify)(ctx, analysisManager)
+
+    if (conf.generateLoopInvariants) {
+      StaticAnalysisLogger.info("[!] Generating Loop Invariants")
+      FullLoopInvariantGenerator(ctx.program).addInvariants()
     }
 
     if (q.runInterpret) {
