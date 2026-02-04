@@ -33,6 +33,7 @@ case class TestConfig(
   summariseProcedures: Boolean = false,
   dsa: Option[DSConfig] = None,
   memoryTransform: Boolean = false,
+  memoryEncoding: Boolean = false,
   useOfflineLifterForGtirbFrontend: Boolean = false
 ) {
   private val scaledtimespans = new ScaledTimeSpans {}
@@ -53,6 +54,7 @@ trait BASILTest {
     summariseProcedures: Boolean = false,
     dsa: Option[DSConfig] = None,
     memoryTransform: Boolean = false,
+    memoryEncoding: Boolean = false,
     postLoad: IRContext => Unit = s => (),
     useOfflineLifterForGtirbFrontend: Boolean = false
   ): BASILResult = {
@@ -76,7 +78,8 @@ trait BASILTest {
         util.BoogieGeneratorConfig().copy(memoryFunctionType = util.BoogieMemoryAccessMode.SuccessiveStoreSelect),
       outputPrefix = BPLPath,
       dsaConfig = dsa,
-      memoryTransform = memoryTransform
+      memoryTransform = memoryTransform,
+      memoryEncoding = memoryEncoding
     )
     val result = RunUtils.loadAndTranslate(config, postLoad = postLoad)
     RunUtils.writeOutput(result)

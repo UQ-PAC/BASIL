@@ -164,26 +164,25 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
     p.requires = p.requires ++ List(
       // Can only reason about input R0, dont know size here
       BValid(me_live, me_live_val, me_object, me_position, me_global, r0, BitVecBLiteral(1,64)),
-      // BNextZero(mem, me_object, r0)
-      Exists(
-        List(i),
-        BinaryBExpr(BoolAND,
-          BinaryBExpr(BoolAND,
-            BinaryBExpr(BVULE, r0, i),
-            BinaryBExpr(EQ, MapAccess(mem, i), BitVecBLiteral(0,8))
-          ),
-          ForAll(
-            List(j),
-            BinaryBExpr(BoolAND,
-              BinaryBExpr(BoolAND,
-                BinaryBExpr(BVULE, r0, j),
-                BinaryBExpr(BVULT, j, i)
-              ),
-              BinaryBExpr(NEQ, MapAccess(mem, j), BitVecBLiteral(0,8))
-            )
-          )
-        )
-      )
+      // Exists(
+      //   List(i),
+      //   BinaryBExpr(BoolAND,
+      //     BinaryBExpr(BoolAND,
+      //       BinaryBExpr(BVULE, r0, i),
+      //       BinaryBExpr(EQ, MapAccess(mem, i), BitVecBLiteral(0,8))
+      //     ),
+      //     ForAll(
+      //       List(j),
+      //       BinaryBExpr(BoolAND,
+      //         BinaryBExpr(BoolAND,
+      //           BinaryBExpr(BVULE, r0, j),
+      //           BinaryBExpr(BVULT, j, i)
+      //         ),
+      //         BinaryBExpr(NEQ, MapAccess(mem, j), BitVecBLiteral(0,8))
+      //       )
+      //     )
+      //   )
+      // )
     );
 
     p.ensures = p.ensures ++ List(

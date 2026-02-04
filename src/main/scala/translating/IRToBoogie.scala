@@ -878,15 +878,20 @@ class IRToBoogie(
           List(store) ++ stateSplit
         case memory: SharedMemory =>
 
-          // TODO: this is very temporary and should be automated.
-          val me_object = BMapVar("me_object", MapBType(BitVecBType(64), IntBType), Scope.Global)
-          val me_position = BMapVar("me_position", MapBType(BitVecBType(64), BitVecBType(64)), Scope.Global)
-          val me_live = BMapVar("me_live", MapBType(IntBType, BitVecBType(8)), Scope.Global)
-          val me_live_val = BMapVar("me_live_val", MapBType(IntBType, BitVecBType(64)), Scope.Global)
-          val me_global = BMapVar("me_global", MapBType(BitVecBType(64), BoolBType), Scope.Global)
-          val validCheck = BAssert(BValid(
-            me_live, me_live_val, me_object, me_position, me_global, m.index.toBoogie, BitVecBLiteral(m.size / 8, 64)
-          ))
+
+          val validCheck = if (config.memoryEncoding) {
+            // TODO: this is very temporary and should be automated.
+            val me_object = BMapVar("me_object", MapBType(BitVecBType(64), IntBType), Scope.Global)
+            val me_position = BMapVar("me_position", MapBType(BitVecBType(64), BitVecBType(64)), Scope.Global)
+            val me_live = BMapVar("me_live", MapBType(IntBType, BitVecBType(8)), Scope.Global)
+            val me_live_val = BMapVar("me_live_val", MapBType(IntBType, BitVecBType(64)), Scope.Global)
+            val me_global = BMapVar("me_global", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+            List(BAssert(BValid(
+              me_live, me_live_val, me_object, me_position, me_global, m.index.toBoogie, BitVecBLiteral(m.size / 8, 64)
+            )))
+          } else {
+            List()
+          }
 
           val gammaValueCheck = BAssert(BinaryBExpr(BoolIMPLIES, L(LArgs, rhs.index), exprToGamma(m.value)))
           val secureUpdate = translateSecureUpdate(List(m))
@@ -894,9 +899,9 @@ class IRToBoogie(
             val rely = BProcedureCall("rely")
             val oldAssigns = translateOldAssigns(Set(memory))
             val guaranteeChecks = translateGuaranteeChecks(List(m))
-            List(rely) ++ oldAssigns ++ List(gammaValueCheck, validCheck, store) ++ secureUpdate ++ guaranteeChecks ++ stateSplit
+            List(rely) ++ oldAssigns ++ List(gammaValueCheck) ++ validCheck ++ List(store) ++ secureUpdate ++ guaranteeChecks ++ stateSplit
           } else {
-            List(gammaValueCheck, validCheck, store) ++ secureUpdate ++ stateSplit
+            List(gammaValueCheck) ++ validCheck ++ List(store) ++ secureUpdate ++ stateSplit
           }
       }
     case l: LocalAssign =>

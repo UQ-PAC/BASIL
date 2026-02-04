@@ -6,7 +6,7 @@ val externAttr = BAttribute("extern")
 val inlineAttr = BAttribute("inline")
 
 type BasilIRFunctionOp = BoolToBV1Op | BVFunctionOp | MemoryLoadOp | MemoryStoreOp | ByteExtract | InBounds |
-  BUninterpreted | Valid | Disjoint | NextZero
+  BUninterpreted | Valid | Disjoint
 
 def genFunctionOpDefinition(
   f: BasilIRFunctionOp,
@@ -44,40 +44,9 @@ def genFunctionOpDefinition(
       BFunction(u.name, u.in.map(BParam(_)), BParam(u.out), None, List(externAttr))
     case v: Valid => genValidFunction(v)
     case d: Disjoint => genDisjointFunction(d)
-    case nz: NextZero => genNextZero(nz)
   }
 }
 
-def genNextZero(nz: NextZero) = {
-  val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter);
-  val me_object = BMapVar("object", MapBType(BitVecBType(64), IntBType), Scope.Parameter)
-  val pointer = BVariable("pointer", BitVecBType(64), Scope.Parameter)
-
-  // function next_zero(#memory: [bv64]bv8, #object: [bv64]int, #pointer: bv64) returns (bool) {
-  //   if (#memory[#pointer] == 0bv8) then true else (
-  //     if (#object[#pointer] == #object[bvadd64(#pointer, 1bv64)])
-  //     then next_zero(#memory, #object, bvadd64(#pointer, 1bv64))
-  //     else false
-  //   )
-  // }
-  
-  val body = IfThenElse(
-    BinaryBExpr(EQ, MapAccess(mem, pointer), BitVecBLiteral(0,8)),
-    TrueBLiteral,
-    IfThenElse(
-      BinaryBExpr(EQ,
-        MapAccess(me_object, pointer),
-        MapAccess(me_object, BinaryBExpr(BVADD, pointer, BitVecBLiteral(1,64)))
-      ),
-      BNextZero(mem, me_object, BinaryBExpr(BVADD, pointer, BitVecBLiteral(1,64))),
-      FalseBLiteral
-    )
-  )
-  
-  val in = List(mem, me_object, pointer)
-
-  BFunction(nz.fnName, in, BParam(BoolBType), Some(body), List(externAttr))
-}
 
 def genValidFunction(v: Valid) = {
   val me_live = BMapVar("live", MapBType(IntBType, BitVecBType(8)), Scope.Parameter)
