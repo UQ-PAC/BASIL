@@ -103,7 +103,7 @@ class CILVisitorImpl(val v: CILVisitor) {
       case l: LambdaExpr => visit_lambda(l)
       case q: QuantifierExpr => {
         val r = visit_lambda(q.body)
-        if (r ne q.body) then QuantifierExpr(q.kind, r) else q
+        if (r ne q.body) then QuantifierExpr(q.kind, r, triggers = q.triggers) else q
       }
       case n: Literal => n
       case Extract(end, start, arg) => {

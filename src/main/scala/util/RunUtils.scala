@@ -62,6 +62,10 @@ object RunUtils {
 
     val analysisManager = AnalysisManager(ctx.program)
 
+    if (conf.memoryEncoding) {
+      visit_prog(transforms.MemoryEncodingTransform(ctx), ctx.program)
+    }
+
     if conf.simplify then doCleanupWithSimplify(ctx, analysisManager)
     else doCleanupWithoutSimplify(ctx, analysisManager)
 
@@ -146,10 +150,6 @@ object RunUtils {
         val memTransferTimer = PerformanceTimer("Mem Transfer Timer", INFO)
         visit_prog(MemoryTransform(dsaResults.topDown, dsaResults.globals), ctx.program)
         memTransferTimer.checkPoint("Performed Memory Transform")
-    }
-
-    if (conf.memoryEncoding) {
-      visit_prog(transforms.MemoryEncodingTransform(ctx), ctx.program)
     }
 
     if q.summariseProcedures then
