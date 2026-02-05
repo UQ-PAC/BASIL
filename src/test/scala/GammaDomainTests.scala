@@ -37,7 +37,8 @@ class GammaDomainTests extends AnyFunSuite, CaptureOutput {
       proc("f", block("assign", LocalAssign(R0, bv64(2), None), goto("returnBlock")), block("returnBlock", ret))
     )
     val f = program.nameToProcedure("f")
-    val initialState = LatticeMap.BottomMap(registers.map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+    val initialState =
+      LatticeMap.BottomMap(registers.map((v: Variable | Memory) => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
     val constPropResults = InterProcConstantPropagation(program).analyze()
     val gammaResults = getMustGammaDomainResults(f, initialState)
     val reachability = getReachabilityConditions(f)
@@ -58,7 +59,8 @@ class GammaDomainTests extends AnyFunSuite, CaptureOutput {
       )
     )
     val f = program.nameToProcedure("f")
-    val initialState = LatticeMap.BottomMap(registers.map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+    val initialState =
+      LatticeMap.BottomMap(registers.map((v: Variable | Memory) => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
     val constPropResults = InterProcConstantPropagation(program).analyze()
     val gammaResults = getMustGammaDomainResults(f, initialState)
     val reachability = getReachabilityConditions(f)
@@ -89,7 +91,8 @@ class GammaDomainTests extends AnyFunSuite, CaptureOutput {
       )
     )
     val f = program.nameToProcedure("f")
-    val initialState = LatticeMap.BottomMap(registers.map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+    val initialState =
+      LatticeMap.BottomMap(registers.map((v: Variable | Memory) => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
     val constPropResults = InterProcConstantPropagation(program).analyze()
     val gammaResults = getMustGammaDomainResults(f, initialState)
 

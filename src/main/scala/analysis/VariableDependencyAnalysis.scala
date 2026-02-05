@@ -33,10 +33,10 @@ private def getLiveVars(p: Procedure): Map[CFGPosition, Set[Variable]] = {
 
 trait ProcVariableDependencyAnalysisFunctions(
   relevantGlobals: Set[Variable],
-  varDepsSummaries: Map[Procedure, Map[Variable, LatticeSet[Variable]]],
+  varDepsSummaries: Map[Procedure, Map[GammaVal, LatticeSet[GammaVal]]],
   procedure: Procedure,
   parameterForm: Boolean
-) extends ForwardIDEAnalysis[Variable, LatticeSet[Variable], LatticeSetLattice[Variable]] {
+) extends ForwardIDEAnalysis[GammaVal, LatticeSet[GammaVal], LatticeSetLattice[GammaVal]] {
   val valuelattice = LatticeSetLattice()
   val edgelattice = EdgeFunctionLattice(valuelattice)
   import edgelattice.{IdEdge, ConstEdge}
@@ -45,23 +45,24 @@ trait ProcVariableDependencyAnalysisFunctions(
   private val reachable = procedure.reachableFrom
   private val liveVars = getLiveVars(procedure)
 
-  def edgesCallToEntry(call: DirectCall, entry: Procedure)(d: DL): Map[DL, EdgeFunction[LatticeSet[Variable]]] = {
+  def edgesCallToEntry(call: DirectCall, entry: Procedure)(d: DL): Map[DL, EdgeFunction[LatticeSet[GammaVal]]] = {
     if varDepsSummaries.contains(entry) then Map()
     else if !parameterForm then Map(d -> IdEdge())
     else
       d match {
-        case Left(v) =>
-          call.actualParams.toList.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]]()) { case (m, (inVar, expr)) =>
+        case Left(v: Variable) =>
+          call.actualParams.toList.foldLeft(Map[DL, EdgeFunction[LatticeSet[GammaVal]]]()) { case (m, (inVar, expr)) =>
             if expr.variables.contains(v) then m + (Left(inVar) -> IdEdge()) else m
           }
+        case Left(m: Memory) => Map(d -> IdEdge())
         case Right(_) =>
-          call.actualParams.toList.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
+          call.actualParams.toList.foldLeft(Map[DL, EdgeFunction[LatticeSet[GammaVal]]](d -> IdEdge())) {
             case (m, (inVar, _)) => m + (Left(inVar) -> ConstEdge(FiniteSet(Set())))
           }
       }
   }
 
-  def edgesExitToAfterCall(exit: Return, aftercall: Command)(d: DL): Map[DL, EdgeFunction[LatticeSet[Variable]]] = {
+  def edgesExitToAfterCall(exit: Return, aftercall: Command)(d: DL): Map[DL, EdgeFunction[LatticeSet[GammaVal]]] = {
     // TODO is this reachability actually needed/helpful?
     if reachable.contains(aftercall.parent.parent) then {
       if !parameterForm then
@@ -81,7 +82,7 @@ trait ProcVariableDependencyAnalysisFunctions(
         }
 
         d match {
-          case Left(v) =>
+          case Left(v: Variable) =>
             exit.outParams.toList
               .flatMap((retVar, expr) => {
                 if expr.variables.contains(v)
@@ -89,25 +90,25 @@ trait ProcVariableDependencyAnalysisFunctions(
                 else List()
               })
               .toMap
-          case Right(_) => Map(d -> IdEdge())
+          case Left(_: Memory) | Right(_) => Map(d -> IdEdge())
         }
       }
     } else Map()
   }
 
-  def edgesCallToAfterCall(call: DirectCall, aftercall: Command)(d: DL): Map[DL, EdgeFunction[LatticeSet[Variable]]] = {
+  def edgesCallToAfterCall(call: DirectCall, aftercall: Command)(d: DL): Map[DL, EdgeFunction[LatticeSet[GammaVal]]] = {
     if !parameterForm then
       d match {
-        case Left(v) =>
+        case Left(v: Variable) =>
           varDepsSummaries
             .get(call.target)
             .map(summary => {
-              summary.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]]()) { case (m, (outVar, deps)) =>
+              summary.foldLeft(Map[DL, EdgeFunction[LatticeSet[GammaVal]]]()) { case (m, (outVar, deps)) =>
                 if deps.contains(v) then m + (Left(outVar) -> IdEdge()) else m
               }
             })
             .getOrElse(Map())
-        case Right(_) => Map(d -> IdEdge())
+        case Left(_: Memory) | Right(_) => Map(d -> IdEdge())
       }
     else
       varDepsSummaries.get(call.target) match {
@@ -120,9 +121,9 @@ trait ProcVariableDependencyAnalysisFunctions(
             // this works with Top elements.
 
             // TODO handle modified global variables
-            case Left(v) => {
+            case Left(v: Variable) => {
               // If the variable is assigned to in this call, reassign its value, else keep it.
-              val init: Map[DL, EdgeFunction[LatticeSet[Variable]]] =
+              val init: Map[DL, EdgeFunction[LatticeSet[GammaVal]]] =
                 if call.outParams.exists(_._2 == v) then Map() else Map(d -> IdEdge())
 
               call.actualParams.foldLeft(init) { case (m, (inVar, expr)) =>
@@ -140,8 +141,12 @@ trait ProcVariableDependencyAnalysisFunctions(
                 }
               }
             }
+            case Left(m: Memory) => summary.get(m) match {
+              case Some(FiniteSet(s)) => s.foldLeft(Map(d -> IdEdge())) { case (m, v) => m + (Left(v) -> IdEdge()) }
+              case _ => Map(d -> IdEdge())
+            }
             case Right(_) =>
-              val initialise = call.outParams.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
+              val initialise = call.outParams.foldLeft(Map[DL, EdgeFunction[LatticeSet[GammaVal]]](d -> IdEdge())) {
                 case (m, (formalVar, resultVar)) => m + (Left(resultVar) -> ConstEdge(FiniteSet(Set())))
               }
               val ret = summary.foldLeft(initialise) { case (m, (endVar, deps)) =>
@@ -163,21 +168,21 @@ trait ProcVariableDependencyAnalysisFunctions(
             case Left(v) if call.outParams.exists(_._2 == v) => Map()
             case Left(v) => Map(d -> IdEdge())
             case Right(_) =>
-              call.outParams.foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) {
+              call.outParams.foldLeft(Map[DL, EdgeFunction[LatticeSet[GammaVal]]](d -> IdEdge())) {
                 case (m, (outVar, resultVar)) => m + (Left(resultVar) -> ConstEdge(FiniteSet(Set())))
               }
           }
       }
   }
 
-  def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[LatticeSet[Variable]]] = {
+  def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[LatticeSet[GammaVal]]] = {
     if n == procedure then
       d match {
         // At the start of the procedure, no variables should depend on anything but themselves.
         case Left(_) => Map()
         case Right(_) =>
           (relevantGlobals ++ procedure.formalInParam).foldLeft(Map(d -> IdEdge())) {
-            (m: Map[DL, EdgeFunction[LatticeSet[Variable]]], v) => m + (Left(v) -> ConstEdge(FiniteSet(Set(v))))
+            (m: Map[DL, EdgeFunction[LatticeSet[GammaVal]]], v) => m + (Left(v) -> ConstEdge(FiniteSet(Set(v))))
           }
       }
     else
@@ -185,22 +190,26 @@ trait ProcVariableDependencyAnalysisFunctions(
         case LocalAssign(assigned, expression, _) =>
           val vars = expression.variables
           d match {
-            case Left(v) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> IdEdge())
+            case Left(v: Variable) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> IdEdge())
             case Left(v) if v == assigned => Map()
-            case Left(v) if liveVars.get(n).exists(!_.contains(v)) => Map()
+            case Left(v: Variable) if liveVars.get(n).exists(!_.contains(v)) => Map()
             case Left(_) => Map(d -> IdEdge())
             // This needs to be FiniteSet(Set()) and not Bottom() since Bottom() means something
             // special to the IDE solver
             case Right(_) =>
               Map(d -> IdEdge(), Left(assigned) -> ConstEdge(FiniteSet(Set())))
           }
+        case MemoryStore(mem, index, value, _, size, _) =>
+          d match {
+            case Left(v: Variable) if value.variables.contains(v) => Map(d -> IdEdge(), Left(mem) -> IdEdge())
+            case _ => Map(d -> IdEdge(), Left(mem) -> ConstEdge(FiniteSet(Set(mem))))
+          }
         case MemoryLoad(lhs, mem, index, _, size, _) =>
           d match {
             case Left(v) if v == lhs => Map()
+            case Left(m) if m == mem => Map(d -> IdEdge(), Left(lhs) -> IdEdge())
             case Left(_) => Map(d -> IdEdge())
-            // An approximation of memory loading is just that the read values could have been anything at all
-            // This could perhaps be more made precise by having dependencies on individual memory regions
-            case Right(_) => Map(d -> IdEdge(), Left(lhs) -> ConstEdge(Top()))
+            case Right(_) => Map(d -> IdEdge(), Left(lhs) -> ConstEdge(FiniteSet(Set(mem))), Left(mem) -> ConstEdge(FiniteSet(Set(mem))))
           }
         case IndirectCall(_, _) =>
           d match {
@@ -212,7 +221,7 @@ trait ProcVariableDependencyAnalysisFunctions(
             case Left(v: LocalVar) if call.outParams.exists(_._2 == v) => Map()
             case Left(v) => Map(d -> IdEdge())
             case Right(_) =>
-              call.outParams.map(_._2).foldLeft(Map[DL, EdgeFunction[LatticeSet[Variable]]](d -> IdEdge())) { (m, v) =>
+              call.outParams.map(_._2).foldLeft(Map[DL, EdgeFunction[LatticeSet[GammaVal]]](d -> IdEdge())) { (m, v) =>
                 m + (Left(v) -> ConstEdge(Top()))
               }
           }
@@ -225,7 +234,7 @@ trait ProcVariableDependencyAnalysisFunctions(
             {
               val vars = expression.variables
               d match {
-                case Left(v) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> IdEdge())
+                case Left(v: Variable) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> IdEdge())
                 case Left(_) => Map(d -> IdEdge())
                 case Right(_) =>
                   Map(d -> IdEdge(), Left(assigned) -> ConstEdge(FiniteSet(Set())))
@@ -254,10 +263,10 @@ trait ProcVariableDependencyAnalysisFunctions(
 class ProcVariableDependencyAnalysis(
   program: Program,
   relevantGlobals: Set[Variable],
-  varDepsSummaries: Map[Procedure, Map[Variable, LatticeSet[Variable]]],
+  varDepsSummaries: Map[Procedure, Map[GammaVal, LatticeSet[GammaVal]]],
   procedure: Procedure,
   parameterForm: Boolean = false
-) extends ForwardIDESolver[Variable, LatticeSet[Variable], LatticeSetLattice[Variable]](program),
+) extends ForwardIDESolver[GammaVal, LatticeSet[GammaVal], LatticeSetLattice[GammaVal]](program),
       ProcVariableDependencyAnalysisFunctions(relevantGlobals, varDepsSummaries, procedure, parameterForm) {
   override def start: CFGPosition = procedure
 }
@@ -279,8 +288,8 @@ class VariableDependencyAnalysis(program: Program, scc: List[Set[Procedure]], pa
         }
         .toSet
 
-  def analyze(): Map[Procedure, Map[Variable, LatticeSet[Variable]]] = {
-    scc.flatten.filter(_.blocks.nonEmpty).foldLeft(Map[Procedure, Map[Variable, LatticeSet[Variable]]]()) {
+  def analyze(): Map[Procedure, Map[GammaVal, LatticeSet[GammaVal]]] = {
+    scc.flatten.filter(_.blocks.nonEmpty).foldLeft(Map[Procedure, Map[GammaVal, LatticeSet[GammaVal]]]()) {
       (varDepsSummaries, procedure) =>
         {
           StaticAnalysisLogger.debug("Generating variable dependencies for " + procedure)

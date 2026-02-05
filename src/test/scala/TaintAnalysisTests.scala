@@ -18,7 +18,7 @@ class TaintAnalysisTests extends AnyFunSuite, CaptureOutput {
   def getVarDepResults(
     program: Program,
     procedure: Procedure
-  ): Map[CFGPosition, Map[Variable, LatticeSet[Variable]]] = {
+  ): Map[CFGPosition, Map[GammaVal, LatticeSet[GammaVal]]] = {
     val variables = registers
     ProcVariableDependencyAnalysis(program, variables, Map(), procedure).analyze()
   }

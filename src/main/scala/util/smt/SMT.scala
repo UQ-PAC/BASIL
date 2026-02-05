@@ -313,6 +313,8 @@ class FormulaConverter(formulaManager: FormulaManager) {
       case Lit(x) => convertBoolLit(x)
       case Var(v) => convertGammaVar(v.name)
       case OldVar(v) => convertGammaVar(s"old(${v.name})")
+      case MemReg(m) => ???
+      case OldMemReg(m) => ???
       case Uop(op, x) =>
         op match {
           case BoolNOT => booleanFormulaManager.not(convertGammaTerm(x))

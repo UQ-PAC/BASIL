@@ -20,7 +20,7 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
     VariableDependencyAnalysis(program, scc, parameterForm).analyze()
   }
 
-  private def getDependencies(procedure: Procedure): Map[Variable, Set[Variable]] = {
+  private def getDependencies(procedure: Procedure): Map[GammaVal, Set[GammaVal]] = {
     varDepsSummaries.getOrElse(procedure, Map()).flatMap { (v, ls) =>
       ls match {
         case LatticeSet.FiniteSet(s) => Some((v, s))
@@ -45,7 +45,9 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
      */
     Logger.debug(s"Generating gamma with reachability preconditions for $procedure")
     val initialMustGammaDeps = LatticeMap.bottomMap(
-      (relevantGlobals ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap
+      (relevantGlobals ++ procedure.formalInParam)
+        .map((v: Variable | Memory) => (v, LatticeSet.FiniteSet(Set(v))))
+        .toMap
     )
     val mustGammaDomain = MustGammaDomain(initialMustGammaDeps)
     val reachabilityDomain = ReachabilityConditions()
@@ -71,7 +73,7 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
                   for {
                     s <- curSet
                     r <- mustGammaResults(a.parent)(v).tryToSet
-                  } yield (s ++ r.map(GammaTerm.Var(_)))
+                  } yield (s ++ r.map(valToTerm))
                 }
                 .map { gammas =>
                   {
@@ -117,14 +119,17 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
       }
     }
 
-    val dependencyMap = getDependencies(procedure).filter { (variable, _) =>
-      outVars.contains(variable)
+    val dependencyMap = getDependencies(procedure).filter { (v, _) =>
+      v match {
+        case v: Variable => outVars.contains(v)
+        case m: Memory => true
+      }
     }
 
     val dependencyPreds = dependencyMap.toList
       .map { (variable, dependencies) =>
         {
-          Predicate.gammaLeq(GammaTerm.Var(variable), GammaTerm.Join(dependencies.map(GammaTerm.OldVar(_)))).simplify
+          Predicate.gammaLeq(valToTerm(variable), GammaTerm.Join(dependencies.map(valToOld(_)))).simplify
         }
       }
       .map(Condition(_, Some("variable dependency analysis")))
@@ -144,7 +149,11 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
      * will not hold.
      */
     val initialMayGammaDeps =
-      LatticeMap.TopMap((relevantGlobals ++ procedure.formalInParam).map(v => (v, LatticeSet.FiniteSet(Set(v)))).toMap)
+      LatticeMap.TopMap(
+        (relevantGlobals ++ procedure.formalInParam)
+          .map((v: Variable | Memory) => (v, LatticeSet.FiniteSet(Set(v))))
+          .toMap
+      )
     val predAbsIntDomain = PredBoundedDisjunctiveCompletion(
       PredProductDomain(DoubleIntervalDomain(Some(procedure)), MayGammaDomain(initialMayGammaDeps)),
       10

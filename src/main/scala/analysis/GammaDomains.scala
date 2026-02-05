@@ -2,9 +2,23 @@ package analysis
 
 import ir.*
 
-type VarGammaMap = LatticeMap[Variable, LatticeSet[Variable]]
+type GammaVal = Variable | Memory
+
+def valToTerm(v: GammaVal): GammaTerm =
+  v match {
+    case (v: Variable) => GammaTerm.Var(v)
+    case (m: Memory) => GammaTerm.MemReg(m)
+  }
+def valToOld(v: GammaVal): GammaTerm =
+  v match {
+    case (v: Variable) => GammaTerm.OldVar(v)
+    case (m: Memory) => GammaTerm.OldMemReg(m)
+  }
+
+type VarGammaMap = LatticeMap[GammaVal, LatticeSet[GammaVal]]
 
 implicit val variableLatticeSetTerm: LatticeSet[Variable] = LatticeSet.Bottom()
+implicit val gammaValLatticeSetTerm: LatticeSet[GammaVal] = LatticeSet.Bottom()
 
 /**
  * An abstract domain that determines for each variable, a set of variables whose gammas (at
@@ -19,20 +33,20 @@ implicit val variableLatticeSetTerm: LatticeSet[Variable] = LatticeSet.Bottom()
  * We have Gamma_x = Join(S), so if Join(S_o) is an overapproximation and Join(S_u) is an
  * underapproximation, we have the invariants that Gamma_x <= Join(S_o) and Join(S_u) <= Gamma_x.
  */
-trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[Variable, LatticeSet[Variable]] {
+trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[GammaVal, LatticeSet[GammaVal]] {
 
   def transfer(m: VarGammaMap, c: Command): VarGammaMap = {
     c match {
       case c: LocalAssign =>
-        m + (c.lhs -> c.rhs.variables.foldLeft(LatticeSet.Bottom[Variable]())((s, v) => s.union(m(v))))
+        m + (c.lhs -> c.rhs.variables.foldLeft(LatticeSet.Bottom[GammaVal]())((s, v) => s.union(m(v))))
       case c: SimulAssign =>
         m ++ c.assignments
-          .map((lhs, rhs) => lhs -> rhs.variables.foldLeft(LatticeSet.Bottom[Variable]())((s, v) => s.union(m(v))))
+          .map((lhs, rhs) => lhs -> rhs.variables.foldLeft(LatticeSet.Bottom[GammaVal]())((s, v) => s.union(m(v))))
           .toMap
       case c: MemoryAssign =>
-        m + (c.lhs -> c.rhs.variables.foldLeft(LatticeSet.Bottom[Variable]())((s, v) => s.union(m(v))))
-      case c: MemoryLoad => m + (c.lhs -> topTerm)
-      case c: MemoryStore => m
+        m + (c.lhs -> c.rhs.variables.foldLeft(LatticeSet.Bottom[GammaVal]())((s, v) => s.union(m(v))))
+      case c: MemoryLoad => m + (c.lhs -> (m(c.mem)))
+      case c: MemoryStore => m + (c.mem -> c.value.variables.foldLeft(m(c.mem))((s, v) => s.union(m(v))))
       case c: Assume => m
       case c: Assert => m
       case c: IndirectCall => top
@@ -40,29 +54,29 @@ trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[Variable, Lat
       case c: GoTo => m
       case c: Return =>
         m ++ c.outParams
-          .map((l, e) => l -> e.variables.foldLeft(LatticeSet.Bottom[Variable]())((s, v) => s.union(m(v))))
+          .map((l, e) => l -> e.variables.foldLeft(LatticeSet.Bottom[GammaVal]())((s, v) => s.union(m(v))))
           .toMap
       case c: Unreachable => m
       case c: NOP => m
     }
   }
 
-  override def init(b: Block): LatticeMap[Variable, LatticeSet[Variable]] = {
+  override def init(b: Block): LatticeMap[GammaVal, LatticeSet[GammaVal]] = {
     if Some(b) == b.parent.entryBlock then initialState else bot
   }
 
-  def termToPred(m: LatticeMap[Variable, LatticeSet[Variable]], v: Variable, s: LatticeSet[Variable]): Predicate =
+  def termToPred(m: LatticeMap[GammaVal, LatticeSet[GammaVal]], v: GammaVal, s: LatticeSet[GammaVal]): Predicate =
     (v, s) match {
-      case (v: Variable, LatticeSet.FiniteSet(s)) => {
+      case (v: GammaVal, LatticeSet.FiniteSet(s)) => {
         val g = s.foldLeft(Some(GammaTerm.Low)) { (q: Option[GammaTerm], t) =>
           (q, t) match {
-            case (Some(q), v: Variable) => Some(GammaTerm.Join(Set(q, GammaTerm.OldVar(v))))
+            case (Some(q), v: Variable) => Some(GammaTerm.Join(Set(q, valToOld(v))))
             case _ => None
           }
         }
         g match {
           // TODO is this right? it should depend on whether this is a may or must analysis.
-          case Some(g) => Predicate.gammaGeq(g, GammaTerm.Var(v)).simplify
+          case Some(g) => Predicate.gammaGeq(g, valToTerm(v)).simplify
           case None => Predicate.True
         }
       }
@@ -75,11 +89,11 @@ trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[Variable, Lat
  */
 class MayGammaDomain(initialState: VarGammaMap)
     extends GammaDomain(initialState)
-    with MayPredMapDomain[Variable, LatticeSet[Variable]] {
-  def joinTerm(a: LatticeSet[Variable], b: LatticeSet[Variable], pos: Block): LatticeSet[Variable] = a.union(b)
+    with MayPredMapDomain[GammaVal, LatticeSet[GammaVal]] {
+  def joinTerm(a: LatticeSet[GammaVal], b: LatticeSet[GammaVal], pos: Block): LatticeSet[GammaVal] = a.union(b)
 
-  def topTerm: LatticeSet[Variable] = LatticeSet.Top()
-  def botTerm: LatticeSet[Variable] = LatticeSet.Bottom()
+  def topTerm: LatticeSet[GammaVal] = LatticeSet.Top()
+  def botTerm: LatticeSet[GammaVal] = LatticeSet.Bottom()
 }
 
 /**
@@ -87,14 +101,14 @@ class MayGammaDomain(initialState: VarGammaMap)
  */
 class MustGammaDomain(initialState: VarGammaMap)
     extends GammaDomain(initialState)
-    with MustPredMapDomain[Variable, LatticeSet[Variable]] {
+    with MustPredMapDomain[GammaVal, LatticeSet[GammaVal]] {
   // Meeting on places we would normally join is how we get our must analysis.
-  def joinTerm(a: LatticeSet[Variable], b: LatticeSet[Variable], pos: Block): LatticeSet[Variable] = a.intersect(b)
+  def joinTerm(a: LatticeSet[GammaVal], b: LatticeSet[GammaVal], pos: Block): LatticeSet[GammaVal] = a.intersect(b)
 
-  def topTerm: LatticeSet[Variable] = LatticeSet.Bottom()
+  def topTerm: LatticeSet[GammaVal] = LatticeSet.Bottom()
   // Since bottom is set to Top, it is important to ensure that when running this analysis, the entry point
   // to the procedure you are analysing has things mostly set to Bottom. That way, Top does not propagate.
-  def botTerm: LatticeSet[Variable] = LatticeSet.Top()
+  def botTerm: LatticeSet[GammaVal] = LatticeSet.Top()
 }
 
 /**

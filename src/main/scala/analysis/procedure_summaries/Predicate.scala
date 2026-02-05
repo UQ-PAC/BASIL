@@ -100,7 +100,9 @@ enum BVTerm {
         (op, x.simplify, y.simplify) match {
           case (BVADD, x, Lit(BitVecLiteral(0, _))) => x
           case (BVADD, Lit(BitVecLiteral(0, _)), y) => y
+          case (BVSHL, x, Lit(BitVecLiteral(0, _))) => x
           case (op, Lit(a), Lit(b)) => Lit(eval.evalBVBinExpr(op, a, b))
+          case (BVADD, Bop(BVADD, x, Lit(a)), Lit(b)) => Bop(BVADD, x, Lit(eval.evalBVBinExpr(BVADD, a, b)))
           case (op, x, y) => Bop(op, x, y)
         }
       case Extract(end, start, body) => Extract(end, start, body.simplify)
@@ -180,6 +182,8 @@ enum GammaTerm {
   case Lit(x: BoolLit)
   case Var(v: Variable)
   case OldVar(v: Variable)
+  case MemReg(m: Memory)
+  case OldMemReg(m: Memory)
   case Uop(op: BoolUnOp, x: GammaTerm)
   case Join(s: Set[GammaTerm])
   // TODO FApply terms?
@@ -195,6 +199,11 @@ enum GammaTerm {
     case Lit(x) => x.toBoogie
     case Var(v) => v.toGamma
     case OldVar(v) => Old(v.toGamma)
+    case MemReg(m) =>
+      val gamma = BMapVar(s"Gamma_${m.name}", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+      val i = BVariable("i", BitVecBType(64), Scope.Local)
+      ForAll(List(i), MapAccess(gamma, i))
+    case OldMemReg(m) => Old(MemReg(m).toBoogie)
     case Uop(op, x) => UnaryBExpr(op, x.toBoogie)
     case Join(s) =>
       if s.size == 0 then TrueBLiteral
@@ -209,6 +218,8 @@ enum GammaTerm {
     case Lit(x) => x
     case Var(v) => LocalVar(s"Gamma_${v.name}", BoolType)
     case OldVar(v) => OldExpr(Var(v).toBasil)
+    case MemReg(m) => m
+    case OldMemReg(m) => OldExpr(m)
     case Uop(op, x) => UnaryExpr(op, x.toBasil)
     case Join(s) =>
       if s.size == 0 then TrueLiteral
@@ -242,6 +253,8 @@ enum GammaTerm {
     case Lit(x) => this
     case Var(v) => this
     case OldVar(v) => this
+    case MemReg(m) => this
+    case OldMemReg(m) => this
     case Uop(op, x) => Uop(op, x.replace(prev, cur))
     case Join(s) => Join(s.map(g => g.replace(prev, cur)))
   }
@@ -255,6 +268,8 @@ enum GammaTerm {
       case Lit(x) => false
       case Var(v) => false
       case OldVar(v) => false
+      case MemReg(m) => false
+      case OldMemReg(m) => false
       case Uop(op, x) => x.contains(term)
       case Join(s) => s.exists(_.contains(term))
     }
@@ -267,6 +282,8 @@ enum GammaTerm {
       case Lit(x) => true
       case Var(v) => vars.contains(v)
       case OldVar(v) => true
+      case MemReg(m) => true
+      case OldMemReg(m) => true
       case Uop(op, x) => x.containsOnly(vars)
       case Join(s) => s.forall(_.containsOnly(vars))
     }
