@@ -666,4 +666,10 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(!IntervalDSA.checksGlobalsMaintained(dsg))
   }
 
+  test("recursion with callee") {
+    val path = "src/test/correct/recursion/gcc/recursion"
+    val config = DSConfig(DSAPhase.TD, true, false, false, true)
+    val results = runTest(path, None, config)
+  }
+
 }
