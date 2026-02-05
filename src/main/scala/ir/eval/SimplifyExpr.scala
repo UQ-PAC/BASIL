@@ -1035,9 +1035,12 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
     case BinaryExpr(BVCONCAT, a, Repeat(n, b)) if a == b => logSimp(e, Repeat(n + 1, a))
     case BinaryExpr(BVCONCAT, SignExtend(n, a), b) if a == b && size(b).get == 1 => logSimp(e, SignExtend(n + 1, a))
     case BinaryExpr(BVCONCAT, a, SignExtend(n, b)) if a == b && size(b).get == 1 => logSimp(e, SignExtend(n + 1, a))
-    case Repeat(n, body) if size(body).get == 1 => SignExtend(n - 1, body)
-    case SignExtend(n, Extract(1, 0, BinaryExpr(BVLSHR, a, BitVecLiteral(m, w)))) if n == m =>
-      BinaryExpr(BVASHR, Extract(n + 1, 0, a), BitVecLiteral(m, w))
+    case Repeat(n, body) if size(body).get == 1 => logSimp(e, SignExtend(n - 1, body))
+    case SignExtend(n, Extract(1, 0, BinaryExpr(BVLSHR, a, BitVecLiteral(m, _)))) if n >= m =>
+      logSimp(
+        e,
+        SignExtend((n - m).toInt, BinaryExpr(BVASHR, Extract((m + 1).toInt, 0, a), BitVecLiteral(m, (m + 1).toInt)))
+      )
 
     case BinaryExpr(BVSHL, body, BitVecLiteral(n, _)) if size(body).get <= n =>
       logSimp(e, BitVecLiteral(0, size(body).get))
