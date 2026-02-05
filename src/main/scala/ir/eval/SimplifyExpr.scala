@@ -1029,6 +1029,15 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
     //    BinaryExpr(BVAND, e, BinaryExpr(BVCONCAT, BitVecLiteral(0, ed), BitVecLiteral(BigInt(2).pow(hi) - 1, hi)))
     //  )
 
+    // Collapses big concats of single bits (probably produced from 32 bit arithmetic right shifts).
+    case BinaryExpr(BVCONCAT, a, b) if a == b => logSimp(e, Repeat(2, a))
+    case BinaryExpr(BVCONCAT, Repeat(n, a), b) if a == b => logSimp(e, Repeat(n+1, a))
+    case BinaryExpr(BVCONCAT, a, Repeat(n, b)) if a == b => logSimp(e, Repeat(n+1, a))
+    case BinaryExpr(BVCONCAT, SignExtend(n, a), b) if a == b && size(b).get == 1 => logSimp(e, SignExtend(n+1, a))
+    case BinaryExpr(BVCONCAT, a, SignExtend(n, b)) if a == b && size(b).get == 1 => logSimp(e, SignExtend(n+1, a))
+    case Repeat(n, body) if size(body).get == 1 => SignExtend(n-1, body)
+    case SignExtend(n, Extract(1, 0, BinaryExpr(BVLSHR, a, BitVecLiteral(m, w)))) if n == m => BinaryExpr(BVASHR, Extract(n+1, 0, a), BitVecLiteral(m, w))
+
     case BinaryExpr(BVSHL, body, BitVecLiteral(n, _)) if size(body).get <= n =>
       logSimp(e, BitVecLiteral(0, size(body).get))
 
