@@ -2,10 +2,10 @@ package analysis
 
 import boogie.*
 import ir.*
+import ir.eval.BitVectorEval.nat2bv
 import ir.transforms.AbstractDomain
 import util.assertion.*
 import util.functional.sequence
-import ir.eval.BitVectorEval.nat2bv
 
 // TODO DAG predicates (don't represent the same subexpression twice)
 

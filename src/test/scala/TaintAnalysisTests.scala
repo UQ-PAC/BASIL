@@ -146,4 +146,32 @@ class TaintAnalysisTests extends AnyFunSuite, CaptureOutput {
 
     assert(varDepResults(IRWalk.lastInProc(f).get)(R0) == FiniteSet(Set(R2)))
   }
+
+  test("mem") {
+    val mem = SharedMemory("mem", 64, 8)
+
+    val program = prog(
+      proc("main", block("main", directCall("f"), goto("mainRet")), block("mainRet", ret)),
+      proc(
+        "f",
+        block("branch", MemoryStore(mem, BitVecLiteral(BigInt(5678), 64), R1, Endian.LittleEndian, 8), goto("a", "b")),
+        block("a", MemoryLoad(R0, mem, BitVecLiteral(BigInt(1234), 64), Endian.LittleEndian, 8), goto("branch")),
+        block("b", MemoryStore(mem, BitVecLiteral(BigInt(1234), 64), R1, Endian.LittleEndian, 8), goto("returnBlock")),
+        block("returnBlock", ret)
+      ),
+    )
+    convertReturns(program)
+
+    val f = program.nameToProcedure("f")
+    val fResults = getVarDepResults(program, f)
+    assert(fResults(IRWalk.lastInProc(f).get)(R0) == FiniteSet(Set(R0, R1, mem)))
+    assert(fResults(IRWalk.lastInProc(f).get)(R1) == FiniteSet(Set(R1)))
+    assert(fResults(IRWalk.lastInProc(f).get)(mem) == FiniteSet(Set(R1, mem)))
+
+    val main = program.nameToProcedure("main")
+    val mainResults = getVarDepResults(program, main)
+    assert(mainResults(IRWalk.lastInProc(main).get)(R0) == FiniteSet(Set(R0, R1, mem)))
+    assert(mainResults(IRWalk.lastInProc(main).get)(R1) == FiniteSet(Set(R1)))
+    assert(mainResults(IRWalk.lastInProc(main).get)(mem) == FiniteSet(Set(R1, mem)))
+  }
 }

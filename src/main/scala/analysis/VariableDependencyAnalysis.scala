@@ -141,10 +141,11 @@ trait ProcVariableDependencyAnalysisFunctions(
                 }
               }
             }
-            case Left(m: Memory) => summary.get(m) match {
-              case Some(FiniteSet(s)) => s.foldLeft(Map(d -> IdEdge())) { case (m, v) => m + (Left(v) -> IdEdge()) }
-              case _ => Map(d -> IdEdge())
-            }
+            case Left(m: Memory) =>
+              summary.get(m) match {
+                case Some(FiniteSet(s)) => s.foldLeft(Map(d -> IdEdge())) { case (m, v) => m + (Left(v) -> IdEdge()) }
+                case _ => Map(d -> IdEdge())
+              }
             case Right(_) =>
               val initialise = call.outParams.foldLeft(Map[DL, EdgeFunction[LatticeSet[GammaVal]]](d -> IdEdge())) {
                 case (m, (formalVar, resultVar)) => m + (Left(resultVar) -> ConstEdge(FiniteSet(Set())))
@@ -209,7 +210,12 @@ trait ProcVariableDependencyAnalysisFunctions(
             case Left(v) if v == lhs => Map()
             case Left(m) if m == mem => Map(d -> IdEdge(), Left(lhs) -> IdEdge())
             case Left(_) => Map(d -> IdEdge())
-            case Right(_) => Map(d -> IdEdge(), Left(lhs) -> ConstEdge(FiniteSet(Set(mem))), Left(mem) -> ConstEdge(FiniteSet(Set(mem))))
+            case Right(_) =>
+              Map(
+                d -> IdEdge(),
+                Left(lhs) -> ConstEdge(FiniteSet(Set(mem))),
+                Left(mem) -> ConstEdge(FiniteSet(Set(mem)))
+              )
           }
         case IndirectCall(_, _) =>
           d match {
