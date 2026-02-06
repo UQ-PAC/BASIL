@@ -10,6 +10,7 @@ import scala.jdk.CollectionConverters.*
  */
 class ExprBNFCVisitor[A](val decls: Declarations)
     extends syntax.Expr.Visitor[ir.Expr, A]
+    with syntax.Var.Visitor[ir.Variable, A]
     with syntax.LocalVar.Visitor[ir.LocalVar, A]
     with syntax.GlobalVar.Visitor[ir.GlobalVar, A]
     with syntax.LambdaDef.Visitor[ir.LambdaExpr, A]
@@ -46,6 +47,10 @@ class ExprBNFCVisitor[A](val decls: Declarations)
     val args = x.listexpr_.asScala.toSeq.map(_.accept(this, arg))
     ir.FApplyExpr(n, args, rt)
   }
+
+  def visit(x: syntax.VarLocalVar, arg: A) = x.localvar_.accept(this, arg)
+  def visit(x: syntax.VarGlobalVar, arg: A) = x.globalvar_.accept(this, arg)
+
   override def visit(x: syntax.LocalVar1, arg: A) = {
     val ty = x.type_.accept(this, arg)
     ir.LocalVar.ofIndexed(unsigilLocal(x.localident_), ty)
@@ -76,6 +81,9 @@ class ExprBNFCVisitor[A](val decls: Declarations)
   override def visit(x: syntax.Expr_Extract, arg: A) =
     ir.Extract(x.intval_1.accept(this, arg).toInt, x.intval_2.accept(this, arg).toInt, x.expr_.accept(this, arg))
   override def visit(x: syntax.Expr_Concat, arg: A) =
-    ir.BinaryExpr(ir.BVCONCAT, x.expr_1.accept(this, arg), x.expr_2.accept(this, arg))
+    exprs(x.listexpr_, arg).reduce(ir.BinaryExpr(ir.BVCONCAT, _, _))
+
+  override def visit(x: syntax.Expr_Assoc, arg: A) =
+    ir.AssocExpr(x.boolbinop_.accept(this, arg), x.listexpr_.asScala.map(_.accept(this, arg)).toList)
 
 }

@@ -26,8 +26,13 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
     with syntax.Jump.Visitor[ir.dsl.EventuallyJump, A]
     with syntax.JumpWithAttrib.Visitor[ir.dsl.EventuallyJump, A]
     with syntax.Assignment.Visitor[(ir.Variable, ir.Expr), A]
-    with syntax.LVars.Visitor[List[ir.Variable], A]
+    with syntax.CallParams.Visitor[List[ir.Expr], (A, List[String])]
+    with syntax.LVars.Visitor[List[ir.Variable], (A, List[String])]
     with syntax.LVar.Visitor[ir.Variable, A]
+    with syntax.NamedCallReturn.Visitor[(ir.Variable, String), A]
+    with syntax.NamedCallArg.Visitor[(String, ir.Expr), A]
+    with syntax.PhiAssign.Visitor[(ir.Variable, List[(String, ir.Variable)]), A]
+    with syntax.PhiExpr.Visitor[(String, ir.Variable), A]
     with AttributeListBNFCVisitor[A] {
 
   val procSpec = decls.procSpecs(procName)
@@ -40,7 +45,7 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
     x.asScala.map(_.accept(this, arg)).toList
 
   // Members declared in Block.Visitor
-  override def visit(x: syntax.Block1, arg: A): ir.dsl.EventuallyBlock =
+  override def visit(x: syntax.Block_NoPhi, arg: A): ir.dsl.EventuallyBlock =
     val ss = stmts(x.liststmtwithattrib_, arg)
     val jump = x.jumpwithattrib_.accept(this, arg)
     val body = ss :+ jump
@@ -51,6 +56,25 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
     val meta = ir.Metadata(originalLabel = origLbl, address = addr)
 
     ir.dsl.block(unsigilBlock(x.blockident_), body: _*).copy(meta = meta)
+
+  override def visit(x: syntax.Block_Phi, arg: A): ir.dsl.EventuallyBlock =
+    val block = new syntax.Block_NoPhi(
+      x.blockident_,
+      x.attribset_,
+      x.beginlist_,
+      x.liststmtwithattrib_,
+      x.jumpwithattrib_,
+      x.endlist_
+    ).accept(this, arg)
+    val phiAssigns = x.listphiassign_.asScala.map(_.accept(this, arg))
+    block.copy(phiAssigns = phiAssigns.toMap)
+
+  // Members declared in PhiAssign.Visitor
+  def visit(x: basil_ir.Absyn.PhiAssign1, arg: A) =
+    (x.lvar_.accept(this, arg), x.listphiexpr_.asScala.map(_.accept(this, arg)).toList)
+
+  // Members declared in PhiExpr.Visitor
+  def visit(x: syntax.PhiExpr1, arg: A) = (unsigilBlock(x.blockident_), x.var_.accept(this, arg))
 
   private def stmtAttrs(x: syntax.AttribSet, arg: A) =
     val attrs = x.accept(this, arg)
@@ -79,6 +103,9 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
   override def visit(x: syntax.Assignment1, arg: A): (ir.Variable, ir.Expr) =
     ((x.lvar_.accept(this, arg)), x.expr_.accept(this, arg))
 
+  override def visit(x: syntax.Stmt_Nop, arg: A) =
+    ir.NOP()
+
   override def visit(x: syntax.Stmt_SingleAssign, arg: A) =
     val assign = x.assignment_.accept(this, arg)
     ir.LocalAssign(assign._1, assign._2)
@@ -87,7 +114,23 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
     val assigns = x.listassignment_.asScala.map(_.accept(this, arg))
     ir.SimulAssign(assigns.to(Vector))
 
-  override def visit(x: syntax.Stmt_Load, arg: A) = ir.MemoryLoad(
+  override def visit(x: syntax.Stmt_Load_Var, arg: A) = ir.MemoryLoad(
+    x.lvar_.accept(this, arg),
+    decls.memories(x.var_.accept(this, arg).name),
+    x.expr_.accept(this, arg),
+    x.endian_.accept(this, arg),
+    x.intval_.accept(this, arg).toInt
+  )
+
+  override def visit(x: syntax.Stmt_Store_Var, arg: A) = ir.MemoryStore(
+    decls.memories(x.var_.accept(this, arg).name),
+    x.expr_1.accept(this, arg),
+    x.expr_2.accept(this, arg),
+    x.endian_.accept(this, arg),
+    x.intval_.accept(this, arg).toInt
+  )
+
+  override def visit(x: syntax.Stmt_Load_Deprecated, arg: A) = ir.MemoryLoad(
     x.lvar_.accept(this, arg),
     decls.memories(unsigilGlobal(x.globalident_)),
     x.expr_.accept(this, arg),
@@ -95,7 +138,7 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
     x.intval_.accept(this, arg).toInt
   )
 
-  override def visit(x: syntax.Stmt_Store, arg: A) = ir.MemoryStore(
+  override def visit(x: syntax.Stmt_Store_Deprecated, arg: A) = ir.MemoryStore(
     decls.memories(unsigilGlobal(x.globalident_)),
     x.expr_1.accept(this, arg),
     x.expr_2.accept(this, arg),
@@ -103,14 +146,45 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
     x.intval_.accept(this, arg).toInt
   )
 
-  override def visit(x: syntax.Stmt_DirectCall, arg: A) =
-    val outs = x.lvars_.accept(this, arg)
-    val ins = exprs(x.listexpr_, arg)
+  def associateNamedBindings[K: Ordering, V](
+    formalOrder: List[K],
+    bindings: Iterable[(K, V)],
+    context: Option[String]
+  ) =
+    val mentionedNames = bindings.map(_._1).toList
 
+    if (formalOrder.sorted != mentionedNames.sorted) {
+      val missing = formalOrder diff mentionedNames
+      val extra = mentionedNames diff formalOrder
+      val contextStr = context.map(" " + _)
+      throw Exception(s"specified names do not match$contextStr. missing: $missing. extra: $extra")
+    }
+
+    val namedMap = bindings.toMap
+    formalOrder.map(namedMap.apply)
+
+  override def visit(x: syntax.NamedCallArg1, arg: A) =
+    (x.localident_, x.expr_.accept(this, arg))
+
+  override def visit(x: syntax.CallParams_Named, arg: (A, List[String])) =
+    val formalNames = arg._2
+    associateNamedBindings(
+      formalNames,
+      x.listnamedcallarg_.asScala.map(_.accept(this, arg._1)),
+      Some("function's declared parameter list")
+    )
+
+  override def visit(x: syntax.CallParams_Exprs, arg: (A, List[String])) =
+    exprs(x.listexpr_, arg._1)
+
+  override def visit(x: syntax.Stmt_DirectCall, arg: A) =
     val callName = unsigilProc(x.procident_)
 
     val formalIns = decls.formalIns(callName)
     val formalOuts = decls.formalOuts(callName)
+
+    val outs = x.lvars_.accept(this, (arg, formalOuts.map(_._1).toList))
+    val ins = x.callparams_.accept(this, (arg, formalIns.map(_._1).toList))
 
     ir.dsl.directCall(formalOuts.keys.zip(outs), unsigilProc(x.procident_), formalIns.keys.zip(ins))
 
@@ -139,16 +213,31 @@ class BlockBNFCVisitor[A](val procName: String, private val _decls: Declarations
   override def visit(x: syntax.Jump_Return, arg: A) =
     val es = exprs(x.listexpr_, arg)
     ir.dsl.ret(formalOuts.keys.zip(es).toList: _*)
+  override def visit(x: syntax.Jump_ProcReturn, arg: A) = ir.dsl.ret
 
   // Members declared in LVar.Visitor
   override def visit(x: syntax.LVar_Local, arg: A) = x.localvar_.accept(this, arg)
   override def visit(x: syntax.LVar_Global, arg: A) = x.globalvar_.accept(this, arg)
 
+  // Members declared in NamedCallReturn.Visitor
+  override def visit(x: syntax.NamedCallReturn1, arg: A) =
+    (x.lvar_.accept(this, arg), x.localident_)
+
   // Members declared in CallLVars.Visitor
-  override def visit(x: syntax.LVars_Empty, arg: A): Nil.type = Nil
-  override def visit(x: syntax.LVars_LocalList, arg: A) =
-    x.listlocalvar_.asScala.toList.map(_.accept(this, arg))
-  override def visit(x: syntax.LVars_List, arg: A) =
-    x.listlvar_.asScala.toList.map(_.accept(this, arg))
+  override def visit(x: syntax.LVars_Empty, arg: (A, List[String])): Nil.type = Nil
+
+  // unnamed list forms are *assumed* to be in out-param decl order
+  override def visit(x: syntax.LVars_LocalList, arg: (A, List[String])) =
+    x.listlocalvar_.asScala.toList.map(_.accept(this, arg._1))
+  override def visit(x: syntax.LVars_List, arg: (A, List[String])) =
+    x.listlvar_.asScala.toList.map(_.accept(this, arg._1))
+
+  override def visit(x: syntax.LVars_NamedList, arg: (A, List[String])) =
+    val formalNames = arg._2
+    associateNamedBindings(
+      formalNames,
+      x.listnamedcallreturn_.asScala.map(_.accept(this, arg._1).swap),
+      Some("function's declared out variables")
+    )
 
 }
