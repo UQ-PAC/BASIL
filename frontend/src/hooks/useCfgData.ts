@@ -8,8 +8,8 @@ import {
 } from '@xyflow/react';
 import {
   getLayoutedElementsFromJSON,
-  type GraphJSON,
 } from '../utils/graphLayout.ts';
+import { extractProcedureGraph } from '../utils/graphUtils.ts';
 import { fetchGraphJson } from '../api/viewer.ts';
 import { compareAndColourElements } from '../utils/cfgColouring.ts';
 import { type CustomNodeData } from '../components/viewers/graph/CustomNode.tsx';
@@ -60,32 +60,6 @@ export function useCfgData(
       setGraphRenderKey((prev) => prev + 1);
       return;
     }
-
-    const extractProcedureGraph = (
-      // TODO: Duplicated in useCfgData.ts
-      graphs: Record<string, GraphJSON> | undefined,
-      procedureName: string
-    ): GraphJSON => {
-      if (!graphs) return { nodes: [], edges: [] };
-
-      const lowerProcedure = procedureName.toLowerCase();
-      const matchingKey = Object.keys(graphs).find((key) =>
-        key.toLowerCase().includes(lowerProcedure)
-      );
-
-      if (!matchingKey) return { nodes: [], edges: [] };
-
-      const procGraph = graphs[matchingKey];
-
-      // Flatten in case of nested graphs (optional)
-      const nodes: GraphJSON['nodes'] = [];
-      const edges: GraphJSON['edges'] = [];
-
-      if (procGraph?.nodes) nodes.push(...procGraph.nodes);
-      if (procGraph?.edges) edges.push(...procGraph.edges);
-
-      return { nodes, edges };
-    };
 
     const fetchAndRenderCfgs = async () => {
       setIsLoadingGraphs(true);
