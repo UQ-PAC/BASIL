@@ -17,31 +17,10 @@ import type { Node, Edge, FitViewOptions } from '@xyflow/react';
 import CustomNode from './CustomNode.tsx';
 import { type CustomNodeData } from './CustomNode.tsx';
 import CustomBackground from './CustomBackground.tsx';
-import {
-  getLayoutedElementsFromJSON,
-  type GraphJSON,
-} from '../../../utils/graphLayout.ts';
+import { applyLayout } from '../../../utils/graphLayout.ts';
 
 import ExpandIcon from '../../../assets/expand-icon.svg';
 import CollapseIcon from '../../../assets/collapse-icon.svg';
-
-async function applyLayout(nodes: Node<CustomNodeData>[], edges: Edge[]) {
-  const graph: GraphJSON = {
-    nodes: nodes.map((n) => ({
-      id: n.id,
-      label: n.data.fullContent,
-      shape: n.type,
-      nodeBackgroundColor: n.data.nodeBackgroundColor as string | undefined,
-    })),
-    edges: edges.map((e) => ({
-      source: e.source,
-      target: e.target,
-      label: e.label as string | undefined,
-    })),
-  };
-
-  return getLayoutedElementsFromJSON(graph);
-}
 
 interface GraphPanelProps {
   nodes: Node<CustomNodeData>[];
@@ -121,12 +100,10 @@ const GraphPanel: React.FC<GraphPanelProps> = ({
 
   const handleExpandAllToggle = useCallback(async () => {
     const newExpandedState = !allNodesExpanded;
+
     const updatedNodes = nodes.map((node) => ({
       ...node,
-      data: {
-        ...node.data,
-        isExpanded: newExpandedState,
-      },
+      data: { ...node.data, isExpanded: newExpandedState },
     }));
 
     setNodes(updatedNodes);
@@ -134,8 +111,12 @@ const GraphPanel: React.FC<GraphPanelProps> = ({
 
     requestAnimationFrame(async () => {
       console.log(`Running relayout for "${title}"...`);
-      const layoutedNodes = await applyLayout(updatedNodes, edges);
-      setNodes(layoutedNodes);
+      const layoutedGraph = await applyLayout(
+        updatedNodes,
+        edges,
+        newExpandedState
+      );
+      setNodes(layoutedGraph.nodes);
       await fitView(fitViewOptions);
       console.log(`Relayout and fitView complete for "${title}".`);
     });
