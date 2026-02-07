@@ -1,0 +1,109 @@
+// src/components/CustomNode.tsx
+import React, { memo, useEffect, useRef } from 'react';
+import {
+  Handle,
+  Position,
+  useUpdateNodeInternals,
+  type Node,
+  type NodeProps,
+} from '@xyflow/react';
+
+import '../../../styles/components/viewers/graph/custom-node.css';
+
+declare const Prism: any;
+
+export interface CustomNodeData {
+  header: string;
+  fullContent: string;
+  headerWidth: number;
+  headerHeight: number;
+  fullContentWidth: number;
+  fullContentHeight: number;
+  nodeBorderColour?: string;
+  isExpanded: boolean;
+  [key: string]: unknown; // Index signature to satisfy Record<string, unknown> constraint
+}
+
+type MyNodeType = Node<CustomNodeData>;
+
+const CustomNode: React.FC<NodeProps<MyNodeType>> = memo(
+  ({ id, data, selected }) => {
+    const updateNodeInternals = useUpdateNodeInternals();
+    const contentRef = useRef<HTMLDivElement>(null);
+    let isExpanded = data.isExpanded;
+
+    useEffect(() => {
+      updateNodeInternals(id);
+    }, [isExpanded, id, updateNodeInternals]);
+
+    useEffect(() => {
+      if (!contentRef.current) return;
+
+      contentRef.current.textContent = isExpanded
+        ? data.fullContent
+        : data.header;
+
+      if (
+        isExpanded &&
+        data.fullContent &&
+        typeof Prism !== 'undefined' &&
+        Prism.languages &&
+        Prism.languages.ir
+      ) {
+        try {
+          requestAnimationFrame(() => {
+            const highlightedHtml = Prism.highlight(
+              data.fullContent,
+              Prism.languages.ir,
+              'ir'
+            );
+            contentRef.current!.innerHTML = highlightedHtml;
+          });
+        } catch (e) {
+          console.error('Prism.highlight failed in CustomNode: ', e);
+          contentRef.current.textContent = data.fullContent;
+        }
+      }
+    }, [isExpanded, data.fullContent, data.header]);
+
+    const currentWidth = isExpanded ? data.fullContentWidth : data.headerWidth;
+    const currentHeight = isExpanded
+      ? data.fullContentHeight
+      : data.headerHeight;
+
+    const nodeStyle: React.CSSProperties = {
+      width: currentWidth,
+      height: currentHeight,
+      border: `3px solid ${data.nodeBorderColour || '#777'}`,
+      backgroundColor: selected ? '#fbfbfb' : '#FFF',
+      boxShadow: selected
+        ? '0 0 0 3px rgba(0, 123, 255, 0.4)'
+        : '0 2px 5px rgba(0,0,0,0.1)',
+      whiteSpace: isExpanded ? 'pre-wrap' : 'nowrap',
+      overflow: isExpanded ? 'auto' : 'hidden',
+      textOverflow: isExpanded ? 'clip' : 'ellipsis',
+    };
+
+    const textDivStyle: React.CSSProperties = {
+      textAlign: isExpanded ? 'left' : 'center',
+    };
+
+    return (
+      <div className="custom-flow-node" style={nodeStyle}>
+        <Handle type="target" position={Position.Top} />
+        <div
+          className="custom-node-header-text"
+          ref={contentRef}
+          style={textDivStyle}
+        >
+          {data.header}
+        </div>
+        <Handle type="source" position={Position.Bottom} />
+      </div>
+    );
+  }
+);
+
+CustomNode.displayName = 'CustomNode';
+
+export default CustomNode;

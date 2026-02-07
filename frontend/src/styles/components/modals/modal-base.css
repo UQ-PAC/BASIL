@@ -1,0 +1,218 @@
+/* src/styles/modal-base.css */
+
+/* --- BASE STYLES FOR ALL MODALS --- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border-bottom: 1px solid var(--modal-border-color);
+  background-color: var(--modal-header-background-color);
+}
+
+.modal-content-base {
+  position: relative;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  border-radius: 0.75rem;
+  box-shadow: 2px 3px 25px -5px var(--modal-border-color);
+  width: 90%;
+  max-width: 1000px;
+  min-height: 100px;
+  margin-left: auto;
+  margin-right: auto;
+  animation: scaleIn 0.25s ease-in-out;
+}
+
+.modal-body {
+  padding: 10px;
+  text-align: center;
+  border-bottom-left-radius: 0.75rem;
+  border-bottom-right-radius: 0.75rem;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.spinner-icon {
+  width: 3rem;
+  height: 3rem;
+  margin: 1rem auto 0;
+  animation: spin 1s linear infinite;
+  display: block;
+  fill: var(--spinner-icon);
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.selection-text {
+  margin-right: 5px;
+  color: var(--text-color);
+
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+/* Status messages (used by both loading and error modals) */
+.status-message {
+  margin: 1rem auto 0;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  max-width: 80%;
+  overflow-wrap: break-word;
+}
+
+.status-info {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.status-error {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.status-loading {
+  background-color: #e0e7ff;
+  color: #3730a3;
+}
+
+.status-warning {
+  background-color: #e6d495;
+  color: #806f11;
+}
+
+.modal-title {
+  font-size: 1.25em;
+  font-weight: bold;
+  margin: 0;
+  color: var(--text-color);
+  padding: 15px;
+}
+
+.selection-options {
+  padding: 20px 10px 20px 10px;
+}
+
+.modal-close-button {
+  background-color: transparent;
+  border: none;
+  font-size: 25px;
+  cursor: pointer;
+  color: var(--modal-close-button);
+}
+
+.modal-close-button:hover {
+  color: #777;
+}
+
+.error-message-body {
+  padding: 10px 20px 20px 20px;
+  text-align: left;
+  color: var(--error-text-color, #991b1b); /* Default as error colour (red) */
+}
+
+.error-message-body p {
+  margin-bottom: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.error-message-body .warning-text {
+  color: #ffc107; /* Yellow colour for warnings */
+}
+
+/* Config Modal */
+.directory-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem; /* space-y-4 */
+}
+
+.directory-label-icon-group {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.directory-input-label {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--modal-input-label-color);
+  margin-right: 0.25rem;
+}
+
+.directory-input-field {
+  width: 99%;
+  border: 1px solid #a5b4fc;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-family: monospace;
+  resize: none;
+  color: var(--text-color);
+  background-color: var(--modal-input-background-color);
+}
+
+.directory-input-field:focus {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px #6366f1;
+}
+
+.action-buttons-group {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.submit-button {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #ffffff;
+  background-color: #4f46e5;
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+}
+
+.submit-button:hover {
+  background-color: #4338ca;
+}

@@ -1,0 +1,162 @@
+:root {
+  /* Main display */
+  --background-color: #ffffff;
+  --text-color: #1f2937;
+
+  /* Modal styles */
+  --modal-header-background-color: #f5f5f5;
+  --border-color: #ccc;
+
+  --primary-action-text-colour: #007bff;
+  --primary-action-text-background-colour: #0056b3;
+}
+
+[data-theme='dark'] {
+  /* Main display */
+  --background-color: #1f2937;
+  --text-color: #f3f4f6;
+  --error-text-color: #fa5454;
+
+  /* Modal styles */
+  --modal-header-background-color: #313d53;
+  --modal-border-color: #777;
+  --modal-close-button: #b8b8b8;
+  --spinner-icon: #fff;
+  --modal-input-label-color: #a5b4fc;
+  --modal-input-background-color: #374151;
+  --modal-input-border-color: #4f46e5;
+
+  /* Sidebar styles */
+  --sidebar-header-color: #f0f0f0;
+  --sidebar-background-color: #313d53;
+  --sidebar-epoch-button-background-color: #0d2e5c;
+  --sidebar-epoch-button-border-color: #010b23;
+  --sidebar-epoch-button-text-color: #fff;
+  --sidebar-config-button-background-color: #000000;
+  --sidebar-config-button-background-hover-color: #222;
+  --sidebar-config-button-border-color: #0030d1;
+  --sidebar-dataset-label-color: #ffffff;
+
+  /* Header styles */
+  --header-settings-icon-color: #919daa;
+  --header-settings-icon-color-hover: #b3bad5;
+
+  /* DropDown styles */
+  --dropdown-background-color-hover: #3c3c3c;
+
+  /* CFG styles */
+  --cfg-header-background--color: #161b22;
+  --cfg-header-border-color: #444;
+  --cfg-header-text-color: #444;
+  --cfg-graph-border-color: #444;
+  --cfg-graph-background-color: #1e293b;
+  --cfg-graph-shadow-color: rgba(0, 0, 0, 0.3);
+  --cfg-graph-header-background: #313d53;
+  --cfg-graph-header-border: #444;
+  --cfg-graph-header-text: #f3f4f6;
+  --cfg-node-background-color: #000;
+  --cfg-node-text-color: #fff;
+  --cfg-button-hover-color: #333;
+
+  /* Combined Viewer */
+  --combined--header-background-color: #161b22;
+  --combined-border-background-color: #444;
+  --combined-ir-code-panel-background-color: #000;
+  --combined-ir-code-panel-border-color: #555;
+
+  /* Code Colour Scheme */
+  --token-keyword-color: #569cd6;
+  --token-variable-color: #9cdcfe;
+  --token-label-color: #ffcc66;
+  --token-function-color: #dcdcaa;
+  --token-type-color: #4ec9b0;
+  --token-number-color: #b5cea8;
+  --token-comment-color: #6a9955;
+  --token-string-color: #5de45d;
+  --token-operator-color: #b8b8b8;
+  --token-punctuation-color: #808080;
+  --token-property-color: #ce9178;
+}
+
+[data-theme='light'] {
+  /* Main display */
+  --background-color: #ffffff;
+  --text-color: #1f2937;
+  --error-text-color: #952222;
+
+  /* Modal styles */
+  --modal-header-background-color: #f5f5f5;
+  --modal-border-color: #888888;
+  --modal-close-button: #040404;
+  --spinner-icon: #000;
+  --modal-input-label-color: #4338ca;
+  --modal-input-background-color: #efefef;
+  --modal-input-border-color: #a5b4fc;
+
+  /* Sidebar styles */
+  --sidebar-header-color: #333;
+  --sidebar-background-color: #f0f0f0;
+  --sidebar-epoch-button-background-color: #9bb8e1;
+  --sidebar-epoch-button-border-color: #ccc;
+  --sidebar-epoch-button-text-color: #000;
+  --sidebar-config-button-background-color: #fff;
+  --sidebar-config-button-border-color: #d1d5db;
+  --sidebar-dataset-label-color: #4b5563;
+  --sidebar-config-button-background-hover-color: #ddd;
+
+  /* Header styles */
+  --header-settings-icon-color: #6a737d;
+  --header-settings-icon-color-hover: #3d4c6a;
+
+  /* DropDown styles */
+  --dropdown-background-color-hover: #bfbfbf;
+
+  /* CFG styles */
+  --cfg-header-background--color: #e0e0e0;
+  --cfg-header-border-color: #000;
+  --cfg-header-text-color: #000;
+  --cfg-graph-border-color: #ddd;
+  --cfg-graph-background-color: #f9f9f9;
+  --cfg-graph-shadow-color: rgba(0, 0, 0, 0.1);
+  --cfg-graph-header-background: #e0e0e0;
+  --cfg-graph-header-border: #ccc;
+  --cfg-graph-header-text: #333;
+  --cfg-node-background-color: #fff;
+  --cfg-node-text-color: #000;
+  --cfg-button-hover-color: #f0f0f0;
+
+  /* Combined Viewer */
+  --combined--header-background-color: #e0e0e0;
+  --combined-border-background-color: #000;
+  --combined-ir-code-panel-background-color: #fff;
+  --combined-ir-code-panel-border-color: #ddd;
+
+  /* Code Color Scheme */
+  --token-keyword-color: #005250;
+  --token-variable-color: #b32b00;
+  --token-label-color: #5c5300;
+  --token-function-color: #7b3fb3;
+  --token-type-color: #0073a2;
+  --token-number-color: #00213d;
+  --token-comment-color: #505050;
+  --token-string-color: #006400;
+  --token-operator-color: #d22f6f;
+  --token-punctuation-color: #353535;
+  --token-property-color: #a0674c;
+}
+
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+
+.main-layout {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  width: 100vw;
+  box-sizing: border-box;
+}
