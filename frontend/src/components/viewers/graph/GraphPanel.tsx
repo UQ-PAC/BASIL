@@ -17,10 +17,31 @@ import type { Node, Edge, FitViewOptions } from '@xyflow/react';
 import CustomNode from './CustomNode.tsx';
 import { type CustomNodeData } from './CustomNode.tsx';
 import CustomBackground from './CustomBackground.tsx';
-import { applyLayout } from '../../../utils/graphLayout.ts';
+import {
+  getLayoutedElementsFromJSON,
+  type GraphJSON,
+} from '../../../utils/graphLayout.ts';
 
 import ExpandIcon from '../../../assets/expand-icon.svg';
 import CollapseIcon from '../../../assets/collapse-icon.svg';
+
+async function applyLayout(nodes: Node<CustomNodeData>[], edges: Edge[]) {
+  const graph: GraphJSON = {
+    nodes: nodes.map((n) => ({
+      id: n.id,
+      label: n.data.fullContent,
+      shape: n.type,
+      nodeBackgroundColor: n.data.nodeBackgroundColor as string | undefined,
+    })),
+    edges: edges.map((e) => ({
+      source: e.source,
+      target: e.target,
+      label: e.label as string | undefined,
+    })),
+  };
+
+  return getLayoutedElementsFromJSON(graph);
+}
 
 interface GraphPanelProps {
   nodes: Node<CustomNodeData>[];

@@ -33,8 +33,6 @@ object IREpochStore {
     Ref.of[IO, List[IREpoch]](List.empty).map(new IREpochStore(_))
 }
 
-case class ProcedureTextLocation(name: String, startLine: Int)
-
 object AfterTransformFormatter {
 
   def formatAfterTransform(afterTransform: Any): String = {

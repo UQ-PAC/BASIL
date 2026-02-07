@@ -6,7 +6,7 @@ import cats.effect.std.Semaphore
 import cats.implicits.*
 import io.circe.generic.auto.*
 import io.circe.syntax.*
-import ir.{Program, dotBlockGraph}
+import ir.{Program, GoTo, Unreachable, Return}
 import org.http4s.*
 import org.http4s.circe.*
 import org.http4s.dsl.io.*
@@ -17,8 +17,6 @@ import java.lang
 import java.util.regex.Pattern
 
 case class ConfigSelection(adt: String, relf: Option[String])
-case class AnalysisStatus(status: String)
-case class DirectorySelection(directoryPath: String)
 
 implicit val selectionDecoder: EntityDecoder[IO, ConfigSelection] = jsonOf[IO, ConfigSelection]
 implicit val statusEncoder: EntityEncoder[IO, AnalysisStatus] = jsonEncoderOf[AnalysisStatus]
@@ -287,31 +285,29 @@ class IrServiceRoutes(
    * @return A JSON object where keys are procedure names and values are their corresponding DOT graph strings.
    * @throws NotFound if the specified `epochName` does not exist or its "before" CFG is not available.
    */
-  private val getBeforeCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "cfg" / epochName / "before" =>
-    ensureReady {
-      logger.info(s"Received GET /cfg/$epochName/before request.") *>
-        epochStore
-          .getEpoch(epochName)
-          .flatMap {
-            case Some(epoch) =>
-              logger.info(s"Attempting to generate 'before' CFG dot graph for epoch: $epochName.") *>
-                IO.delay(generateDotGraphs(epoch.beforeTransform)).flatMap { dotGraph =>
-                  logger.info(
-                    s"Successfully generated 'before' CFG dot graph for epoch '$epochName'. Responding with JSON."
-                  ) *>
-                    Ok(dotGraph.asJson)
-                }
-            case None =>
-              logger.warn(s"Epoch '$epochName' not found in store for 'before' CFG request. Sending 404.") *>
-                NotFound(s"Epoch '$epochName' not found or before CFG not available.")
-          }
-          .handleErrorWith { e =>
-            logger.error(e)(
-              s"An error occurred while processing GET /cfg/$epochName/before request: ${e.getMessage}"
-            ) *>
-              InternalServerError("An internal server error occurred during CFG generation.")
-          }
-    }
+  private val getBeforeCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
+    case GET -> Root / "cfg" / epochName / "before" => // TODO: Move all of the case ... down a line
+      ensureReady {
+        logger.info(s"Received GET /cfg/$epochName/before request.") *>
+          epochStore
+            .getEpoch(epochName)
+            .flatMap {
+              case Some(epoch) =>
+                logger.info(s"Generating 'before' CFG models for epoch: $epochName.") *>
+                  IO.blocking(generateProcedureGraphs(epoch.beforeTransform)).flatMap { graphs =>
+                    logger.info(s"Successfully generated ${graphs.size} 'before' procedure graphs. Responding with JSON.") *>
+                      Ok(graphs.asJson)
+                  }
+
+              case None =>
+                logger.warn(s"Epoch '$epochName' not found for 'before' CFG request.") *>
+                  NotFound(AnalysisStatus(s"Epoch '$epochName' not found").asJson)
+            }
+            .handleErrorWith { e =>
+              logger.error(e)(s"Error processing 'before' CFG request: ${e.getMessage}") *>
+                InternalServerError(AnalysisStatus("Internal server error during CFG generation").asJson)
+            }
+      }
   }
 
   /**
@@ -324,29 +320,30 @@ class IrServiceRoutes(
    * @return A JSON object where keys are procedure names and values are their corresponding DOT graph strings.
    * @throws NotFound if the specified `epochName` does not exist or its "after" CFG is not available.
    */
-  private val getAfterCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "cfg" / epochName / "after" =>
-    ensureReady {
-      logger.info(s"Received GET /cfg/$epochName/after request.") *>
-        epochStore
-          .getEpoch(epochName)
-          .flatMap {
-            case Some(epoch) =>
-              logger.info(s"Attempting to generate 'after' CFG dot graph for epoch: $epochName.") *>
-                IO.delay(generateDotGraphs(epoch.afterTransform)).flatMap { dotGraph =>
-                  logger.info(
-                    s"Successfully generated 'after' CFG dot graph for epoch '$epochName'. Responding with JSON."
-                  ) *>
-                    Ok(dotGraph.asJson)
-                }
-            case None =>
-              logger.warn(s"Epoch '$epochName' not found in store for 'after' CFG request. Sending 404.") *>
-                NotFound(s"Epoch '$epochName' not found or after CFG not available.")
-          }
-          .handleErrorWith { e =>
-            logger.error(e)(s"An error occurred while processing GET /cfg/$epochName/after request: ${e.getMessage}") *>
-              InternalServerError("An internal server error occurred during CFG generation.")
-          }
-    }
+  private val getAfterCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
+    case GET -> Root / "cfg" / epochName / "after" =>
+      ensureReady {
+        logger.info(s"Received GET /cfg/$epochName/after request.") *>
+          epochStore
+            .getEpoch(epochName)
+            .flatMap {
+              case Some(epoch) =>
+                logger.info(s"Generating 'after' CFG models for epoch: $epochName.") *>
+                  // Use evalOn with a blocking pool if generateProcedureGraphs is CPU intensive
+                  IO.blocking(generateProcedureGraphs(epoch.afterTransform)).flatMap { graphs =>
+                    logger.info(s"Successfully generated ${graphs.size} procedure graphs. Responding with JSON.") *>
+                      Ok(graphs.asJson)
+                  }
+
+              case None =>
+                logger.warn(s"Epoch '$epochName' not found for 'after' CFG request.") *>
+                  NotFound(AnalysisStatus(s"Epoch '$epochName' not found").asJson)
+            }
+            .handleErrorWith { e =>
+              logger.error(e)(s"Error processing CFG request: ${e.getMessage}") *>
+                InternalServerError(AnalysisStatus("Internal server error during CFG generation").asJson)
+            }
+      }
   }
 
   /**
@@ -445,20 +442,31 @@ class IrServiceRoutes(
       .getOrElse(NotFound(s"Procedure '$procedureName' not found."))
   }
 
-  private def generateDotGraphs(program: Program): Map[String, String] = {
+  private def generateProcedureGraphs(program: Program): Map[String, ProcedureGraph] = {
     program.procedures.map { proc =>
-      val originalDotOutput = dotBlockGraph(proc)
-      val cleanedDotOutput = removeGraphAttributesBlock(originalDotOutput)
-      proc.procName -> cleanedDotOutput
+      val nodes = proc.blocks.map { block =>
+        val content = PrettyPrinter.pp_block(block)
+        NodeData(id = block.label, label = content)
+      }.toList
+
+      val edges = proc.blocks.flatMap { block =>
+        block.jump match {
+          case g: GoTo =>
+            g.targets.zipWithIndex.map { (target, idx) =>
+              EdgeData(
+                id = s"e-${block.label}-${target.label}-$idx",
+                source = block.label,
+                target = target.label,
+              )
+            }
+
+          case _: Return => Nil
+          case _: Unreachable => Nil
+          case _ => Nil
+        }
+      }.toList
+
+      proc.procName -> ProcedureGraph(nodes, edges)
     }.toMap
-  }
-
-  private def removeGraphAttributesBlock(dotString: String): String = {
-    // Removes the global 'graph' attribute block from the DOT string.
-    val graphAttributeBlockPattern = Pattern.compile("""^graph.*;$""", Pattern.CASE_INSENSITIVE | Pattern.MULTILINE)
-
-    val cleanedString = graphAttributeBlockPattern.matcher(dotString).replaceAll("")
-
-    cleanedString.trim
   }
 }

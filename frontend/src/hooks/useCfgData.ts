@@ -6,8 +6,11 @@ import {
   useNodesState,
   useEdgesState,
 } from '@xyflow/react';
-import { getLayoutedElements } from '../utils/graphLayout.ts';
-import { fetchDotString } from '../api/viewer.ts';
+import {
+  getLayoutedElementsFromJSON,
+  type GraphJSON,
+} from '../utils/graphLayout.ts';
+import { fetchGraphJson } from '../api/viewer.ts';
 import { compareAndColourElements } from '../utils/cfgColouring.ts';
 import { type CustomNodeData } from '../components/viewers/graph/CustomNode.tsx';
 
@@ -58,27 +61,44 @@ export function useCfgData(
       return;
     }
 
+    const extractProcedureGraph = (
+      // TODO: Duplicated in useCfgData.ts
+      graphs: Record<string, GraphJSON> | undefined,
+      procedureName: string
+    ): GraphJSON => {
+      if (!graphs) return { nodes: [], edges: [] };
+
+      const lowerProcedure = procedureName.toLowerCase();
+      const matchingKey = Object.keys(graphs).find((key) =>
+        key.toLowerCase().includes(lowerProcedure)
+      );
+
+      if (!matchingKey) return { nodes: [], edges: [] };
+
+      const procGraph = graphs[matchingKey];
+
+      // Flatten in case of nested graphs (optional)
+      const nodes: GraphJSON['nodes'] = [];
+      const edges: GraphJSON['edges'] = [];
+
+      if (procGraph?.nodes) nodes.push(...procGraph.nodes);
+      if (procGraph?.edges) edges.push(...procGraph.edges);
+
+      return { nodes, edges };
+    };
+
     const fetchAndRenderCfgs = async () => {
       setIsLoadingGraphs(true);
       setGraphError(null);
 
       try {
         const [beforeResponse, afterResponse] = await Promise.all([
-          fetchDotString(selectedStartEpoch!, 'before'),
-          fetchDotString(selectedEndEpoch!, 'after'),
+          fetchGraphJson(selectedStartEpoch!, 'before'),
+          fetchGraphJson(selectedEndEpoch!, 'after'),
         ]);
 
-        const lowerSelectedProcedure = selectedProcedureName!.toLowerCase();
-
-        const extractDot = (response: Record<string, string>) => {
-          const matchingKey = Object.keys(response).find((key) =>
-            key.toLowerCase().includes(lowerSelectedProcedure)
-          );
-          return matchingKey ? response[matchingKey] : undefined;
-        };
-
-        const beforeDotString = extractDot(beforeResponse);
-        const afterDotString = extractDot(afterResponse);
+        const beforeDotString = beforeResponse; // TODO: A lot of renaming to be done now
+        const afterDotString = afterResponse;
 
         let processedBeforeNodes: Node<CustomNodeData>[] = [];
         let processedBeforeEdges: Edge[] = [];
@@ -86,12 +106,20 @@ export function useCfgData(
         let processedAfterEdges: Edge[] = [];
 
         if (beforeDotString) {
+          const singleProcGraph = extractProcedureGraph(
+            beforeResponse,
+            selectedProcedureName! // TODO: Is there a better way then !
+          );
           ({ nodes: processedBeforeNodes, edges: processedBeforeEdges } =
-            await getLayoutedElements(beforeDotString, 'before-'));
+            await getLayoutedElementsFromJSON(singleProcGraph, 'before-'));
         }
         if (afterDotString) {
+          const singleProcGraph = extractProcedureGraph(
+            afterResponse,
+            selectedProcedureName! // TODO: Is there a better way then !
+          );
           ({ nodes: processedAfterNodes, edges: processedAfterEdges } =
-            await getLayoutedElements(afterDotString, 'after-'));
+            await getLayoutedElementsFromJSON(singleProcGraph, 'after-'));
         }
 
         const {

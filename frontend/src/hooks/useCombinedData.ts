@@ -6,13 +6,12 @@ import {
   useNodesState,
   useEdgesState,
 } from '@xyflow/react';
-import { getLayoutedElements } from '../utils/graphLayout.ts';
-import { fetchDotString, fetchIrCode } from '../api/viewer.ts';
+import {
+  getLayoutedElementsFromJSON,
+  type GraphJSON,
+} from '../utils/graphLayout.ts';
+import { fetchGraphJson, fetchIrCode } from '../api/viewer.ts';
 import { type CustomNodeData } from '../components/viewers/graph/CustomNode.tsx';
-
-interface DotGraphResponse {
-  [procedureName: string]: string;
-}
 
 interface CombinedDataHookResult {
   irCode: string | null;
@@ -99,33 +98,50 @@ export function useCombinedData(
       return;
     }
 
+    const extractProcedureGraph = ( // TODO: Duplicated in useCfgData.ts
+      graphs: Record<string, GraphJSON> | undefined,
+      procedureName: string
+    ): GraphJSON => {
+      if (!graphs) return { nodes: [], edges: [] };
+
+      const lowerProcedure = procedureName.toLowerCase();
+      const matchingKey = Object.keys(graphs).find((key) =>
+        key.toLowerCase().includes(lowerProcedure)
+      );
+
+      if (!matchingKey) return { nodes: [], edges: [] };
+
+      const procGraph = graphs[matchingKey];
+
+      // Flatten in case of nested graphs (optional)
+      const nodes: GraphJSON['nodes'] = [];
+      const edges: GraphJSON['edges'] = [];
+
+      if (procGraph?.nodes) nodes.push(...procGraph.nodes);
+      if (procGraph?.edges) edges.push(...procGraph.edges);
+
+      return { nodes, edges };
+    };
+
     const fetchCfgData = async () => {
       setIsLoading(true);
       setGraphError(null);
       try {
-        const [beforeDotResponse, afterDotResponse] = await Promise.all([
-          fetchDotString(selectedStartEpoch!, 'before'),
-          fetchDotString(selectedEndEpoch!, 'after'),
+        const [beforeResponse, afterResponse] = await Promise.all([
+          fetchGraphJson(selectedStartEpoch!, 'before'), // TODO: Are these correct
+          fetchGraphJson(selectedEndEpoch!, 'after'),
         ]);
 
-        const lowerSelectedProcedure = selectedProcedureName!.toLowerCase();
-
-        const extractDot = (response: DotGraphResponse | undefined) => {
-          if (!response) return undefined;
-          const matchingProcedureKey = Object.keys(response).find((key) =>
-            key.toLowerCase().includes(lowerSelectedProcedure)
-          );
-          return matchingProcedureKey
-            ? response[matchingProcedureKey]
-            : undefined;
-        };
-
-        const beforeDotString = extractDot(beforeDotResponse);
-        const afterDotString = extractDot(afterDotResponse);
+        const beforeDotString = beforeResponse;
+        const afterDotString = afterResponse;
 
         if (beforeDotString) {
-          const { nodes, edges } = await getLayoutedElements(
-            beforeDotString,
+          const singleProcGraph = extractProcedureGraph(
+            beforeResponse,
+            selectedProcedureName!  // TODO: Is there a better way then !
+          );
+          const { nodes, edges } = await getLayoutedElementsFromJSON(
+            singleProcGraph,
             'before-'
           );
           setBeforeNodes(nodes);
@@ -139,8 +155,12 @@ export function useCombinedData(
         }
 
         if (afterDotString) {
-          const { nodes, edges } = await getLayoutedElements(
-            afterDotString,
+          const singleProcGraph = extractProcedureGraph(
+            afterResponse,
+            selectedProcedureName!  // TODO: Is there a better way then !
+          );
+          const { nodes, edges } = await getLayoutedElementsFromJSON(
+            singleProcGraph,
             'after-'
           );
           setAfterNodes(nodes);

@@ -1,9 +1,6 @@
 // src/api/viewer.ts
 import { API_BASE_URL } from './index';
-
-interface DotGraphResponse {
-  [procedureName: string]: string;
-}
+import type { GraphJSON } from '../utils/graphLayout.ts'; // TODO: Or maybe move this here
 
 interface ProcedureLocation {
   name: string;
@@ -18,10 +15,10 @@ export interface IREpochData {
   epochName: string;
 }
 
-export async function fetchDotString(
+export async function fetchGraphJson(
   epoch: string,
   type: 'before' | 'after'
-): Promise<DotGraphResponse> {
+): Promise<Record<string, GraphJSON>> {
   const response = await fetch(`${API_BASE_URL}/cfg/${epoch}/${type}`);
 
   if (!response.ok) {
