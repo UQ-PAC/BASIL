@@ -6,7 +6,7 @@ import cats.effect.std.Semaphore
 import cats.implicits.*
 import io.circe.generic.auto.*
 import io.circe.syntax.*
-import ir.{Program, GoTo, Unreachable, Return}
+import ir.{GoTo, Program, Return, Unreachable}
 import org.http4s.*
 import org.http4s.circe.*
 import org.http4s.dsl.io.*
@@ -14,7 +14,6 @@ import org.typelevel.log4cats.{Logger, LoggerFactory, LoggerName}
 import translating.PrettyPrinter
 
 import java.lang
-import java.util.regex.Pattern
 
 case class ConfigSelection(adt: String, relf: Option[String])
 
@@ -285,29 +284,30 @@ class IrServiceRoutes(
    * @return A JSON object where keys are procedure names and values are their corresponding DOT graph strings.
    * @throws NotFound if the specified `epochName` does not exist or its "before" CFG is not available.
    */
-  private val getBeforeCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case GET -> Root / "cfg" / epochName / "before" => // TODO: Move all of the case ... down a line
-      ensureReady {
-        logger.info(s"Received GET /cfg/$epochName/before request.") *>
-          epochStore
-            .getEpoch(epochName)
-            .flatMap {
-              case Some(epoch) =>
-                logger.info(s"Generating 'before' CFG models for epoch: $epochName.") *>
-                  IO.blocking(generateProcedureGraphs(epoch.beforeTransform)).flatMap { graphs =>
-                    logger.info(s"Successfully generated ${graphs.size} 'before' procedure graphs. Responding with JSON.") *>
-                      Ok(graphs.asJson)
-                  }
+  private val getBeforeCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "cfg" / epochName / "before" =>
+    ensureReady {
+      logger.info(s"Received GET /cfg/$epochName/before request.") *>
+        epochStore
+          .getEpoch(epochName)
+          .flatMap {
+            case Some(epoch) =>
+              logger.info(s"Generating 'before' CFG models for epoch: $epochName.") *>
+                IO.blocking(generateProcedureGraphs(epoch.beforeTransform)).flatMap { graphs =>
+                  logger.info(
+                    s"Successfully generated ${graphs.size} 'before' procedure graphs. Responding with JSON."
+                  ) *>
+                    Ok(graphs.asJson)
+                }
 
-              case None =>
-                logger.warn(s"Epoch '$epochName' not found for 'before' CFG request.") *>
-                  NotFound(AnalysisStatus(s"Epoch '$epochName' not found").asJson)
-            }
-            .handleErrorWith { e =>
-              logger.error(e)(s"Error processing 'before' CFG request: ${e.getMessage}") *>
-                InternalServerError(AnalysisStatus("Internal server error during CFG generation").asJson)
-            }
-      }
+            case None =>
+              logger.warn(s"Epoch '$epochName' not found for 'before' CFG request.") *>
+                NotFound(AnalysisStatus(s"Epoch '$epochName' not found").asJson)
+          }
+          .handleErrorWith { e =>
+            logger.error(e)(s"Error processing 'before' CFG request: ${e.getMessage}") *>
+              InternalServerError(AnalysisStatus("Internal server error during CFG generation").asJson)
+          }
+    }
   }
 
   /**
@@ -320,30 +320,29 @@ class IrServiceRoutes(
    * @return A JSON object where keys are procedure names and values are their corresponding DOT graph strings.
    * @throws NotFound if the specified `epochName` does not exist or its "after" CFG is not available.
    */
-  private val getAfterCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case GET -> Root / "cfg" / epochName / "after" =>
-      ensureReady {
-        logger.info(s"Received GET /cfg/$epochName/after request.") *>
-          epochStore
-            .getEpoch(epochName)
-            .flatMap {
-              case Some(epoch) =>
-                logger.info(s"Generating 'after' CFG models for epoch: $epochName.") *>
-                  // Use evalOn with a blocking pool if generateProcedureGraphs is CPU intensive
-                  IO.blocking(generateProcedureGraphs(epoch.afterTransform)).flatMap { graphs =>
-                    logger.info(s"Successfully generated ${graphs.size} procedure graphs. Responding with JSON.") *>
-                      Ok(graphs.asJson)
-                  }
+  private val getAfterCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "cfg" / epochName / "after" =>
+    ensureReady {
+      logger.info(s"Received GET /cfg/$epochName/after request.") *>
+        epochStore
+          .getEpoch(epochName)
+          .flatMap {
+            case Some(epoch) =>
+              logger.info(s"Generating 'after' CFG models for epoch: $epochName.") *>
+                // Use evalOn with a blocking pool if generateProcedureGraphs is CPU intensive
+                IO.blocking(generateProcedureGraphs(epoch.afterTransform)).flatMap { graphs =>
+                  logger.info(s"Successfully generated ${graphs.size} procedure graphs. Responding with JSON.") *>
+                    Ok(graphs.asJson)
+                }
 
-              case None =>
-                logger.warn(s"Epoch '$epochName' not found for 'after' CFG request.") *>
-                  NotFound(AnalysisStatus(s"Epoch '$epochName' not found").asJson)
-            }
-            .handleErrorWith { e =>
-              logger.error(e)(s"Error processing CFG request: ${e.getMessage}") *>
-                InternalServerError(AnalysisStatus("Internal server error during CFG generation").asJson)
-            }
-      }
+            case None =>
+              logger.warn(s"Epoch '$epochName' not found for 'after' CFG request.") *>
+                NotFound(AnalysisStatus(s"Epoch '$epochName' not found").asJson)
+          }
+          .handleErrorWith { e =>
+            logger.error(e)(s"Error processing CFG request: ${e.getMessage}") *>
+              InternalServerError(AnalysisStatus("Internal server error during CFG generation").asJson)
+          }
+    }
   }
 
   /**
@@ -453,16 +452,12 @@ class IrServiceRoutes(
         block.jump match {
           case g: GoTo =>
             g.targets.zipWithIndex.map { (target, idx) =>
-              EdgeData(
-                id = s"e-${block.label}-${target.label}-$idx",
-                source = block.label,
-                target = target.label,
-              )
+              EdgeData(id = s"e-${block.label}-${target.label}-$idx", source = block.label, target = target.label)
             }
 
           case _: Return => Nil
           case _: Unreachable => Nil
-          case _ => Nil
+          case null => Nil
         }
       }.toList
 
