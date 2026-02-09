@@ -586,32 +586,32 @@ case class LOp(indexType: BType) extends FunctionOp
 
 /** Utility to check validity of memory encoding pointer.
   */
-case class Valid() extends FunctionOp {
-  val fnName: String = s"valid"
-}
+// case class Valid() extends FunctionOp {
+//   val fnName: String = s"valid"
+// }
 
-case class BValid(
-  me_live: BMapVar,
-  me_live_val: BMapVar,
-  me_object: BMapVar,
-  me_position: BMapVar,
-  me_global: BMapVar,
-  pointer: BExpr,
-  n: BExpr
-) extends BExpr {
-  override def toString: String = s"$fnName($me_live, $me_live_val, $me_object, $me_position, $me_global, $pointer, $n)"
-  val fnName: String = s"valid"
+// case class BValid(
+//   me_live: BMapVar,
+//   me_live_val: BMapVar,
+//   me_object: BMapVar,
+//   me_position: BMapVar,
+//   me_global: BMapVar,
+//   pointer: BExpr,
+//   n: BExpr
+// ) extends BExpr {
+//   override def toString: String = s"$fnName($me_live, $me_live_val, $me_object, $me_position, $me_global, $pointer, $n)"
+//   val fnName: String = s"valid"
 
-  override val getType: BType = BoolBType
-  val inputs = List(me_live, me_live_val, me_object, me_position, me_global, pointer, n)
+//   override val getType: BType = BoolBType
+//   val inputs = List(me_live, me_live_val, me_object, me_position, me_global, pointer, n)
 
-  override def functionOps: Set[FunctionOp] =
-    inputs.flatMap(i => i.functionOps).toSet + Valid()
-  override def locals: Set[BVar] = inputs.flatMap(i => i.locals).toSet
-  override def globals: Set[BVar] = inputs.flatMap(i => i.globals).toSet
-  override def params: Set[BVar] = inputs.flatMap(i => i.params).toSet
-  override def loads: Set[BExpr] = inputs.flatMap(i => i.loads).toSet
-}
+//   override def functionOps: Set[FunctionOp] =
+//     inputs.flatMap(i => i.functionOps).toSet + Valid()
+//   override def locals: Set[BVar] = inputs.flatMap(i => i.locals).toSet
+//   override def globals: Set[BVar] = inputs.flatMap(i => i.globals).toSet
+//   override def params: Set[BVar] = inputs.flatMap(i => i.params).toSet
+//   override def loads: Set[BExpr] = inputs.flatMap(i => i.loads).toSet
+// }
 
 /** Utility to check disjointedness of two pointers.
   */

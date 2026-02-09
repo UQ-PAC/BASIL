@@ -1,236 +1,98 @@
-package ir.transforms
+package ir.transforms.memoryEncoding
 
 import boogie.*
 import ir.cilvisitor.*
 import ir.*
 
-class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
-  // // first m bits of pointer are for offset
-  // private val m = 32
-  
-  // // Helpful variables to have
-  // private val r0 = BVariable("R0", BitVecBType(64), Scope.Global)
-  // private val r0_gamma = BVariable("Gamma_R0", BoolBType, Scope.Global)
-  // private val i = BVariable("i", BitVecBType(64), Scope.Local)
-  // private val j = BVariable("j", BitVecBType(64), Scope.Local)
-  // private val o = BVariable("o", IntBType, Scope.Local)
-  
-  // // Counter of allocations for getting a fresh id on new allocation
-  // private val me_alloc_counter = BVariable("me_alloc_counter", IntBType, Scope.Global)
+private def r(n: Int) = Register(s"R$n", 64)
 
-  // // Object is a mapping from pointer to allocation id
-  // private val me_object = BMapVar("me_object", MapBType(BitVecBType(64), IntBType), Scope.Global)
-  // private val me_object_gamma = BMapVar("Gamma_me_object", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+// object counter:
+private val me_object_counter = GlobalVar("me_object_counter", IntType)
 
-  // // Position is a mapping from pointer to its offset
-  // private val me_position = BMapVar("me_position", MapBType(BitVecBType(64), BitVecBType(64)), Scope.Global)
-  // private val me_position_gamma = BMapVar("Gamma_me_position", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+private val me_region = GlobalVar("me_region", MapType(BitVecType(64), IntType))
+private val me_object = GlobalVar("me_object", MapType(BitVecType(64), IntType))
+private val me_offset = GlobalVar("me_offset", MapType(BitVecType(64), BitVecType(64)))
 
-  // // Live is a mapping from allocation id to liveness
-  // // 0=Dead, 1=Live, 2=Fresh
-  // // if live, find allocation size in me_live_vals
-  // private val me_live = BMapVar("me_live", MapBType(IntBType, BitVecBType(8)), Scope.Global)
-  // private val me_live_gamma = BMapVar("Gamma_me_live", MapBType(IntBType, BoolBType), Scope.Global)
-  // private val me_live_val = BMapVar("me_live_val", MapBType(IntBType, BitVecBType(64)), Scope.Global)
-  // private val me_live_val_gamma = BMapVar("Gamma_me_live_val", MapBType(IntBType, BoolBType), Scope.Global)
+// Liveness/Temporal bound:
+// 0 = fresh, 1 = live, 2 = dead
+private val me_liveness = GlobalVar("me_liveness", MapType(IntType, BitVecType(2)))
+private val me_live = GlobalVar("me_live", MapType(IntType, BitVecType(2)))
 
-  // // Mapping for global pointers
-  // private val me_global = BMapVar("me_global", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+// Spatial bound:
+private val me_start = GlobalVar("me_start", MapType(IntType, BitVecType(64)))
+private val me_end = GlobalVar("me_end", MapType(IntType, BitVecType(64)))
+private val me_size = GlobalVar("me_size", MapType(IntType, BitVecType(64)))
 
-  // private val gamma_mem = BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global)
-  // private val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+private val mem = SharedMemory("mem", 64, 8)
 
-  // private var global_addresses = ctx.symbols.flatMap(s => Range(s.value.intValue, s.value.intValue + s.size)).toSet
+private val i = LocalVar("i", BitVecType(64))
+private val o = LocalVar("o", IntType)
 
-  // private def R(n: Int) = BVariable(s"R$n", BitVecBType(64), Scope.Global)
-  // private def Gamma_R(n: Int) = BVariable(s"Gamma_R$n", BoolBType, Scope.Global)
+private def implies_else(cond: Expr, true_br: Expr, false_br: Expr) = BinaryExpr(
+  BoolAND,
+  BinaryExpr(BoolIMPLIES, cond, true_br),
+  BinaryExpr(BoolIMPLIES, UnaryExpr(BoolNOT, cond), false_br)
+)
 
-  private def r(n: Int) = Register(s"R$n",64)
-  private def gamma_r(n: Int) = GlobalVar(s"Gamma_R$n", BoolType)
+private def implies(cond: Expr, true_br: Expr) = BinaryExpr(BoolIMPLIES, cond, true_br)
 
-  private val me_global = GlobalVar("me_global", MapType(BitVecType(64), BoolType))
-  private val me_allocation = GlobalVar("me_allocation", MapType(BitVecType(64), IntType))
-  private val me_offset = GlobalVar("me_offset", MapType(BitVecType(64), BitVecType(64)))
+private def same_object(p1: Expr, p2: Expr) =
+  BinaryExpr(EQ, addr_to_obj(p1), addr_to_obj(p2))
 
-  // Liveness/Temporal bound:
-  // 0 = fresh, 1 = live, 2 = dead
-  private val me_live = GlobalVar("me_live", MapType(IntType, BitVecType(2)))
+private def in_bounds(lower: Expr, upper: Expr, n: Expr) =
+  BinaryExpr(BoolAND, BinaryExpr(BVULE, lower, n), BinaryExpr(BVULT, n, upper))
 
-  // Spatial bound:
-  private val me_start = GlobalVar("me_start", MapType(IntType, BitVecType(64)))
-  private val me_end = GlobalVar("me_end", MapType(IntType, BitVecType(64)))
-  private val me_size = GlobalVar("me_size", MapType(IntType, BitVecType(64)))
+// Check if an address + size is a valid region for access
+private def valid(addr: Expr, n: Expr) =
+  FApplyExpr("valid", Seq(me_liveness, me_size, me_object, me_region, me_offset, addr, n), BoolType)
 
-  private val mem = SharedMemory("mem", 64, 8)
+// Get associated object for address
+private def addr_to_obj(addr: Expr, map: Expr = me_object) = FApplyExpr("addr_to_object", Seq(map, addr), IntType)
 
-  private val i = LocalVar("i", BitVecType(64))
+// Get address offset into its object
+private def addr_to_offset(addr: Expr, map: Expr = me_offset) =
+  FApplyExpr("addr_to_offset", Seq(map, addr), BitVecType(64))
 
-  private def implies_else(cond: Expr, true_br: Expr, false_br: Expr) = BinaryExpr(
-    BoolAND,
-    BinaryExpr(BoolIMPLIES,
-      cond,
-      true_br
-    ),
-    BinaryExpr(BoolIMPLIES,
-      UnaryExpr(BoolNOT, cond),
-      false_br
-    )
-  )
+// Get region an object belongs to (e.g. .data, .init, stack, heap)
+// 0: Unspecified for now i guess
+// 1: Heap, safe for object allocation, free, etc
+private def addr_to_region(addr: Expr, map: Expr = me_region) = FApplyExpr("addr_to_region", Seq(map, addr), IntType)
 
-  private def in_bounds(lower: Expr, upper: Expr, n: Expr) = BinaryExpr(
-    BoolAND,
-    BinaryExpr(BVULE, lower, n),
-    BinaryExpr(BVULT, n, upper)
-  )
+// Get object size
+private def obj_size(obj: Expr, map: Expr = me_size) = FApplyExpr("obj_size", Seq(map, obj), BitVecType(64))
 
-  private def valid(addr: Expr, n: Expr) = FApplyExpr(
-    "valid",
-    Seq(
-      me_live,
-      me_size,
-      me_allocation,
-      me_global,
-      addr,
-      n
-    ),
-    BoolType
-  )
+private def obj_is_fresh(obj: Expr, map: Expr = me_liveness) =
+  BinaryExpr(EQ, obj_liveness(obj, map = map), BitVecLiteral(0, 2))
+private def obj_is_alive(obj: Expr, map: Expr = me_liveness) =
+  BinaryExpr(EQ, obj_liveness(obj, map = map), BitVecLiteral(1, 2))
+private def obj_is_dead(obj: Expr, map: Expr = me_liveness) =
+  BinaryExpr(EQ, obj_liveness(obj, map = map), BitVecLiteral(2, 2))
+private def obj_liveness(obj: Expr, map: Expr = me_liveness) =
+  FApplyExpr("obj_liveness", Seq(map, obj), BitVecType(2))
 
-  private def addr_to_allocation(addr: Expr) = FApplyExpr(
-    "addr_to_allocation",
-    Seq(
-      me_allocation,
-      addr,
-    ),
-    IntType
-  )
+private def read_mem(addr: Expr, map: Expr = mem) = FApplyExpr("read_mem", Seq(map, addr), BitVecType(8))
 
-  private def addr_to_offset(addr: Expr) = FApplyExpr(
-    "addr_to_offset",
-    Seq(
-      me_offset,
-      addr,
-    ),
-    BitVecType(64)
-  )
-
-  private def addr_is_global(addr: Expr) = FApplyExpr(
-    "addr_is_global",
-    Seq(
-      me_global,
-      addr
-    ),
-    BoolType
-  )
-
-  private def obj_to_size(obj: Expr) = FApplyExpr(
-    "obj_size",
-    Seq(
-      me_size,
-      obj
-    ),
-    BitVecType(64)
-  )
-
-  private def obj_is_fresh(obj: Expr) = FApplyExpr(
-    "obj_is_fresh",
-    Seq(
-      me_live,
-      obj,
-    ),
-    BoolType
-  )
-
-  private def obj_is_alive(obj: Expr) = FApplyExpr(
-    "obj_is_alive",
-    Seq(
-      me_live,
-      obj,
-    ),
-    BoolType
-  )
-
-  private def obj_is_dead(obj: Expr) = FApplyExpr(
-    "obj_is_dead",
-    Seq(
-      me_live,
-      obj,
-    ),
-    BoolType
-  )
-
-  private def read_mem(addr: Expr) = FApplyExpr(
-    "read_mem",
-    Seq(
-      mem,
-      addr
-    ),
-    BitVecType(8)
-  )
-
-  private def read_gamma_mem(addr: Expr) = FApplyExpr(
-    "read_gama_mem",
-    Seq(
-      mem,
-      addr
-    ),
-    BoolType
-  )
+class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisitor {
+  private var global_addresses = ctx.symbols.flatMap(s => Range(s.value.intValue, s.value.intValue + s.size)).toSet
 
   private def transform_memset(p: Procedure) = {
     // r0: Start address
     // r1: Character
     // r2: Bytes to write
-    
-    p.modifies ++= Set(
-      mem,
-    )
 
-    // p.requires = p.requires ++ List(
-    //   BValid(me_live, me_live_val, me_object, me_position, me_global, ret, n)
-    // )
+    p.modifies ++= Set(mem)
 
-    p.requiresExpr ++= List(
-      valid(r(0), r(2))
-    )
-
-    // p.ensures = p.ensures ++ List(
-    //   // return value is equal to input destination
-    //   ForAll(
-    //     List(i.toBoogie),
-    //     BinaryBExpr(EQ,
-    //       MapAccess(mem.toBoogie,i.toBoogie),
-    //       IfThenElse(
-    //         BinaryBExpr(BoolAND,
-    //           BinaryBExpr(BVULE, r(0).toBoogie, i.toBoogie),
-    //           BinaryBExpr(BVULT, i.toBoogie, BinaryBExpr(BVADD, r(0).toBoogie, Old(r(2).toBoogie)))
-    //         ),
-    //         r(1).toBoogie,
-    //         Old(MapAccess(mem.toBoogie, i.toBoogie)),
-    //       ),
-    //     ),
-    //     List(List(MapAccess(mem.toBoogie, i.toBoogie)))
-    //   ),
-    // )
+    p.requiresExpr ++= List(valid(r(0), r(2)))
 
     p.ensuresExpr ++= List(
       QuantifierExpr(
         QuantifierSort.forall,
-        LambdaExpr(List(i),
+        LambdaExpr(
+          List(i),
           implies_else(
-            in_bounds(
-              r(0),
-              BinaryExpr(BVADD, r(0), r(2)),
-              i
-            ),
-            BinaryExpr(EQ,
-              read_mem(i),
-              Extract(8,0,r(1)),
-            ),
-            BinaryExpr(EQ,
-              read_mem(i),
-              OldExpr(read_mem(i))
-            )
+            in_bounds(r(0), BinaryExpr(BVADD, r(0), r(2)), i),
+            BinaryExpr(EQ, read_mem(i), Extract(8, 0, r(1))),
+            BinaryExpr(EQ, read_mem(i), read_mem(i, map = OldExpr(mem)))
           )
         ),
         triggers = List(List(read_mem(i)))
@@ -242,301 +104,243 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
     // r0: Destination start address
     // r1: Source start address
     // r2: Bytes to copy
-    
-    // val dest = R(0)
-    // val gamma_dest = Gamma_R(0)
 
-    // val src = R(1)
-    // val gamma_src = Gamma_R(1)
+    p.modifies ++= Set(mem)
 
-    // val n = R(2)
-    // val gamma_n = Gamma_R(2)
-    p.modifies ++= Set(
-      mem
-    )
-
-    // p.requires = p.requires ++ List(
-    //   BinaryBExpr(EQ, gamma_n, TrueBLiteral),
-    //   BValid(me_live, me_live_val, me_object, me_position, me_global, src, n),
-    //   BValid(me_live, me_live_val, me_object, me_position, me_global, dest, n),
-    // )
-
-    p.requires ++= List(
-      BinaryBExpr(EQ, r(2).toGamma, TrueBLiteral),
-    )
+    p.requires ++= List(BinaryBExpr(EQ, r(2).toGamma, TrueBLiteral))
 
     p.requiresExpr ++= List(
       // BinaryExpr(EQ, gamma_r(2), TrueLiteral),
       valid(r(0), r(2)),
-      valid(r(1), r(2)),
+      valid(r(1), r(2))
     )
 
-    // p.ensures = p.ensures ++ List(
-    //   // return value is equal to input... this is a bit silly but its how memcpy is defined
-    //   BinaryBExpr(EQ, dest, Old(dest)),
-    //   BinaryBExpr(EQ, gamma_dest, Old(gamma_dest)),
-
-    //   ForAll(
-    //     List(i),
-    //     BinaryBExpr(EQ, MapAccess(mem, i),
-    //       IfThenElse(
-    //         BinaryBExpr(BoolAND,
-    //           BinaryBExpr(BVULE, dest, i),
-    //           BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, n))
-    //         ),
-    //         MapAccess(mem, BinaryBExpr(BVADD, MapAccess(me_position, i), src)),
-    //         Old(MapAccess(mem, i))
-    //       ),
-    //     ),
-    //     List(List(MapAccess(mem,i)))
-    //   ),
-
-    //   ForAll(
-    //     List(i),
-    //     BinaryBExpr(EQ, MapAccess(gamma_mem, i),
-    //       IfThenElse(
-    //         BinaryBExpr(BoolAND,
-    //           BinaryBExpr(BVULE, dest, i),
-    //           BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, dest, n))
-    //         ),
-    //         MapAccess(gamma_mem, BinaryBExpr(BVADD, MapAccess(me_position, i), src)),
-    //         Old(MapAccess(gamma_mem, i))
-    //       ),
-    //     ),
-    //     List(List(MapAccess(gamma_mem,i)))
-    //   ),
-    // )
-
     val cond = in_bounds(r(0), BinaryExpr(BVADD, r(0), r(2)), i)
+
+    p.ensures ++= List(
+      ForAll(
+        List(i.toBoogie),
+        BinaryBExpr(
+          EQ,
+          MapAccess(mem.toGamma, i.toBoogie),
+          IfThenElse(
+            cond.toBoogie,
+            MapAccess(mem.toGamma, BinaryBExpr(BVADD, addr_to_offset(i).toBoogie, r(1).toBoogie)),
+            Old(MapAccess(mem.toGamma, i.toBoogie))
+          )
+        ),
+        List(List(MapAccess(mem.toGamma, i.toBoogie)))
+      )
+    )
+
     p.ensuresExpr ++= List(
       QuantifierExpr(
         QuantifierSort.forall,
-        LambdaExpr(List(i),
+        LambdaExpr(
+          List(i),
           implies_else(
             cond,
-            BinaryExpr(EQ,
-              read_mem(i),
-              read_mem(BinaryExpr(BVADD, addr_to_offset(i), r(1)))
-            ),
-            BinaryExpr(EQ,
-              read_mem(i),
-              OldExpr(read_mem(i))
-            )
+            BinaryExpr(EQ, read_mem(i), read_mem(BinaryExpr(BVADD, addr_to_offset(i), r(1)))),
+            BinaryExpr(EQ, read_mem(i), read_mem(i, map = OldExpr(mem)))
           )
         ),
         triggers = List(List(read_mem(i)))
-      ),
-      QuantifierExpr(
-        QuantifierSort.forall,
-        LambdaExpr(List(i),
-          implies_else(
-            cond,
-            BinaryExpr(EQ,
-              read_gamma_mem(i),
-              read_gamma_mem(BinaryExpr(BVADD, addr_to_offset(i), r(1)))
-            ),
-            BinaryExpr(EQ,
-              read_gamma_mem(i),
-              OldExpr(read_gamma_mem(i))
-            )
-          )
-        ),
-        triggers = List(List(read_gamma_mem(i)))
       )
     )
   }
 
   private def transform_strlen(p: Procedure) = {
-    p.modifies ++= Set(
-      GlobalVar("R0", BitVecType(64)),
+    p.modifies ++= (if (simplify) then Set() else Set(r(0)))
+
+    p.requiresExpr ++= List(
+      valid(r(0), BitVecLiteral(1, 64)),
+      QuantifierExpr(
+        QuantifierSort.exists,
+        LambdaExpr(
+          List(i),
+          BinaryExpr(
+            BoolAND,
+            BinaryExpr(EQ, addr_to_obj(i), addr_to_obj(r(0))),
+            BinaryExpr(EQ, read_mem(i), BitVecLiteral(0, 8))
+          )
+        )
+      )
     )
 
-    // val dest = BinaryBExpr(BVADD, Old(r0), r0)
+    p.ensures = p.ensures ++ List(BinaryBExpr(EQ, r(0).toGamma, TrueBLiteral))
 
-    // p.requires = p.requires ++ List(
-    //   // First byte is valid, cant reason about full size in precond
-    //   BValid(me_live, me_live_val, me_object, me_position, me_global, r0, BitVecBLiteral(1,64)),
-
-    //   // Exists some 0 in the allocation:
-    //   Exists(
-    //     List(i),
-    //     BinaryBExpr(BoolAND,
-    //       BinaryBExpr(EQ, MapAccess(me_object, i), MapAccess(me_object, r0)),
-    //       BinaryBExpr(EQ, MapAccess(mem, i), BitVecBLiteral(0, 8))
-    //     ),
-    //   )
-    // )
-
-    // p.ensures = p.ensures ++ List(
-    //   BinaryBExpr(EQ, r0_gamma, TrueBLiteral),
-    //   ForAll(
-    //     List(i),
-    //     BinaryBExpr(BoolIMPLIES,
-    //       BinaryBExpr(BoolAND,
-    //         BinaryBExpr(BVULE, Old(r0), i),
-    //         BinaryBExpr(BVULT, i, dest)
-    //       ),
-    //       BinaryBExpr(NEQ, MapAccess(mem, i), BitVecBLiteral(0,8)),
-    //     ),
-    //   ),
-    //   BinaryBExpr(EQ,
-    //     MapAccess(me_object, dest),
-    //     MapAccess(me_object, Old(r0))
-    //   ),
-    //   BinaryBExpr(EQ,
-    //     MapAccess(mem, dest),
-    //     BitVecBLiteral(0,8)
-    //   ),
-    //   BValid(me_live, me_live_val, me_object, me_position, me_global, Old(r0), r0),
-    //   BinaryBExpr(BVULE, Old(r0), dest)
-    // )
+    val dest = BinaryExpr(BVADD, OldExpr(r(0)), r(0));
+    p.ensuresExpr ++= List(
+      QuantifierExpr(
+        QuantifierSort.forall,
+        LambdaExpr(
+          List(i),
+          implies(in_bounds(OldExpr(r(0)), dest, i), BinaryExpr(NEQ, read_mem(i), BitVecLiteral(0, 8)))
+        ),
+        triggers = List(List(read_mem(i)))
+      ),
+      BinaryExpr(EQ, read_mem(dest), BitVecLiteral(0, 8)),
+      valid(OldExpr(r(0)), r(0)),
+      BinaryExpr(BVULE, OldExpr(r(0)), dest)
+    )
   }
 
   private def transform_free(p: Procedure) = {
-    p.modifies ++= Set(
-      GlobalVar("me_live", MapType(IntType, BitVecType(8))),
+    p.modifies ++= Set(me_liveness)
+
+    p.requiresExpr ++= List(
+      // Addr must be at offset 0 to free
+      BinaryExpr(EQ, addr_to_offset(r(0)), BitVecLiteral(0, 64)),
+      // obj must be alive
+      obj_is_alive(addr_to_obj(r(0))),
+      // Addr must be heap allocated
+      BinaryExpr(EQ, addr_to_region(r(0)), IntLiteral(1))
     )
 
-    // val obj = MapAccess(me_object, r0)
+    // Freeing requires fully high gamma
+    p.requires ++= List(
+      ForAll(
+        List(i.toBoogie),
+        BinaryBExpr(
+          BoolIMPLIES,
+          same_object(i, r(0)).toBoogie,
+          BinaryBExpr(EQ, MapAccess(mem.toGamma, i.toBoogie), TrueBLiteral)
+        )
+      )
+    )
 
-    // p.requires = p.requires ++ List(
-    //   // Pointer must at base of allocation for free (no offset)
-    //   BinaryBExpr(EQ, MapAccess(me_position, r0), BitVecBLiteral(0,64)),
-    //   // Pointer must be live to free
-    //   BinaryBExpr(EQ, MapAccess(me_live, obj), BitVecBLiteral(1,8)),
-    //   // The pointer being freed must not be global
-    //   UnaryBExpr(BoolNOT, MapAccess(me_global, r0)),
-    //   // The pointer being freed must be fully high
-    //   ForAll(
-    //     List(i),
-    //     BinaryBExpr(BoolIMPLIES,
-    //       BinaryBExpr(EQ, MapAccess(me_object, i), MapAccess(me_object, r0)),
-    //       BinaryBExpr(EQ, MapAccess(gamma_mem, i), TrueBLiteral)
-    //     )
-    //   )
-    // )
-
-    // p.ensures = p.ensures ++ List(
-    //   // Sets the old live value to dead
-    //   ForAll(
-    //     List(o),
-    //     BinaryBExpr(EQ,
-    //       MapAccess(me_live, o),
-    //       IfThenElse(
-    //         BinaryBExpr(EQ, o, obj),
-    //         BitVecBLiteral(2, 8),
-    //         Old(MapAccess(me_live, o)),
-    //       )
-    //     ),
-    //     List(
-    //       List(MapAccess(me_live, o))
-    //     )
-    //   ),
-    // )
+    // Ensures liveness is dead for the object otherwise unchanged
+    p.ensuresExpr ++= List(
+      QuantifierExpr(
+        QuantifierSort.forall,
+        LambdaExpr(
+          List(o),
+          implies_else(
+            BinaryExpr(EQ, o, addr_to_obj(r(0))),
+            obj_is_dead(o),
+            BinaryExpr(EQ, obj_liveness(o), obj_liveness(o, map = OldExpr(me_liveness)))
+          )
+        ),
+        triggers = List(List(obj_liveness(o)))
+      )
+    )
   }
-  
+
   private def transform_malloc(p: Procedure) = {
-    p.modifies ++= Set(
-      GlobalVar("me_alloc_counter", IntType),
-      GlobalVar("me_live", MapType(IntType, BitVecType(8))),
-      GlobalVar("me_live_val", MapType(IntType, BitVecType(64))),
-      GlobalVar("me_position", MapType(BitVecType(64), BitVecType(64))),
-      GlobalVar("me_object", MapType(BitVecType(64), IntType)),
-      GlobalVar("R0", BitVecType(64)),
+    p.modifies ++= Set(me_object_counter, me_liveness, me_live, me_offset, me_object) ++ (if (simplify) then Set()
+                                                                                          else Set(r(0)))
+
+    p.requires ++= List(BinaryBExpr(EQ, r(0).toGamma, TrueBLiteral))
+
+    p.requiresExpr ++= List(
+      // Cant malloc 0 or less bytes
+      BinaryExpr(BVUGT, r(0), BitVecLiteral(0, 64))
     )
-    
-    // p.requires = p.requires ++ List(
-    //   // Cant malloc 0 or less bytes
-    //   BinaryBExpr(BVUGT, r0, BitVecBLiteral(0, 64)),
-    //   BinaryBExpr(EQ, r0_gamma, TrueBLiteral),
-    // )
 
-    // p.ensures = p.ensures ++ List(
-    //   BinaryBExpr(EQ, r0_gamma, TrueBLiteral),
+    p.ensures ++= List(BinaryBExpr(EQ, r(0).toGamma, TrueBLiteral))
 
-    //   // Alloc count is bumped up by 1 after every allocation
-    //   // me_alloc_counter := Old(me_alloc_counter) + 1
-    //   BinaryBExpr(EQ, me_alloc_counter, BinaryBExpr(IntADD, Old(me_alloc_counter), IntBLiteral(BigInt(1)))),
+    p.ensuresExpr ++= List(
+      BinaryExpr(EQ, me_object_counter, BinaryExpr(IntADD, OldExpr(me_object_counter), IntLiteral(1))),
+      BinaryExpr(BVUGT, BinaryExpr(BVADD, r(0), OldExpr(r(0))), r(0)),
 
-    //   // Ensure that there is not an overflow
-    //   BinaryBExpr(BVUGT, BinaryBExpr(BVADD, r0, Old(r0)), r0),
+      // All addresses in allocation are updated to the new object
+      QuantifierExpr(
+        QuantifierSort.forall,
+        LambdaExpr(
+          List(i),
+          implies_else(
+            in_bounds(r(0), BinaryExpr(BVADD, r(0), OldExpr(r(0))), i),
+            BinaryExpr(EQ, addr_to_obj(i), OldExpr(me_object_counter)),
+            BinaryExpr(EQ, addr_to_obj(i), addr_to_obj(i, map = OldExpr(me_object)))
+          )
+        ),
+        triggers = List(List(addr_to_obj(i)))
+      ),
 
-    //   // Updates object mapping for all bytes in our allocated object and keeps others the same
-    //   ForAll(
-    //     List(i),
-    //     BinaryBExpr(EQ,
-    //       MapAccess(me_object, i),
-    //       IfThenElse(
-    //         BinaryBExpr(BoolAND,
-    //           BinaryBExpr(BVULE, r0, i),
-    //           BinaryBExpr(BVULT, i, BinaryBExpr(BVADD, r0, Old(r0)))
-    //         ),
-    //         Old(me_alloc_counter),
-    //         Old(MapAccess(me_object, i))
-    //       ),
-    //     ),
-    //     List(List(MapAccess(me_object, i)))
-    //   ),
+      // All addresses in allocation have offset relative to base
+      QuantifierExpr(
+        QuantifierSort.forall,
+        LambdaExpr(
+          List(i),
+          implies_else(
+            same_object(i, r(0)),
+            BinaryExpr(EQ, addr_to_offset(i), BinaryExpr(BVSUB, i, r(0))),
+            BinaryExpr(EQ, addr_to_offset(i), addr_to_offset(i, map = OldExpr(me_offset)))
+          )
+        ),
+        triggers = List(List(addr_to_offset(i)))
+      ),
 
-    //   // Update position mapping
-    //   ForAll(
-    //     List(i),
-    //     IfThenElse(
-    //       BinaryBExpr(EQ,
-    //         MapAccess(me_object, r0),
-    //         MapAccess(me_object, i)
-    //       ),
-    //       BinaryBExpr(EQ, MapAccess(me_position, i), BinaryBExpr(BVSUB, i, r0)),
-    //       BinaryBExpr(EQ, MapAccess(me_position, i), Old(MapAccess(me_position, i)))
-    //     ),
-    //     List(List(MapAccess(me_position, i)))
-    //   ),
+      // Object liveness and size must be updated
+      QuantifierExpr(
+        QuantifierSort.forall,
+        LambdaExpr(
+          List(o),
+          implies_else(
+            BinaryExpr(EQ, o, OldExpr(me_object_counter)),
+            BinaryExpr(BoolAND, obj_is_alive(o), BinaryExpr(EQ, obj_size(o), OldExpr(r(0)))),
+            BinaryExpr(
+              BoolAND,
+              BinaryExpr(EQ, obj_liveness(o), obj_liveness(o, map = OldExpr(me_liveness))),
+              BinaryExpr(EQ, obj_size(o), obj_size(o, map = OldExpr(me_size)))
+            )
+          )
+        ),
+        triggers = List(List(obj_liveness(o), obj_size(o)))
+      ),
 
-    //   // Guarantee the object is live and has correct liveness
-    //   ForAll(
-    //     List(o),
-    //     IfThenElse(
-    //       BinaryBExpr(EQ, o, Old(me_alloc_counter)),
-    //       BinaryBExpr(BoolAND,
-    //         BinaryBExpr(EQ, MapAccess(me_live, o), BitVecBLiteral(1, 8)),
-    //         BinaryBExpr(EQ, MapAccess(me_live_val, o), Old(r0)),
-    //       ),
-    //       BinaryBExpr(BoolAND,
-    //         BinaryBExpr(EQ, MapAccess(me_live, o), Old(MapAccess(me_live, o))),
-    //         BinaryBExpr(EQ, MapAccess(me_live_val, o), Old(MapAccess(me_live_val, o))),
-    //       )
-    //     ),
-    //     List(
-    //       List(MapAccess(me_live, o)),
-    //       List(MapAccess(me_live_val, o))
-    //     )
-    //   ),
-
-    //   // Ensure that the full allocation of R0 is in fresh memory
-    //   // and that it is not overlapping a global var
-    //   ForAll(
-    //     List(i),
-    //     BinaryBExpr(BoolIMPLIES,
-    //       BinaryBExpr(EQ, MapAccess(me_object, r0), MapAccess(me_object, i)),
-    //       BinaryBExpr(BoolAND,
-    //         // They must have previously been fresh in the old state
-    //         BinaryBExpr(EQ,
-    //           Old(MapAccess(me_live, Old(MapAccess(me_object, i)))),
-    //           BitVecBLiteral(2,8)
-    //         ),
-    //         // And they must not be a global variable
-    //         UnaryBExpr(BoolNOT, Old(MapAccess(me_global, i))),
-    //       )
-    //     ),
-    //     List(
-    //       List(MapAccess(me_object, i)),
-    //       List(MapAccess(me_global, i))
-    //     )
-    //   ),
-    // )
+      // Allocated object was fresh prior to allocation,
+      // and it belongs to the heap.
+      QuantifierExpr(
+        QuantifierSort.forall,
+        LambdaExpr(
+          List(i),
+          implies(
+            same_object(i, r(0)),
+            BinaryExpr(
+              BoolAND,
+              obj_is_fresh(addr_to_obj(i, map = OldExpr(me_object)), map = OldExpr(me_liveness)),
+              BinaryExpr(EQ, addr_to_region(i), IntLiteral(1))
+            )
+          )
+        ),
+        triggers = List(List(addr_to_obj(i)), List(addr_to_region(i)))
+      )
+    )
   }
- 
+
   private def transform_main(p: Procedure) = {
+    p.requiresExpr ++= List(
+      BinaryExpr(EQ, me_object_counter, IntLiteral(0)),
+      QuantifierExpr(
+        QuantifierSort.forall,
+        LambdaExpr(
+          List(o),
+          obj_is_fresh(o)
+        ),
+        triggers = List(List(obj_liveness(o)))
+      ),
+      QuantifierExpr(
+        QuantifierSort.forall,
+        LambdaExpr(
+          List(i),
+          BinaryExpr(EQ, addr_to_obj(i), IntLiteral(0))
+        ),
+        triggers = List(List(addr_to_obj(i)))
+      ),
+      QuantifierExpr(
+        QuantifierSort.forall,
+        LambdaExpr(
+          List(i),
+          implies_else(
+            BinaryExpr(BVULE, i, BitVecLiteral(global_addresses.max, 64)),
+            BinaryExpr(EQ, addr_to_region(i), IntLiteral(0)),
+            BinaryExpr(EQ, addr_to_region(i), IntLiteral(1)),
+          )
+        ),
+        triggers = List(List(addr_to_region(i)))
+      ),
+    )
     // p.requires = p.requires ++ List(
     //   // Allocation counter starts at 1
     //   BinaryBExpr(EQ, me_alloc_counter, IntBLiteral(1)),
@@ -575,7 +379,7 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
   override def vprog(p: Program) = {
     // TODO: datatypes would clean liveness up a bit in future. Something like this:
     // https://github.com/boogie-org/boogie/blob/master/Test/datatypes/is-cons.bpl
-   
+
     DoChildren()
   }
 
@@ -587,9 +391,101 @@ class MemoryEncodingTransform(ctx: IRContext) extends CILVisitor {
       case "memset" => transform_memset(p)
       case "strlen" => transform_strlen(p)
       case "memcpy" => transform_memcpy(p)
-      case _ => { }
+      case _ => {}
     }
 
     SkipChildren()
   }
+}
+
+def memoryEncodingDecls(): List[BDeclaration] = {
+  val me_object_param = BMapVar("object", MapBType(BitVecBType(64), IntBType), Scope.Parameter)
+  val me_offset_param = BMapVar("offset", MapBType(BitVecBType(64), BitVecBType(64)), Scope.Parameter)
+  val me_region_param = BMapVar("region", MapBType(BitVecBType(64), IntBType), Scope.Parameter)
+  val me_liveness_param = BMapVar("liveness", MapBType(IntBType, BitVecBType(2)), Scope.Parameter)
+  val me_size_param = BMapVar("size", MapBType(IntBType, BitVecBType(64)), Scope.Parameter)
+  val mem_param = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter)
+  val addr_param = BVariable("addr", BitVecBType(64), Scope.Parameter)
+  val n_param = BVariable("n", BitVecBType(64), Scope.Parameter)
+  val obj_param = BVariable("obj", IntBType, Scope.Parameter)
+  List(
+    BFunction(
+      "addr_to_obj",
+      List(me_object_param, addr_param),
+      BVariable("r", IntBType, Scope.Local),
+      Some(MapAccess(me_object_param, addr_param))
+    ),
+    BFunction(
+      "addr_to_offset",
+      List(me_offset_param, addr_param),
+      BVariable("r", BitVecBType(64), Scope.Local),
+      Some(MapAccess(me_offset_param, addr_param))
+    ),
+    BFunction(
+      "addr_to_region",
+      List(me_region_param, addr_param),
+      BVariable("r", IntBType, Scope.Local),
+      Some(MapAccess(me_region_param, addr_param))
+    ),
+    BFunction(
+      "obj_liveness",
+      List(me_liveness_param, obj_param),
+      BVariable("r", BitVecBType(2), Scope.Local),
+      Some(MapAccess(me_liveness_param, obj_param))
+    ),
+    BFunction(
+      "obj_size",
+      List(me_size_param, obj_param),
+      BVariable("r", BitVecBType(64), Scope.Local),
+      Some(MapAccess(me_size_param, obj_param))
+    ),
+    BFunction(
+      "read_mem",
+      List(mem_param, addr_param),
+      BVariable("r", BitVecBType(8), Scope.Local),
+      Some(MapAccess(mem_param, addr_param))
+    ),
+    BFunction(
+      "valid",
+      List(me_liveness_param, me_size_param, me_object_param, me_region_param, me_offset_param, addr_param, n_param),
+      BVariable("r", BoolBType, Scope.Local),
+      Some(
+        BinaryBExpr(
+          BoolIMPLIES,
+          BinaryBExpr(EQ, MapAccess(me_region_param, addr_param), IntBLiteral(1)),
+          BinaryBExpr(
+            BoolAND,
+            BinaryBExpr(EQ, MapAccess(me_liveness_param, MapAccess(me_object_param, addr_param)), BitVecBLiteral(1, 2)),
+            BinaryBExpr(
+              BoolAND,
+              BinaryBExpr(BVULE, BitVecBLiteral(0, 64), MapAccess(me_offset_param, addr_param)),
+              BinaryBExpr(
+                BVULE,
+                BinaryBExpr(BVADD, MapAccess(me_offset_param, addr_param), n_param),
+                MapAccess(me_size_param, MapAccess(me_object_param, addr_param))
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+}
+
+def assertValid(m: MemoryStore) = {
+  BAssert(
+    BFunctionCall(
+      "valid",
+      List(
+        me_liveness.toBoogie,
+        me_size.toBoogie,
+        me_object.toBoogie,
+        me_region.toBoogie,
+        me_offset.toBoogie,
+        m.index.toBoogie,
+        BitVecBLiteral(m.size / 8, 64)
+      ),
+      BoolBType
+    )
+  )
 }

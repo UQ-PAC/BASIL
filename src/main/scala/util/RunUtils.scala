@@ -62,10 +62,6 @@ object RunUtils {
 
     val analysisManager = AnalysisManager(ctx.program)
 
-    if (conf.memoryEncoding) {
-      visit_prog(transforms.MemoryEncodingTransform(ctx), ctx.program)
-    }
-
     if conf.simplify then doCleanupWithSimplify(ctx, analysisManager)
     else doCleanupWithoutSimplify(ctx, analysisManager)
 
@@ -108,6 +104,10 @@ object RunUtils {
       AnalysisPipelineMRA.runToFixpoint(conf, ctx)
     }
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
+
+    if (conf.memoryEncoding) {
+      visit_prog(transforms.memoryEncoding.MemoryEncodingTransform(ctx, conf.simplify), ctx.program)
+    }
 
     assert(ir.invariant.programDiamondForm(ctx.program))
     ir.eval.SimplifyValidation.validate = conf.validateSimp
