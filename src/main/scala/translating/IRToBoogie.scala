@@ -266,8 +266,10 @@ class IRToBoogie(
       .toList
       .sorted
 
+    val memoryEncodingDecls = if (config.memoryEncoding) then transforms.memoryEncoding.memoryEncodingDecls() else List()
+
     val declarations =
-      globalDecls ++ globalConsts ++ functionsUsed ++ rgLib ++ pushUpModifiesFixedPoint(rgProcs ++ procedures)
+      globalDecls ++ globalConsts ++ functionsUsed ++ memoryEncodingDecls ++ rgLib ++ pushUpModifiesFixedPoint(rgProcs ++ procedures)
     BProgram(declarations, filename)
   }
 
@@ -881,14 +883,15 @@ class IRToBoogie(
 
           val validCheck = if (config.memoryEncoding) {
             // TODO: this is very temporary and should be automated.
-            val me_object = BMapVar("me_object", MapBType(BitVecBType(64), IntBType), Scope.Global)
-            val me_position = BMapVar("me_position", MapBType(BitVecBType(64), BitVecBType(64)), Scope.Global)
-            val me_live = BMapVar("me_live", MapBType(IntBType, BitVecBType(8)), Scope.Global)
-            val me_live_val = BMapVar("me_live_val", MapBType(IntBType, BitVecBType(64)), Scope.Global)
-            val me_global = BMapVar("me_global", MapBType(BitVecBType(64), BoolBType), Scope.Global)
-            List(BAssert(BValid(
-              me_live, me_live_val, me_object, me_position, me_global, m.index.toBoogie, BitVecBLiteral(m.size / 8, 64)
-            )))
+            // val me_object = BMapVar("me_object", MapBType(BitVecBType(64), IntBType), Scope.Global)
+            // val me_position = BMapVar("me_position", MapBType(BitVecBType(64), BitVecBType(64)), Scope.Global)
+            // val me_live = BMapVar("me_live", MapBType(IntBType, BitVecBType(8)), Scope.Global)
+            // val me_live_val = BMapVar("me_live_val", MapBType(IntBType, BitVecBType(64)), Scope.Global)
+            // val me_global = BMapVar("me_global", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+            // List(BAssert(BValid(
+            //   me_live, me_live_val, me_object, me_position, me_global, m.index.toBoogie, BitVecBLiteral(m.size / 8, 64)
+            // )))
+            transforms.memoryEncoding.memoryStoreAsserts(m)
           } else {
             List()
           }

@@ -149,7 +149,7 @@ object RunUtils {
     }
 
     if (conf.memoryEncoding) {
-      visit_prog(transforms.MemoryEncodingTransform(ctx), ctx.program)
+      visit_prog(transforms.memoryEncoding.MemoryEncodingTransform(ctx), ctx.program)
     }
 
     if q.summariseProcedures then
