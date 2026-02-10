@@ -617,6 +617,8 @@ object SpecFixer {
       case b: BVariable if defined.contains(b.name) =>
         BVariable(b.name, b.getType, if makeLocal then Scope.Local else b.scope)
       case b: BVariable => {
+        println(b.name)
+        println(varInPost)
         if isPost && varInPost.contains(b.name) then
           BVariable(varInPost(b.name), b.getType, if makeLocal then Scope.Local else b.scope)
         else if !isPost && varInPre.contains(b.name) then

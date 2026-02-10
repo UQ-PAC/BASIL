@@ -107,6 +107,11 @@ object RunUtils {
 
     assert(ir.invariant.programDiamondForm(ctx.program))
     ir.eval.SimplifyValidation.validate = conf.validateSimp
+
+    if (conf.memoryEncoding) {
+      visit_prog(transforms.memoryEncoding.MemoryEncodingTransform(ctx, conf.simplify), ctx.program)
+    }
+
     if (conf.simplify) {
 
       ir.transforms.clearParams(ctx.program)
@@ -146,10 +151,6 @@ object RunUtils {
         val memTransferTimer = PerformanceTimer("Mem Transfer Timer", INFO)
         visit_prog(MemoryTransform(dsaResults.topDown, dsaResults.globals), ctx.program)
         memTransferTimer.checkPoint("Performed Memory Transform")
-    }
-
-    if (conf.memoryEncoding) {
-      visit_prog(transforms.memoryEncoding.MemoryEncodingTransform(ctx), ctx.program)
     }
 
     if q.summariseProcedures then
