@@ -47,7 +47,7 @@ private def valid(addr: Expr, n: Expr) =
   FApplyExpr("valid", Seq(me_liveness, me_size, me_object, me_region, me_offset, addr, n), BoolType)
 
 // Get associated object for address
-private def addr_to_obj(addr: Expr, map: Expr = me_object) = FApplyExpr("addr_to_object", Seq(map, addr), IntType)
+private def addr_to_obj(addr: Expr, map: Expr = me_object) = FApplyExpr("addr_to_obj", Seq(map, addr), IntType)
 
 // Get address offset into its object
 private def addr_to_offset(addr: Expr, map: Expr = me_offset) =
@@ -83,6 +83,22 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
     p.modifies ++= Set(mem)
 
     p.requiresExpr ++= List(valid(r(0), r(2)))
+
+    p.ensures ++= List(
+      ForAll(
+        List(i.toBoogie),
+        BinaryBExpr(
+          EQ,
+          MapAccess(mem.toGamma, i.toBoogie),
+          IfThenElse(
+            in_bounds(r(0), BinaryExpr(BVADD, r(0), r(2)), i).toBoogie,
+            r(1).toGamma,
+            Old(MapAccess(mem.toGamma, i.toBoogie))
+          )
+        ),
+        List(List(MapAccess(mem.toGamma, i.toBoogie)))
+      )
+    )
 
     p.ensuresExpr ++= List(
       QuantifierExpr(
@@ -286,7 +302,7 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
             )
           )
         ),
-        triggers = List(List(obj_liveness(o), obj_size(o)))
+        triggers = List(List(obj_liveness(o)), List(obj_size(o)))
       ),
 
       // Allocated object was fresh prior to allocation,
@@ -311,21 +327,15 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
 
   private def transform_main(p: Procedure) = {
     p.requiresExpr ++= List(
-      BinaryExpr(EQ, me_object_counter, IntLiteral(0)),
+      BinaryExpr(EQ, me_object_counter, IntLiteral(1)),
       QuantifierExpr(
         QuantifierSort.forall,
-        LambdaExpr(
-          List(o),
-          obj_is_fresh(o)
-        ),
+        LambdaExpr(List(o), obj_is_fresh(o)),
         triggers = List(List(obj_liveness(o)))
       ),
       QuantifierExpr(
         QuantifierSort.forall,
-        LambdaExpr(
-          List(i),
-          BinaryExpr(EQ, addr_to_obj(i), IntLiteral(0))
-        ),
+        LambdaExpr(List(i), BinaryExpr(EQ, addr_to_obj(i), IntLiteral(0))),
         triggers = List(List(addr_to_obj(i)))
       ),
       QuantifierExpr(
@@ -335,11 +345,11 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
           implies_else(
             BinaryExpr(BVULE, i, BitVecLiteral(global_addresses.max, 64)),
             BinaryExpr(EQ, addr_to_region(i), IntLiteral(0)),
-            BinaryExpr(EQ, addr_to_region(i), IntLiteral(1)),
+            BinaryExpr(EQ, addr_to_region(i), IntLiteral(1))
           )
         ),
         triggers = List(List(addr_to_region(i)))
-      ),
+      )
     )
     // p.requires = p.requires ++ List(
     //   // Allocation counter starts at 1
@@ -399,6 +409,7 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
 }
 
 def memoryEncodingDecls(): List[BDeclaration] = {
+  // This is very cursed i know
   val me_object_param = BMapVar("object", MapBType(BitVecBType(64), IntBType), Scope.Parameter)
   val me_offset_param = BMapVar("offset", MapBType(BitVecBType(64), BitVecBType(64)), Scope.Parameter)
   val me_region_param = BMapVar("region", MapBType(BitVecBType(64), IntBType), Scope.Parameter)
@@ -408,6 +419,7 @@ def memoryEncodingDecls(): List[BDeclaration] = {
   val addr_param = BVariable("addr", BitVecBType(64), Scope.Parameter)
   val n_param = BVariable("n", BitVecBType(64), Scope.Parameter)
   val obj_param = BVariable("obj", IntBType, Scope.Parameter)
+
   List(
     BFunction(
       "addr_to_obj",
@@ -452,17 +464,48 @@ def memoryEncodingDecls(): List[BDeclaration] = {
       Some(
         BinaryBExpr(
           BoolIMPLIES,
-          BinaryBExpr(EQ, MapAccess(me_region_param, addr_param), IntBLiteral(1)),
+          BinaryBExpr(
+            EQ,
+            BFunctionCall("addr_to_region", List(me_region_param, addr_param), IntBType, true),
+            IntBLiteral(1)
+          ),
+// case class BFunctionCall(name: String, args: List[BExpr], outType: BType, uninterpreted: Boolean = false)
+//     extends BExpr {
           BinaryBExpr(
             BoolAND,
-            BinaryBExpr(EQ, MapAccess(me_liveness_param, MapAccess(me_object_param, addr_param)), BitVecBLiteral(1, 2)),
+            BinaryBExpr(
+              EQ,
+              BFunctionCall(
+                "obj_liveness",
+                List(
+                  me_liveness_param,
+                  BFunctionCall("addr_to_obj", List(me_object_param, addr_param), IntBType, true)
+                ),
+                BitVecBType(2),
+                true
+              ),
+              BitVecBLiteral(1, 2)
+            ),
             BinaryBExpr(
               BoolAND,
-              BinaryBExpr(BVULE, BitVecBLiteral(0, 64), MapAccess(me_offset_param, addr_param)),
               BinaryBExpr(
                 BVULE,
-                BinaryBExpr(BVADD, MapAccess(me_offset_param, addr_param), n_param),
-                MapAccess(me_size_param, MapAccess(me_object_param, addr_param))
+                BitVecBLiteral(0, 64),
+                BFunctionCall("addr_to_offset", List(me_offset_param, addr_param), BitVecBType(64), true)
+              ),
+              BinaryBExpr(
+                BVULE,
+                BinaryBExpr(
+                  BVADD,
+                  BFunctionCall("addr_to_offset", List(me_offset_param, addr_param), BitVecBType(64), true),
+                  n_param
+                ),
+                BFunctionCall(
+                  "obj_size",
+                  List(me_size_param, BFunctionCall("addr_to_obj", List(me_object_param, addr_param), IntBType, true)),
+                  BitVecBType(64),
+                  true
+                )
               )
             )
           )
