@@ -1,5 +1,6 @@
 package analysis
 
+import analysis.Interval.ConcreteInterval
 import ir.*
 import ir.transforms.AbstractDomain
 import util.assertion.*
@@ -9,8 +10,11 @@ trait MustAnalysis
 
 /** A domain that performs two analyses in parallel.
   */
-class ProductDomain[L1, L2](d1: AbstractDomain[L1], d2: AbstractDomain[L2]) extends AbstractDomain[(L1, L2)] {
+trait ProductDomain[L1, L2] extends AbstractDomain[(L1, L2)] {
   def join(a: (L1, L2), b: (L1, L2), pos: Block): (L1, L2) = (d1.join(a._1, b._1, pos), d2.join(a._2, b._2, pos))
+
+  def d1: AbstractDomain[L1]
+  def d2: AbstractDomain[L2]
 
   override def widen(a: (L1, L2), b: (L1, L2), pos: Block): (L1, L2) =
     (d1.widen(a._1, b._1, pos), d2.widen(a._2, b._2, pos))
@@ -26,10 +30,119 @@ class ProductDomain[L1, L2](d1: AbstractDomain[L1], d2: AbstractDomain[L2]) exte
 }
 
 /**
+ * A domain that is the reduced product of two other domains.
+ */
+trait ReducedProductDomain[L1, L2] extends ProductDomain[L1, L2] {
+  def reduce(a: (L1, L2), c: Command): (L1, L2)
+  override def transfer(a: (L1, L2), c: Command): (L1, L2) = {
+    val things = (d1.transfer(a._1, c), d2.transfer(a._2, c))
+    // PERFORMANCE: This reduces every variable every transfer. Needless to say that this is
+    // quite inefficient.
+    reduce(things, c)
+  }
+}
+
+private implicit val intervalTerm: Interval = Interval.Bottom
+
+/**
+ * The reduced product between the interval and tnum domains.
+ */
+class TNumIntervalReducedProduct extends ReducedProductDomain[LatticeMap[Variable, Interval], Map[Variable, TNum]] {
+  override def d1: AbstractDomain[LatticeMap[Variable, Interval]] = UnsignedIntervalDomain()
+  override def d2: AbstractDomain[Map[Variable, TNum]] = TNumDomain()
+
+  override def reduce(
+    unreduced: (LatticeMap[Variable, Interval], Map[Variable, TNum]),
+    c: Command
+  ): (LatticeMap[Variable, Interval], Map[Variable, TNum]) = {
+    def reduceSingle(int: Interval, x: TNum): (Interval, TNum) = {
+
+      int match {
+        case int: ConcreteInterval =>
+          val interval =
+            Interval.ConcreteInterval(refineLowerBound(int.lower, x), refineUpperBound(int.upper, x), int.width)
+          val tnum = refineTnum(int.lower, int.upper, x)
+          (interval, tnum)
+        case Interval.Top => (Interval.Top, x)
+        case Interval.Bottom => (Interval.Bottom, x)
+      }
+    }
+
+    c match {
+      case c: LocalAssign =>
+        val result = reduceSingle(unreduced._1(c.lhs), unreduced._2(c.lhs))
+        (unreduced._1 + (c.lhs -> result._1), unreduced._2 + (c.lhs -> result._2))
+      case c: MemoryAssign =>
+        val result = reduceSingle(unreduced._1(c.lhs), unreduced._2(c.lhs))
+        (unreduced._1 + (c.lhs -> result._1), unreduced._2 + (c.lhs -> result._2))
+      case c: SimulAssign =>
+        val (ints, tnums) = c.assignments
+          .map((v, e) => v)
+          .map(v => (v, reduceSingle(unreduced._1(v), unreduced._2(v))))
+          .map((v, t) => ((v, t._1), (v, t._2)))
+          .unzip
+        (unreduced._1 ++ ints.toMap, unreduced._2 ++ tnums)
+      case c: Return =>
+        val (ints, tnums) = c.outParams
+          .map((v, e) => v)
+          .map(v => (v, reduceSingle(unreduced._1(v), unreduced._2(v))))
+          .map((v, t) => ((v, t._1), (v, t._2)))
+          .unzip
+        (unreduced._1 ++ ints.toMap, unreduced._2 ++ tnums)
+      case _ => unreduced
+    }
+  }
+
+  /* These three methods (refine*()) are only exposed publicly so they can be tested, since they
+   * contain most of the logic for this domain. You probably shouldn't use them.
+   */
+  def refineLowerBound(a: BigInt, x: TNum): BigInt = {
+    var newBound = x.maxUnsignedValue().value
+    for i <- x.width to 0 by -1
+    do
+      if 0 != (x.mask.value & (1 << i)) then
+        newBound = newBound & (~(1 << i)) // Unset the ith bit
+        if newBound < a then newBound = newBound | (1 << i) // Re-set the ith bit
+    newBound
+  }
+
+  def refineUpperBound(a: BigInt, x: TNum): BigInt = {
+    var newBound = x.minUnsignedValue().value
+    for i <- x.width to 0 by -1
+    do
+      if 0 != (x.mask.value & (1 << i)) then
+        newBound = newBound | (1 << i) // Set the ith bit
+        if newBound > a then newBound = newBound & (~(1 << i)) // Unset the ith bit
+    newBound
+  }
+
+  def refineTnum(a: BigInt, b: BigInt, x: TNum): TNum = {
+    val mask = ~(a ^ b)
+    var lb = a // An extra copy to obliterate instead of breaking from the loop
+    var stupidVariable = 1
+    var value = x.value.value
+    var tnumMask = x.mask.value
+    for i <- x.width - 1 to 0 by -1 do
+      if (mask & (1 << i)) == 0 then
+        lb = 0
+        stupidVariable = 0 // Because break doesn't exist because actually this for loop is a
+      // method call! or something. Just do nothing for the rest of the loop instead.
+      /* if !(((value & (1 << i)) > 0) || ((value & (1 << i)) == (a & (1 << i)))) then
+       *    TODO: go to bottom here because interval and tnum don't overlap */
+      value = value | (lb & (1 << i))
+      tnumMask = tnumMask & (~(stupidVariable << i))
+
+    TNum(BitVecLiteral(value, x.width), BitVecLiteral(tnumMask, x.width))
+  }
+}
+
+/**
  * Encodes the conjunction of two domain predicates.
  */
-class PredProductDomain[L1, L2](d1: PredicateEncodingDomain[L1], d2: PredicateEncodingDomain[L2])
-    extends ProductDomain[L1, L2](d1, d2)
+class PredProductDomain[L1, L2](
+  override val d1: PredicateEncodingDomain[L1],
+  override val d2: PredicateEncodingDomain[L2]
+) extends ProductDomain[L1, L2]
     with PredicateEncodingDomain[(L1, L2)] {
 
   def toPred(x: (L1, L2)): Predicate = Predicate.and(d1.toPred(x._1), d2.toPred(x._2)).simplify
