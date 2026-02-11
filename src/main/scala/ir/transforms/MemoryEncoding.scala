@@ -4,8 +4,6 @@ import boogie.*
 import ir.cilvisitor.*
 import ir.*
 
-private def r(n: Int) = Register(s"R$n", 64)
-
 // object counter:
 private val me_object_counter = GlobalVar("me_object_counter", IntType)
 
@@ -75,24 +73,37 @@ private def read_mem(addr: Expr, map: Expr = mem) = FApplyExpr("read_mem", Seq(m
 class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisitor {
   private var global_addresses = ctx.symbols.flatMap(s => Range(s.value.intValue, s.value.intValue + s.size)).toSet
 
+  private def r(n: Int) = if simplify then LocalVar(s"R${n}_out", BitVecType(64))
+  else Register(s"R$n", 64)
+
+  private def old_r(n: Int) = if simplify then LocalVar(s"R${n}_in", BitVecType(64)) else OldExpr(Register(s"R$n", 64))
+
+  private def old_gamma_r(n: Int) = if simplify then LocalVar(s"R${n}_in", BitVecType(64)).toGamma else Old(Register(s"R$n", 64).toGamma)
+
+  // for preconditions, aka no OLD and maps to #Rn_in wiht simplify
+  private def pre_r(n: Int) = if simplify then LocalVar(s"R${n}_in", BitVecType(64))
+  else Register(s"R$n", 64)
+
   private def transform_memset(p: Procedure) = {
     // r0: Start address
     // r1: Character
     // r2: Bytes to write
 
     p.modifies ++= Set(mem)
+    if !simplify then p.modifies ++= Set(Register("R0", 64))
 
-    p.requiresExpr ++= List(valid(r(0), r(2)))
+    p.requiresExpr ++= List(valid(pre_r(0), pre_r(2)))
 
     p.ensures ++= List(
+      BinaryBExpr(EQ, r(0).toBoogie, old_r(0).toBoogie),
       ForAll(
         List(i.toBoogie),
         BinaryBExpr(
           EQ,
           MapAccess(mem.toGamma, i.toBoogie),
           IfThenElse(
-            in_bounds(r(0), BinaryExpr(BVADD, r(0), r(2)), i).toBoogie,
-            r(1).toGamma,
+            in_bounds(old_r(0), BinaryExpr(BVADD, old_r(0), old_r(2)), i).toBoogie,
+            old_gamma_r(1),
             Old(MapAccess(mem.toGamma, i.toBoogie))
           )
         ),
@@ -106,8 +117,8 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
         LambdaExpr(
           List(i),
           implies_else(
-            in_bounds(r(0), BinaryExpr(BVADD, r(0), r(2)), i),
-            BinaryExpr(EQ, read_mem(i), Extract(8, 0, r(1))),
+            in_bounds(old_r(0), BinaryExpr(BVADD, old_r(0), old_r(2)), i),
+            BinaryExpr(EQ, read_mem(i), Extract(8, 0, old_r(1))),
             BinaryExpr(EQ, read_mem(i), read_mem(i, map = OldExpr(mem)))
           )
         ),
@@ -122,18 +133,20 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
     // r2: Bytes to copy
 
     p.modifies ++= Set(mem)
+    if !simplify then p.modifies ++= Set(Register("R0", 64))
 
-    p.requires ++= List(BinaryBExpr(EQ, r(2).toGamma, TrueBLiteral))
+    p.requires ++= List(BinaryBExpr(EQ, pre_r(2).toGamma, TrueBLiteral))
 
     p.requiresExpr ++= List(
       // BinaryExpr(EQ, gamma_r(2), TrueLiteral),
-      valid(r(0), r(2)),
-      valid(r(1), r(2))
+      valid(pre_r(0), pre_r(2)),
+      valid(pre_r(1), pre_r(2))
     )
 
-    val cond = in_bounds(r(0), BinaryExpr(BVADD, r(0), r(2)), i)
+    val cond = in_bounds(pre_r(0), BinaryExpr(BVADD, old_r(0), old_r(2)), i)
 
     p.ensures ++= List(
+      BinaryBExpr(EQ, r(0).toBoogie, old_r(0).toBoogie),
       ForAll(
         List(i.toBoogie),
         BinaryBExpr(
@@ -141,7 +154,7 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
           MapAccess(mem.toGamma, i.toBoogie),
           IfThenElse(
             cond.toBoogie,
-            MapAccess(mem.toGamma, BinaryBExpr(BVADD, addr_to_offset(i).toBoogie, r(1).toBoogie)),
+            MapAccess(mem.toGamma, BinaryBExpr(BVADD, addr_to_offset(i).toBoogie, old_r(1).toBoogie)),
             Old(MapAccess(mem.toGamma, i.toBoogie))
           )
         ),
@@ -156,7 +169,7 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
           List(i),
           implies_else(
             cond,
-            BinaryExpr(EQ, read_mem(i), read_mem(BinaryExpr(BVADD, addr_to_offset(i), r(1)))),
+            BinaryExpr(EQ, read_mem(i), read_mem(BinaryExpr(BVADD, addr_to_offset(i), old_r(1)))),
             BinaryExpr(EQ, read_mem(i), read_mem(i, map = OldExpr(mem)))
           )
         ),
@@ -166,17 +179,17 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
   }
 
   private def transform_strlen(p: Procedure) = {
-    p.modifies ++= (if (simplify) then Set() else Set(r(0)))
+    if !simplify then p.modifies ++= Set(Register("R0", 64))
 
     p.requiresExpr ++= List(
-      valid(r(0), BitVecLiteral(1, 64)),
+      valid(pre_r(0), BitVecLiteral(1, 64)),
       QuantifierExpr(
         QuantifierSort.exists,
         LambdaExpr(
           List(i),
           BinaryExpr(
             BoolAND,
-            BinaryExpr(EQ, addr_to_obj(i), addr_to_obj(r(0))),
+            BinaryExpr(EQ, addr_to_obj(i), addr_to_obj(pre_r(0))),
             BinaryExpr(EQ, read_mem(i), BitVecLiteral(0, 8))
           )
         )
@@ -185,19 +198,16 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
 
     p.ensures = p.ensures ++ List(BinaryBExpr(EQ, r(0).toGamma, TrueBLiteral))
 
-    val dest = BinaryExpr(BVADD, OldExpr(r(0)), r(0));
+    val dest = BinaryExpr(BVADD, old_r(0), r(0));
     p.ensuresExpr ++= List(
       QuantifierExpr(
         QuantifierSort.forall,
-        LambdaExpr(
-          List(i),
-          implies(in_bounds(OldExpr(r(0)), dest, i), BinaryExpr(NEQ, read_mem(i), BitVecLiteral(0, 8)))
-        ),
+        LambdaExpr(List(i), implies(in_bounds(old_r(0), dest, i), BinaryExpr(NEQ, read_mem(i), BitVecLiteral(0, 8)))),
         triggers = List(List(read_mem(i)))
       ),
       BinaryExpr(EQ, read_mem(dest), BitVecLiteral(0, 8)),
-      valid(OldExpr(r(0)), r(0)),
-      BinaryExpr(BVULE, OldExpr(r(0)), dest)
+      valid(old_r(0), r(0)),
+      BinaryExpr(BVULE, old_r(0), dest)
     )
   }
 
@@ -206,11 +216,11 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
 
     p.requiresExpr ++= List(
       // Addr must be at offset 0 to free
-      BinaryExpr(EQ, addr_to_offset(r(0)), BitVecLiteral(0, 64)),
+      BinaryExpr(EQ, addr_to_offset(pre_r(0)), BitVecLiteral(0, 64)),
       // obj must be alive
-      obj_is_alive(addr_to_obj(r(0))),
+      obj_is_alive(addr_to_obj(pre_r(0))),
       // Addr must be heap allocated
-      BinaryExpr(EQ, addr_to_region(r(0)), IntLiteral(1))
+      BinaryExpr(EQ, addr_to_region(pre_r(0)), IntLiteral(1))
     )
 
     // Freeing requires fully high gamma
@@ -219,7 +229,7 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
         List(i.toBoogie),
         BinaryBExpr(
           BoolIMPLIES,
-          same_object(i, r(0)).toBoogie,
+          same_object(i, pre_r(0)).toBoogie,
           BinaryBExpr(EQ, MapAccess(mem.toGamma, i.toBoogie), TrueBLiteral)
         )
       )
@@ -232,7 +242,7 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
         LambdaExpr(
           List(o),
           implies_else(
-            BinaryExpr(EQ, o, addr_to_obj(r(0))),
+            BinaryExpr(EQ, o, addr_to_obj(old_r(0))),
             obj_is_dead(o),
             BinaryExpr(EQ, obj_liveness(o), obj_liveness(o, map = OldExpr(me_liveness)))
           )
@@ -243,21 +253,22 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
   }
 
   private def transform_malloc(p: Procedure) = {
-    p.modifies ++= Set(me_object_counter, me_liveness, me_live, me_offset, me_object) ++ (if (simplify) then Set()
-                                                                                          else Set(r(0)))
+    p.modifies ++= Set(me_object_counter, me_liveness, me_live, me_offset, me_object)
 
-    p.requires ++= List(BinaryBExpr(EQ, r(0).toGamma, TrueBLiteral))
+    if !simplify then p.modifies ++= Set(Register("R0", 64))
+
+    p.requires ++= List(BinaryBExpr(EQ, pre_r(0).toGamma, TrueBLiteral))
 
     p.requiresExpr ++= List(
       // Cant malloc 0 or less bytes
-      BinaryExpr(BVUGT, r(0), BitVecLiteral(0, 64))
+      BinaryExpr(BVUGT, pre_r(0), BitVecLiteral(0, 64))
     )
 
     p.ensures ++= List(BinaryBExpr(EQ, r(0).toGamma, TrueBLiteral))
 
     p.ensuresExpr ++= List(
       BinaryExpr(EQ, me_object_counter, BinaryExpr(IntADD, OldExpr(me_object_counter), IntLiteral(1))),
-      BinaryExpr(BVUGT, BinaryExpr(BVADD, r(0), OldExpr(r(0))), r(0)),
+      BinaryExpr(BVUGT, BinaryExpr(BVADD, r(0), old_r(0)), r(0)),
 
       // All addresses in allocation are updated to the new object
       QuantifierExpr(
@@ -265,7 +276,7 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
         LambdaExpr(
           List(i),
           implies_else(
-            in_bounds(r(0), BinaryExpr(BVADD, r(0), OldExpr(r(0))), i),
+            in_bounds(r(0), BinaryExpr(BVADD, r(0), old_r(0)), i),
             BinaryExpr(EQ, addr_to_obj(i), OldExpr(me_object_counter)),
             BinaryExpr(EQ, addr_to_obj(i), addr_to_obj(i, map = OldExpr(me_object)))
           )
@@ -294,7 +305,7 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
           List(o),
           implies_else(
             BinaryExpr(EQ, o, OldExpr(me_object_counter)),
-            BinaryExpr(BoolAND, obj_is_alive(o), BinaryExpr(EQ, obj_size(o), OldExpr(r(0)))),
+            BinaryExpr(BoolAND, obj_is_alive(o), BinaryExpr(EQ, obj_size(o), old_r(0))),
             BinaryExpr(
               BoolAND,
               BinaryExpr(EQ, obj_liveness(o), obj_liveness(o, map = OldExpr(me_liveness))),

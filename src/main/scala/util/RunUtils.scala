@@ -105,10 +105,6 @@ object RunUtils {
     }
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
 
-    if (conf.memoryEncoding) {
-      visit_prog(transforms.memoryEncoding.MemoryEncodingTransform(ctx, conf.simplify), ctx.program)
-    }
-
     assert(ir.invariant.programDiamondForm(ctx.program))
     ir.eval.SimplifyValidation.validate = conf.validateSimp
     if (conf.simplify) {
@@ -150,6 +146,10 @@ object RunUtils {
         val memTransferTimer = PerformanceTimer("Mem Transfer Timer", INFO)
         visit_prog(MemoryTransform(dsaResults.topDown, dsaResults.globals), ctx.program)
         memTransferTimer.checkPoint("Performed Memory Transform")
+    }
+
+    if (conf.memoryEncoding) {
+      visit_prog(transforms.memoryEncoding.MemoryEncodingTransform(ctx, conf.simplify), ctx.program)
     }
 
     if q.summariseProcedures then
