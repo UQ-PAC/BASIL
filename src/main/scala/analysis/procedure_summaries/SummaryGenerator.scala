@@ -221,8 +221,8 @@ def getGenerateProcedureSummariesTransform(simplified: Boolean): Transform =
 
       val summaryGenerator = SummaryGenerator(prog, simplified)
       for procedure <- prog.procedures if procedure != prog.mainProcedure do
-        procedure.requires = summaryGenerator.generateRequires(procedure)
-        procedure.ensures = summaryGenerator.generateEnsures(procedure)
+        procedure.requires ++= summaryGenerator.generateRequires(procedure)
+        procedure.ensures ++= summaryGenerator.generateEnsures(procedure)
 
       man.ClobberAll
     },

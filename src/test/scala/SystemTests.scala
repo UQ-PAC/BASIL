@@ -711,6 +711,7 @@ class MemoryEncodingSystemTests extends SystemTests {
       useBAPFrontend = false,
       expectVerify = true,
       memoryEncoding = true,
+      simplify = true,
       timeout = timeout
     )
   )
@@ -721,6 +722,7 @@ class MemoryEncodingSystemTests extends SystemTests {
       useBAPFrontend = false,
       expectVerify = false,
       memoryEncoding = true,
+      simplify = true,
       timeout = timeout
     )
   )
