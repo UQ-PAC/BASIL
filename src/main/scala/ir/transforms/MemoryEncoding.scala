@@ -362,39 +362,6 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
         triggers = List(List(addr_to_region(i)))
       )
     )
-    // p.requires = p.requires ++ List(
-    //   // Allocation counter starts at 1
-    //   BinaryBExpr(EQ, me_alloc_counter, IntBLiteral(1)),
-
-    //   // All objects start fresh ...
-    //   ForAll(
-    //     List(o),
-    //     BinaryBExpr(EQ,
-    //       MapAccess(me_live, o),
-    //       BitVecBLiteral(2, 8)
-    //     ),
-    //     List(List(MapAccess(me_live, o)))
-    //   ),
-
-    //   // ... with id 0
-    //   ForAll(
-    //     List(i),
-    //     BinaryBExpr(EQ,
-    //       MapAccess(me_object, i),
-    //       IntBLiteral(0)
-    //     ),
-    //     List(List(MapAccess(me_object, i)))
-    //   ),
-
-    //   ForAll(
-    //     List(i),
-    //     BinaryBExpr(EQ,
-    //       MapAccess(me_global, i),
-    //       BinaryBExpr(BVULE, i, BitVecBLiteral(global_addresses.max, 64)),
-    //     ),
-    //     List(List(MapAccess(me_global, i)))
-    //   ),
-    // )
   }
 
   override def vprog(p: Program) = {
@@ -480,8 +447,6 @@ def memoryEncodingDecls(): List[BDeclaration] = {
             BFunctionCall("addr_to_region", List(me_region_param, addr_param), IntBType, true),
             IntBLiteral(1)
           ),
-// case class BFunctionCall(name: String, args: List[BExpr], outType: BType, uninterpreted: Boolean = false)
-//     extends BExpr {
           BinaryBExpr(
             BoolAND,
             BinaryBExpr(
