@@ -74,8 +74,9 @@ trait BASILTest {
       simplify = simplify,
       summariseProcedures = summariseProcedures,
       staticAnalysis = staticAnalysisConf,
-      boogieTranslation =
-        util.BoogieGeneratorConfig(memoryEncoding=memoryEncoding).copy(memoryFunctionType = util.BoogieMemoryAccessMode.SuccessiveStoreSelect),
+      boogieTranslation = util
+        .BoogieGeneratorConfig(memoryEncoding = memoryEncoding)
+        .copy(memoryFunctionType = util.BoogieMemoryAccessMode.SuccessiveStoreSelect),
       outputPrefix = BPLPath,
       dsaConfig = dsa,
       memoryTransform = memoryTransform,

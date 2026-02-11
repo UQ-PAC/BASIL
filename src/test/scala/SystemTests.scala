@@ -700,30 +700,17 @@ class MemoryTransformSystemTests extends SystemTests {
   )
 }
 
-
 @test_util.tags.StandardSystemTest
 class MemoryEncodingSystemTests extends SystemTests {
   private val timeout = 60
 
   runTests(
     "memory_encoding/correct",
-    TestConfig(
-      useBAPFrontend = false,
-      expectVerify = true,
-      memoryEncoding = true,
-      simplify = true,
-      timeout = timeout
-    )
+    TestConfig(useBAPFrontend = false, expectVerify = true, memoryEncoding = true, simplify = true, timeout = timeout)
   )
 
   runTests(
     "memory_encoding/incorrect",
-    TestConfig(
-      useBAPFrontend = false,
-      expectVerify = false,
-      memoryEncoding = true,
-      simplify = true,
-      timeout = timeout
-    )
+    TestConfig(useBAPFrontend = false, expectVerify = false, memoryEncoding = true, simplify = true, timeout = timeout)
   )
 }

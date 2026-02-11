@@ -486,7 +486,8 @@ case class IfThenElse(guard: BExpr, thenExpr: BExpr, elseExpr: BExpr) extends BE
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitIfThenElse(this)
 }
 
-trait BQuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr, triggers: List[List[BExpr]] = List()) extends BExpr {
+trait BQuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr, triggers: List[List[BExpr]] = List())
+    extends BExpr {
   override def toString: String = {
     val trstr = if triggers.nonEmpty then {
       triggers.filter(t => t.nonEmpty).map(t => "{" + t.mkString(",") + "}").mkString(" ")

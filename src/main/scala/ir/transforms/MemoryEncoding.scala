@@ -78,7 +78,8 @@ class MemoryEncodingTransform(ctx: IRContext, simplify: Boolean) extends CILVisi
 
   private def old_r(n: Int) = if simplify then LocalVar(s"R${n}_in", BitVecType(64)) else OldExpr(Register(s"R$n", 64))
 
-  private def old_gamma_r(n: Int) = if simplify then LocalVar(s"R${n}_in", BitVecType(64)).toGamma else Old(Register(s"R$n", 64).toGamma)
+  private def old_gamma_r(n: Int) =
+    if simplify then LocalVar(s"R${n}_in", BitVecType(64)).toGamma else Old(Register(s"R$n", 64).toGamma)
 
   // for preconditions, aka no OLD and maps to #Rn_in wiht simplify
   private def pre_r(n: Int) = if simplify then LocalVar(s"R${n}_in", BitVecType(64))

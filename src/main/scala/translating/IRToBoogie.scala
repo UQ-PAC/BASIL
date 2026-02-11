@@ -269,7 +269,9 @@ class IRToBoogie(
     val memEncodingDecls = if (config.memoryEncoding) then transforms.memoryEncoding.memoryEncodingDecls() else List()
 
     val declarations =
-      globalDecls ++ globalConsts ++ functionsUsed ++ memEncodingDecls ++ rgLib ++ pushUpModifiesFixedPoint(rgProcs ++ procedures)
+      globalDecls ++ globalConsts ++ functionsUsed ++ memEncodingDecls ++ rgLib ++ pushUpModifiesFixedPoint(
+        rgProcs ++ procedures
+      )
     BProgram(declarations, filename)
   }
 
@@ -880,7 +882,6 @@ class IRToBoogie(
           List(store) ++ stateSplit
         case memory: SharedMemory =>
 
-
           val validCheck = if (config.memoryEncoding) {
             List(transforms.memoryEncoding.assertValid(m))
           } else {
@@ -893,7 +894,9 @@ class IRToBoogie(
             val rely = BProcedureCall("rely")
             val oldAssigns = translateOldAssigns(Set(memory))
             val guaranteeChecks = translateGuaranteeChecks(List(m))
-            List(rely) ++ oldAssigns ++ List(gammaValueCheck) ++ validCheck ++ List(store) ++ secureUpdate ++ guaranteeChecks ++ stateSplit
+            List(rely) ++ oldAssigns ++ List(gammaValueCheck) ++ validCheck ++ List(
+              store
+            ) ++ secureUpdate ++ guaranteeChecks ++ stateSplit
           } else {
             List(gammaValueCheck) ++ validCheck ++ List(store) ++ secureUpdate ++ stateSplit
           }
