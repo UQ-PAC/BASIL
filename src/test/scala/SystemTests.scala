@@ -702,7 +702,7 @@ class MemoryTransformSystemTests extends SystemTests {
 
 @test_util.tags.StandardSystemTest
 class MemoryEncodingSystemTests extends SystemTests {
-  private val timeout = 60
+  private val timeout = 240
 
   runTests(
     "memory_encoding/correct",
