@@ -1,8 +1,8 @@
 package ir.transforms.memoryEncoding
 
 import boogie.*
-import ir.cilvisitor.*
 import ir.*
+import ir.cilvisitor.*
 
 // object counter:
 private val me_object_counter = GlobalVar("me_object_counter", IntType)
