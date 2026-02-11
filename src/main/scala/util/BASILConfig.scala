@@ -15,7 +15,8 @@ case class BoogieGeneratorConfig(
   coalesceConstantMemory: Boolean = true,
   procedureRely: Option[ProcRelyVersion] = None,
   threadSplit: Boolean = false,
-  directTranslation: Boolean = false
+  directTranslation: Boolean = false,
+  memoryEncoding: Boolean = false
 )
 
 case class ILLoadingConfig(
@@ -89,5 +90,6 @@ case class BASILConfig(
   assertCalleeSaved: Boolean = false,
   staticAnalysis: Option[StaticAnalysisConfig] = None,
   boogieTranslation: BoogieGeneratorConfig = BoogieGeneratorConfig(),
+  memoryEncoding: Boolean = false,
   outputPrefix: String
 )

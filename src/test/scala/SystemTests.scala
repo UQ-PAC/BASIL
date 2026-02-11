@@ -191,6 +191,7 @@ trait SystemTests extends AnyFunSuite, CaptureOutput, BASILTest, TestCustomisati
       conf.summariseProcedures,
       dsa = conf.dsa,
       memoryTransform = conf.memoryTransform,
+      memoryEncoding = conf.memoryEncoding,
       useOfflineLifterForGtirbFrontend = conf.useOfflineLifterForGtirbFrontend
     )
     val translateTime = timer.checkPoint("translate-boogie")
@@ -696,5 +697,20 @@ class MemoryTransformSystemTests extends SystemTests {
       dsa = Some(DSConfig()),
       memoryTransform = true
     )
+  )
+}
+
+@test_util.tags.StandardSystemTest
+class MemoryEncodingSystemTests extends SystemTests {
+  private val timeout = 240
+
+  runTests(
+    "memory_encoding/correct",
+    TestConfig(useBAPFrontend = false, expectVerify = true, memoryEncoding = true, simplify = true, timeout = timeout)
+  )
+
+  runTests(
+    "memory_encoding/incorrect",
+    TestConfig(useBAPFrontend = false, expectVerify = false, memoryEncoding = true, simplify = true, timeout = timeout)
   )
 }

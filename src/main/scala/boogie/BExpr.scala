@@ -486,9 +486,12 @@ case class IfThenElse(guard: BExpr, thenExpr: BExpr, elseExpr: BExpr) extends BE
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitIfThenElse(this)
 }
 
-trait BQuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr, triggers: List[BExpr] = List()) extends BExpr {
+trait BQuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr, triggers: List[List[BExpr]] = List())
+    extends BExpr {
   override def toString: String = {
-    val trstr = if triggers.nonEmpty then "{" + triggers.mkString(",") + "} " else ""
+    val trstr = if triggers.nonEmpty then {
+      triggers.filter(t => t.nonEmpty).map(t => "{" + t.mkString(",") + "}").mkString(" ")
+    } else ""
     val boundString = bound.map(_.withType).mkString(", ")
     s"($sort $boundString::  $trstr($body))"
   }
@@ -510,10 +513,10 @@ enum Quantifier {
   case lambda
 }
 
-case class ForAll(bound: List[BVar], body: BExpr, triggers: List[BExpr] = List())
+case class ForAll(bound: List[BVar], body: BExpr, triggers: List[List[BExpr]] = List())
     extends BQuantifierExpr(Quantifier.forall, bound, body, triggers)
 
-case class Exists(bound: List[BVar], body: BExpr, triggers: List[BExpr] = List())
+case class Exists(bound: List[BVar], body: BExpr, triggers: List[List[BExpr]] = List())
     extends BQuantifierExpr(Quantifier.exists, bound, body, triggers)
 
 case class Lambda(bound: List[BVar], body: BExpr) extends BQuantifierExpr(Quantifier.lambda, bound, body)

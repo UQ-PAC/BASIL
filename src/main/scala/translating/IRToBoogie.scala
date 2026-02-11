@@ -257,7 +257,7 @@ class IRToBoogie(
     val functionsUsed = (functionsUsed2 ++ functionsUsed3 ++ functionsUsed4 ++ functionsUsed5).toList.sorted
 
     val globalVars = procedures.flatMap(_.globals) ++ rgProcs.flatMap(_.globals)
-    val globalDecls = globalVars.map(b => BVarDecl(b, List(externAttr))).distinct.sorted.toList
+    val globalDecls = globalVars.distinctBy(b => b.name).map(b => BVarDecl(b, List(externAttr))).distinct.sorted.toList
 
     val globalConsts: List[BConstAxiomPair] = globals
       .map { g =>
@@ -266,8 +266,12 @@ class IRToBoogie(
       .toList
       .sorted
 
+    val memEncodingDecls = if (config.memoryEncoding) then transforms.memoryEncoding.memoryEncodingDecls() else List()
+
     val declarations =
-      globalDecls ++ globalConsts ++ functionsUsed ++ rgLib ++ pushUpModifiesFixedPoint(rgProcs ++ procedures)
+      globalDecls ++ globalConsts ++ functionsUsed ++ memEncodingDecls ++ rgLib ++ pushUpModifiesFixedPoint(
+        rgProcs ++ procedures
+      )
     BProgram(declarations, filename)
   }
 
@@ -877,15 +881,24 @@ class IRToBoogie(
         case _: StackMemory =>
           List(store) ++ stateSplit
         case memory: SharedMemory =>
+
+          val validCheck = if (config.memoryEncoding) {
+            List(transforms.memoryEncoding.assertValid(m))
+          } else {
+            List()
+          }
+
           val gammaValueCheck = BAssert(BinaryBExpr(BoolIMPLIES, L(LArgs, rhs.index), exprToGamma(m.value)))
           val secureUpdate = translateSecureUpdate(List(m))
           if (!atomic) {
             val rely = BProcedureCall("rely")
             val oldAssigns = translateOldAssigns(Set(memory))
             val guaranteeChecks = translateGuaranteeChecks(List(m))
-            List(rely) ++ oldAssigns ++ List(gammaValueCheck, store) ++ secureUpdate ++ guaranteeChecks ++ stateSplit
+            List(rely) ++ oldAssigns ++ List(gammaValueCheck) ++ validCheck ++ List(
+              store
+            ) ++ secureUpdate ++ guaranteeChecks ++ stateSplit
           } else {
-            List(gammaValueCheck, store) ++ secureUpdate ++ stateSplit
+            List(gammaValueCheck) ++ validCheck ++ List(store) ++ secureUpdate ++ stateSplit
           }
       }
     case l: LocalAssign =>

@@ -465,15 +465,15 @@ case class LambdaExpr(binds: List[LocalVar], body: Expr) extends Expr {
   def returnType = body.getType
 }
 
-case class QuantifierExpr(kind: QuantifierSort, body: LambdaExpr, triggers: List[Expr] = List()) extends Expr {
+case class QuantifierExpr(kind: QuantifierSort, body: LambdaExpr, triggers: List[List[Expr]] = List()) extends Expr {
   require(body.returnType == BoolType, "Type error: quantifier with non-boolean body")
   override def getType: IRType = BoolType
   def toBoogie: BExpr = {
     val b = body.binds.map(_.toBoogie)
     val bdy = body.body.toBoogie
     kind match {
-      case QuantifierSort.forall => ForAll(b, bdy, triggers.map(_.toBoogie))
-      case QuantifierSort.exists => Exists(b, bdy, triggers.map(_.toBoogie))
+      case QuantifierSort.forall => ForAll(b, bdy, triggers.map(_.map(_.toBoogie)))
+      case QuantifierSort.exists => Exists(b, bdy, triggers.map(_.map(_.toBoogie)))
     }
   }
   override def variables: Set[Variable] = body.variables

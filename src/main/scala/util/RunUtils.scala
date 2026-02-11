@@ -148,6 +148,10 @@ object RunUtils {
         memTransferTimer.checkPoint("Performed Memory Transform")
     }
 
+    if (conf.memoryEncoding) {
+      visit_prog(transforms.memoryEncoding.MemoryEncodingTransform(ctx, conf.simplify), ctx.program)
+    }
+
     if (conf.transformIrreducibleLoops) {
       StaticAnalysisLogger.info("[!] Transforming Irreducible Loops")
       IrreducibleLoops.transform_all_and_update(ctx.program)
