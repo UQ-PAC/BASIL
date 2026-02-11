@@ -5,7 +5,8 @@ import util.BoogieMemoryAccessMode
 val externAttr = BAttribute("extern")
 val inlineAttr = BAttribute("inline")
 
-type BasilIRFunctionOp = BoolToBV1Op | BVFunctionOp | MemoryLoadOp | MemoryStoreOp | ByteExtract | InBounds | BUninterpreted
+type BasilIRFunctionOp = BoolToBV1Op | BVFunctionOp | MemoryLoadOp | MemoryStoreOp | ByteExtract | InBounds |
+  BUninterpreted
 
 def genFunctionOpDefinition(
   f: BasilIRFunctionOp,
