@@ -8,17 +8,20 @@
 }
 
 .custom-flow-node {
+  display: block;
+  width: auto !important;
+  height: auto !important;
   padding: 10px 15px;
+  overflow: hidden;
+  box-sizing: border-box;
   background-color: var(--cfg-node-background-color) !important;
   border-radius: 5px;
   font-family: 'Mono', monospace;
   font-size: 0.8em;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-  display: flex;
-  flex-grow: 1;
-  align-items: center;
-  box-sizing: border-box;
+
 }
+
 
 /* Specific styling for selected nodes */
 .custom-flow-node.selected {
@@ -28,6 +31,20 @@
 .custom-node-header-text {
   flex-grow: 1;
   color: var(--cfg-node-text-color);
+  align-items: center;
+
+}
+
+.custom-node-header-text pre,
+.custom-node-header-text code {
+  all: unset;
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  width: max-content;
 }
 
 .react-flow__panel.react-flow__minimap {
