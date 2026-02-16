@@ -1,6 +1,6 @@
 // src/api/viewer.ts
 import { API_BASE_URL } from './index';
-import type { GraphJSON } from '../utils/graphLayout.ts'; // TODO: Or maybe move this here
+import type { GraphJSON } from '../utils/graphLayout.ts';
 
 interface ProcedureLocation {
   name: string;
@@ -13,6 +13,25 @@ export interface IREpochData {
   after: string;
   procedures: ProcedureLocation[];
   epochName: string;
+}
+
+export interface ProcedureMetadata {
+  name: string;
+  beforeHash: string;
+  afterHash: string;
+}
+
+export async function fetchProcedureIndex(
+  epoch: string
+): Promise<ProcedureMetadata[]> {
+  const response = await fetch(`${API_BASE_URL}/ir/${epoch}/procedures`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      errorText || `HTTP error fetching procedure index for epoch ${epoch}`
+    );
+  }
+  return response.json();
 }
 
 export async function fetchGraphJson(

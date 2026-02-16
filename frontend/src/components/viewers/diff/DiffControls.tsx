@@ -1,11 +1,4 @@
 import ReactDOM from 'react-dom';
-import * as React from 'react';
-
-interface ProcedureLocation {
-  name: string;
-  startLine: number;
-  approxEndLine: number; // You might not need this one in controls, but keeping for consistency
-}
 
 type Props = {
   headerElement: HTMLElement | null;
@@ -13,8 +6,6 @@ type Props = {
   setOutputFormat: (val: 'side-by-side' | 'line-by-line') => void;
   contextLines: number;
   setContextLines: (val: number) => void;
-  procedureList: ProcedureLocation[];
-  onSelectProcedure: (lineNumber: number) => void;
 };
 
 export function DiffControls({
@@ -23,23 +14,10 @@ export function DiffControls({
   setOutputFormat,
   contextLines,
   setContextLines,
-  procedureList,
-  onSelectProcedure,
 }: Props) {
-  if (!headerElement) return null;
-
-  // Handler for the new procedure dropdown
-  const handleProcedureChange = (
-    event: React.ChangeEvent<HTMLSelectElement>
-  ) => {
-    const selectedLine = parseInt(event.target.value, 10);
-    if (!isNaN(selectedLine) && selectedLine > 0) {
-      onSelectProcedure(selectedLine);
-    }
-  };
-
-  return ReactDOM.createPortal(
+  const controls = (
     <div className="custom-controls">
+      {/* Output Format Toggle */}
       <div className="toggle-group">
         <button
           className={`toggle-button ${outputFormat === 'side-by-side' ? 'active' : ''}`}
@@ -57,29 +35,7 @@ export function DiffControls({
         </button>
       </div>
 
-      <div className="display-type-container">
-        <div className="procedure-select-wrapper">
-          <label htmlFor="procedure-select" className="procedure-label">
-            Go to Procedure:
-          </label>
-          <select
-            id="procedure-select"
-            className="procedure-dropdown"
-            onChange={handleProcedureChange}
-            defaultValue="" // Default to an empty option
-          >
-            <option value="" disabled>
-              Select a procedure
-            </option>
-            {procedureList.map((proc) => (
-              <option key={proc.name} value={proc.startLine}>
-                {proc.name} (Line {proc.startLine})
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
+      {/* Context Lines */}
       <div className="context-wrapper">
         <label htmlFor="context-dropdown" className="context-label">
           Context Lines:
@@ -105,7 +61,10 @@ export function DiffControls({
           <option value="all">All</option>
         </select>
       </div>
-    </div>,
-    headerElement
+    </div>
   );
+
+  return headerElement
+    ? ReactDOM.createPortal(controls, headerElement)
+    : controls;
 }

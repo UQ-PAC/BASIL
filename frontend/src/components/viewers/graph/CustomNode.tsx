@@ -22,6 +22,7 @@ export interface CustomNodeData {
   fullContentHeight: number;
   nodeBorderColour?: string;
   isExpanded: boolean;
+  originalExpanded?: boolean;
   [key: string]: unknown; // Index signature to satisfy Record<string, unknown> constraint
 }
 

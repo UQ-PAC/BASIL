@@ -9,9 +9,11 @@ import '../../styles/components/button-selection.css';
 import '../../styles/components/viewers/graph/graph.css';
 import { FIT_VIEW_OPTIONS, ZOOM_CONFIGS } from '../../constants.ts';
 
+import '../../styles/prism-ir-theme.css';
 import '../../lib/prism-ir.ts';
 import 'prismjs/plugins/line-numbers/prism-line-numbers.js';
 import 'prismjs/plugins/line-numbers/prism-line-numbers.css';
+import { useGraphController } from '../../hooks/useGraphController.ts';
 declare const Prism: any;
 
 interface CombinedViewerProps {
@@ -42,14 +44,10 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
     isLoading,
     graphError,
     graphRenderKey,
-    beforeNodes,
-    beforeEdges,
-    afterNodes,
-    afterEdges,
-    onBeforeNodesChange,
-    onBeforeEdgesChange,
-    onAfterNodesChange,
-    onAfterEdgesChange,
+    beforeNodes: initialBeforeNodes,
+    beforeEdges: initialBeforeEdges,
+    afterNodes: initialAfterNodes,
+    afterEdges: initialAfterEdges,
   } = useCombinedData(
     selectedStartEpoch,
     selectedEndEpoch,
@@ -63,6 +61,19 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
   const [panelTopOffset, setPanelTopOffset] = useState(0);
   const graphWrapperRef = useRef<HTMLDivElement>(null);
   const stickyTopOffset = 105; /* The distance the headers above it take up */
+
+  const beforeController = useGraphController([], []); // TODO: Remove duplication
+  const afterController = useGraphController([], []);
+
+  useEffect(() => {
+    beforeController.setNodes(initialBeforeNodes);
+    beforeController.setEdges(initialBeforeEdges);
+  }, [initialBeforeNodes, initialBeforeEdges]);
+
+  useEffect(() => {
+    afterController.setNodes(initialAfterNodes);
+    afterController.setEdges(initialAfterEdges);
+  }, [initialAfterNodes, initialAfterEdges]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -106,13 +117,31 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
   }, [irCode, irCodeRef.current]);
 
   const currentCfgNodes =
-    displayCfgType === 'before' ? beforeNodes : afterNodes;
+    displayCfgType === 'before'
+      ? beforeController.nodes
+      : afterController.nodes;
   const currentCfgEdges =
-    displayCfgType === 'before' ? beforeEdges : afterEdges;
+    displayCfgType === 'before'
+      ? beforeController.edges
+      : afterController.edges;
   const currentOnNodesChange =
-    displayCfgType === 'before' ? onBeforeNodesChange : onAfterNodesChange;
+    displayCfgType === 'before'
+      ? beforeController.onNodesChange
+      : afterController.onNodesChange;
   const currentOnEdgesChange =
-    displayCfgType === 'before' ? onBeforeEdgesChange : onAfterEdgesChange;
+    displayCfgType === 'before'
+      ? beforeController.onEdgesChange
+      : afterController.onEdgesChange;
+  const currentNodeDoubleClick =
+    displayCfgType === 'before'
+      ? beforeController.toggleNodeExpand
+      : afterController.toggleNodeExpand;
+  const currentNodeExpandAll =
+    displayCfgType === 'before'
+      ? () =>
+          beforeController.toggleAllExpand(!beforeController.allNodesExpanded)
+      : () =>
+          afterController.toggleAllExpand(!afterController.allNodesExpanded);
 
   const currentCfgTitle = `${displayCfgType === 'before' ? 'Before' : 'After'} Transform: ${selectedProcedureName || 'N/A'}`;
 
@@ -236,10 +265,13 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
           {currentCfgNodes.length > 0 || currentCfgEdges.length > 0 ? (
             <ReactFlowProvider>
               <GraphPanel
+                key={`${displayCfgType}-${graphRenderKey}`}
                 nodes={currentCfgNodes}
                 edges={currentCfgEdges}
                 onNodesChange={currentOnNodesChange}
                 onEdgesChange={currentOnEdgesChange}
+                onNodeDoubleClick={currentNodeDoubleClick}
+                onExpandAll={currentNodeExpandAll}
                 title={currentCfgTitle}
                 fitViewOptions={FIT_VIEW_OPTIONS}
                 minZoom={ZOOM_CONFIGS.min}

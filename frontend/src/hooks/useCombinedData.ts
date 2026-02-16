@@ -20,10 +20,6 @@ interface CombinedDataHookResult {
   beforeEdges: Edge[];
   afterNodes: Node<CustomNodeData>[];
   afterEdges: Edge[];
-  onBeforeNodesChange: (changes: any) => void;
-  onBeforeEdgesChange: (changes: any) => void;
-  onAfterNodesChange: (changes: any) => void;
-  onAfterEdgesChange: (changes: any) => void;
 }
 
 export function useCombinedData(
@@ -37,15 +33,15 @@ export function useCombinedData(
   const [graphError, setGraphError] = useState<string | null>(null);
   const [graphRenderKey, setGraphRenderKey] = useState(0);
 
-  const [beforeNodes, setBeforeNodes, onBeforeNodesChange] = useNodesState<
+  const [beforeNodes, setBeforeNodes] = useNodesState<
     Node<CustomNodeData>
   >([]);
-  const [beforeEdges, setBeforeEdges, onBeforeEdgesChange] =
+  const [beforeEdges, setBeforeEdges] =
     useEdgesState<Edge>([]);
-  const [afterNodes, setAfterNodes, onAfterNodesChange] = useNodesState<
+  const [afterNodes, setAfterNodes] = useNodesState<
     Node<CustomNodeData>
   >([]);
-  const [afterEdges, setAfterEdges, onAfterEdgesChange] = useEdgesState<Edge>(
+  const [afterEdges, setAfterEdges] = useEdgesState<Edge>(
     []
   );
 

@@ -9,15 +9,12 @@ import {
   type Node as ReactFlowNode,
   type ReactFlowInstance,
   useReactFlow,
-  useNodes,
-  useEdges,
 } from '@xyflow/react';
 import type { Node, Edge, FitViewOptions } from '@xyflow/react';
 
 import CustomNode from './CustomNode.tsx';
 import { type CustomNodeData } from './CustomNode.tsx';
 import CustomBackground from './CustomBackground.tsx';
-import { applyLayout } from '../../../utils/graphLayout.ts';
 
 import ExpandIcon from '../../../assets/expand-icon.svg';
 import CollapseIcon from '../../../assets/collapse-icon.svg';
@@ -27,6 +24,9 @@ interface GraphPanelProps {
   edges: Edge[];
   onNodesChange: (changes: NodeChange<Node<CustomNodeData>>[]) => void;
   onEdgesChange: (changes: EdgeChange<Edge>[]) => void;
+  onNodeDoubleClick?: (nodeId: string) => void;
+  onExpandAll?: () => void;
+  allNodesExpanded?: boolean;
   title: string;
   fitViewOptions: FitViewOptions;
   minZoom: number;
@@ -41,19 +41,28 @@ const GraphPanel: React.FC<GraphPanelProps> = ({
   edges,
   onNodesChange,
   onEdgesChange,
+  onNodeDoubleClick,
+  onExpandAll,
+  allNodesExpanded,
   title,
   fitViewOptions,
   minZoom,
   maxZoom,
   graphRenderKey,
 }) => {
-  const { fitView, setNodes } = useReactFlow();
+  const { fitView } = useReactFlow();
   const [reactFlowInstanceReady, setReactFlowInstanceReady] = useState(false);
   const fitViewExecutedRef = useRef<number | null>(null);
-  const [allNodesExpanded, setAllNodesExpanded] = useState(false);
 
-  const currentNodes = useNodes();
-  const currentEdges = useEdges();
+  useEffect(() => {
+    if (nodes.length === 0 || !reactFlowInstanceReady) return;
+
+    const rafId = requestAnimationFrame(() => {
+      fitView(fitViewOptions as FitViewOptions<Node<CustomNodeData>>);
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [nodes, reactFlowInstanceReady, fitView, fitViewOptions]);
 
   const getMiniMapNodeColor = (node: ReactFlowNode<CustomNodeData>): string => {
     return node.data.nodeBorderColour || '#E0E0E0';
@@ -67,11 +76,6 @@ const GraphPanel: React.FC<GraphPanelProps> = ({
     },
     [fitViewOptions, title]
   );
-
-  useEffect(() => {
-    setReactFlowInstanceReady(false);
-    setAllNodesExpanded(false);
-  }, [graphRenderKey]);
 
   useEffect(() => {
     if (
@@ -98,56 +102,13 @@ const GraphPanel: React.FC<GraphPanelProps> = ({
     title,
   ]);
 
-  const handleExpandAllToggle = useCallback(async () => {
-    const newExpandedState = !allNodesExpanded;
-
-    const updatedNodes = nodes.map((node) => ({
-      ...node,
-      data: { ...node.data, isExpanded: newExpandedState },
-    }));
-
-    setNodes(updatedNodes);
-    setAllNodesExpanded(newExpandedState);
-
-    requestAnimationFrame(async () => {
-      console.log(`Running relayout for "${title}"...`);
-      const layoutedGraph = await applyLayout(
-        updatedNodes,
-        edges,
-        newExpandedState
-      );
-      setNodes(layoutedGraph.nodes);
-      await fitView(fitViewOptions);
-      console.log(`Relayout and fitView complete for "${title}".`);
-    });
-  }, [
-    nodes,
-    edges,
-    allNodesExpanded,
-    setNodes,
-    fitView,
-    fitViewOptions,
-    title,
-  ]);
-
   const handleNodeDoubleClick = useCallback(
-    async (_event: React.MouseEvent, node: ReactFlowNode) => {
-      const updatedNodes = currentNodes.map((n) => {
-        if (n.id === node.id) {
-          return {
-            ...n,
-            data: {
-              ...n.data,
-              isExpanded: !n.data.isExpanded,
-            },
-          };
-        }
-        return n;
-      });
-
-      setNodes(updatedNodes);
+    (_event: React.MouseEvent, node: ReactFlowNode<CustomNodeData>) => {
+      if (onNodeDoubleClick) {
+        onNodeDoubleClick(node.id);
+      }
     },
-    [currentNodes, currentEdges, setNodes]
+    [onNodeDoubleClick]
   );
 
   return (
@@ -184,6 +145,7 @@ const GraphPanel: React.FC<GraphPanelProps> = ({
               >
                 <button
                   type="button"
+                  onClick={onExpandAll}
                   className="react-flow__controls-button"
                   title={
                     allNodesExpanded ? 'Collapse All Nodes' : 'Expand All Nodes'
@@ -191,7 +153,6 @@ const GraphPanel: React.FC<GraphPanelProps> = ({
                   aria-label={
                     allNodesExpanded ? 'Collapse All Nodes' : 'Expand All Nodes'
                   }
-                  onClick={handleExpandAllToggle}
                 >
                   {allNodesExpanded ? (
                     <CollapseIcon className="node-size-icon" />

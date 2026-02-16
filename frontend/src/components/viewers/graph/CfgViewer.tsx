@@ -1,5 +1,5 @@
 // src/components/viewers/graph/CfgViewer.tsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -10,6 +10,7 @@ import GraphPanel from './GraphPanel.tsx';
 
 import '../../../styles/components/viewers/cfg-viewer.css';
 import '../../../styles/components/viewers/graph/graph.css';
+import { useGraphController } from '../../../hooks/useGraphController.ts';
 
 interface CfgViewerProps {
   selectedStartEpoch: string | null;
@@ -31,18 +32,27 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
   procedureError,
 }) => {
   const {
-    beforeNodes,
-    beforeEdges,
-    afterNodes,
-    afterEdges,
+    beforeNodes: initialBeforeNodes,
+    beforeEdges: initialBeforeEdges,
+    afterNodes: initialAfterNodes,
+    afterEdges: initialAfterEdges,
     isLoadingGraphs,
     graphError: graphError,
     graphRenderKey,
-    onBeforeNodesChange,
-    onBeforeEdgesChange,
-    onAfterNodesChange,
-    onAfterEdgesChange,
   } = useCfgData(selectedStartEpoch, selectedEndEpoch, selectedProcedureName);
+
+  const beforeController = useGraphController([], []); // TODO: Fix duplication here
+  const afterController = useGraphController([], []);
+
+  useEffect(() => {
+    beforeController.setNodes(initialBeforeNodes);
+    beforeController.setEdges(initialBeforeEdges);
+  }, [initialBeforeNodes, initialBeforeEdges]);
+
+  useEffect(() => {
+    afterController.setNodes(initialAfterNodes);
+    afterController.setEdges(initialAfterEdges);
+  }, [initialAfterNodes, initialAfterEdges]);
 
   if (loadingProcedures || isLoadingGraphs) {
     return <div className="cfg-viewer-message">Loading CFG data...</div>;
@@ -120,15 +130,23 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
       </div>
       <div className="cfg-comparison-container">
         <div className="cfg-panel">
-          {beforeNodes.length > 0 || beforeEdges.length > 0 ? (
+          {beforeController.nodes.length > 0 ||
+          beforeController.edges.length > 0 ? (
             <>
               {graphRenderKey > 0 && (
                 <ReactFlowProvider>
                   <GraphPanel
-                    nodes={beforeNodes}
-                    edges={beforeEdges}
-                    onNodesChange={onBeforeNodesChange}
-                    onEdgesChange={onBeforeEdgesChange}
+                    nodes={beforeController.nodes}
+                    edges={beforeController.edges}
+                    onNodesChange={beforeController.onNodesChange}
+                    onEdgesChange={beforeController.onEdgesChange}
+                    onNodeDoubleClick={beforeController.toggleNodeExpand}
+                    onExpandAll={() =>
+                      beforeController.toggleAllExpand(
+                        !beforeController.allNodesExpanded
+                      )
+                    }
+                    allNodesExpanded={beforeController.allNodesExpanded}
                     title={`Before Transform: ${selectedProcedureName}`}
                     fitViewOptions={FIT_VIEW_OPTIONS}
                     minZoom={ZOOM_CONFIGS.min}
@@ -145,15 +163,23 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
           )}
         </div>
         <div className="cfg-panel">
-          {beforeNodes.length > 0 || beforeEdges.length > 0 ? (
+          {afterController.nodes.length > 0 ||
+          afterController.edges.length > 0 ? (
             <>
               {graphRenderKey > 0 && (
                 <ReactFlowProvider>
                   <GraphPanel
-                    nodes={afterNodes}
-                    edges={afterEdges}
-                    onNodesChange={onAfterNodesChange}
-                    onEdgesChange={onAfterEdgesChange}
+                    nodes={afterController.nodes}
+                    edges={afterController.edges}
+                    onNodesChange={afterController.onNodesChange}
+                    onEdgesChange={afterController.onEdgesChange}
+                    onNodeDoubleClick={afterController.toggleNodeExpand}
+                    onExpandAll={() =>
+                      afterController.toggleAllExpand(
+                        !afterController.allNodesExpanded
+                      )
+                    }
+                    allNodesExpanded={afterController.allNodesExpanded}
                     title={`After Transform: ${selectedProcedureName}`}
                     fitViewOptions={FIT_VIEW_OPTIONS}
                     minZoom={ZOOM_CONFIGS.min}

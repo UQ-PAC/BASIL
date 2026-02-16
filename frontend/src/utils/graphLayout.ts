@@ -155,11 +155,27 @@ export async function applyLayout(
   const layoutedGraph = await elk.layout(elkGraph);
   if (!layoutedGraph.children) return { nodes: [], edges: [] };
 
-  const layoutedNodes = mapELKToReactFlow(
-    rawNodes,
-    layoutedGraph.children,
-    expanded
-  );
+  const layoutedNodes = nodes.map((originalNode) => {
+    const elkNode = layoutedGraph.children?.find(
+      (c) => c.id === `${prefix}${originalNode.id}`
+    );
+
+    if (!elkNode) return originalNode;
+
+    return {
+      ...originalNode,
+      position: {
+        x: elkNode.x ?? originalNode.position.x,
+        y: elkNode.y ?? originalNode.position.y,
+      },
+      style: {
+        ...originalNode.style,
+        width: elkNode.width,
+        height: elkNode.height,
+      },
+    };
+  });
+
   return { nodes: layoutedNodes, edges: reactFlowEdges };
 }
 

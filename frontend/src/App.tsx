@@ -185,8 +185,8 @@ function App() {
       case ViewMode.IR:
         return (
           <DiffViewer
-            selectedStartEpoch={singleSelectedStartEpoch}
-            selectedEndEpoch={singleSelectedEndEpoch}
+            startEpoch={singleSelectedStartEpoch}
+            endEpoch={singleSelectedEndEpoch}
             theme={theme}
           />
         );

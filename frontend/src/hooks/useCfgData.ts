@@ -22,10 +22,6 @@ interface CfgDataHookResult {
   isLoadingGraphs: boolean;
   graphError: string | null;
   graphRenderKey: number;
-  onBeforeNodesChange: (changes: any) => void;
-  onBeforeEdgesChange: (changes: any) => void;
-  onAfterNodesChange: (changes: any) => void;
-  onAfterEdgesChange: (changes: any) => void;
 }
 
 export function useCfgData(
@@ -33,17 +29,10 @@ export function useCfgData(
   selectedEndEpoch: string | null,
   selectedProcedureName: string | null
 ): CfgDataHookResult {
-  const [beforeNodes, setBeforeNodes, onBeforeNodesChange] = useNodesState<
-    Node<CustomNodeData>
-  >([]);
-  const [beforeEdges, setBeforeEdges, onBeforeEdgesChange] =
-    useEdgesState<Edge>([]);
-  const [afterNodes, setAfterNodes, onAfterNodesChange] = useNodesState<
-    Node<CustomNodeData>
-  >([]);
-  const [afterEdges, setAfterEdges, onAfterEdgesChange] = useEdgesState<Edge>(
-    []
-  );
+  const [beforeNodes, setBeforeNodes] = useNodesState<Node<CustomNodeData>>([]);
+  const [beforeEdges, setBeforeEdges] = useEdgesState<Edge>([]);
+  const [afterNodes, setAfterNodes] = useNodesState<Node<CustomNodeData>>([]);
+  const [afterEdges, setAfterEdges] = useEdgesState<Edge>([]);
 
   const [isLoadingGraphs, setIsLoadingGraphs] = useState(false);
   const [graphError, setGraphError] = useState<string | null>(null);
@@ -139,9 +128,5 @@ export function useCfgData(
     isLoadingGraphs,
     graphError,
     graphRenderKey,
-    onBeforeNodesChange,
-    onBeforeEdgesChange,
-    onAfterNodesChange,
-    onAfterEdgesChange,
   };
 }

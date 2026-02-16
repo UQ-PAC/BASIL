@@ -43,6 +43,9 @@
 
   /* DropDown styles */
   --dropdown-background-color-hover: #3c3c3c;
+  --ir-proc-with-changes-color: #264e77;
+  --ir-proc-selected: #1976D2;
+  --ir-proc-background-color: #131313;
 
   /* CFG styles */
   --cfg-header-background--color: #161b22;
@@ -110,6 +113,9 @@
 
   /* DropDown styles */
   --dropdown-background-color-hover: #bfbfbf;
+  --ir-proc-with-changes-color: #9BB8E1;
+  --ir-proc-selected: #007BFF;
+  --ir-proc-background-color: #F0F0F0;
 
   /* CFG styles */
   --cfg-header-background--color: #e0e0e0;
