@@ -33,17 +33,10 @@ export function useCombinedData(
   const [graphError, setGraphError] = useState<string | null>(null);
   const [graphRenderKey, setGraphRenderKey] = useState(0);
 
-  const [beforeNodes, setBeforeNodes] = useNodesState<
-    Node<CustomNodeData>
-  >([]);
-  const [beforeEdges, setBeforeEdges] =
-    useEdgesState<Edge>([]);
-  const [afterNodes, setAfterNodes] = useNodesState<
-    Node<CustomNodeData>
-  >([]);
-  const [afterEdges, setAfterEdges] = useEdgesState<Edge>(
-    []
-  );
+  const [beforeNodes, setBeforeNodes] = useNodesState<Node<CustomNodeData>>([]);
+  const [beforeEdges, setBeforeEdges] = useEdgesState<Edge>([]);
+  const [afterNodes, setAfterNodes] = useNodesState<Node<CustomNodeData>>([]);
+  const [afterEdges, setAfterEdges] = useEdgesState<Edge>([]);
 
   useEffect(() => {
     if (!selectedStartEpoch || !selectedEndEpoch || !selectedProcedureName) {

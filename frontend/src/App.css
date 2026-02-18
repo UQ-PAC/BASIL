@@ -44,7 +44,7 @@
   /* DropDown styles */
   --dropdown-background-color-hover: #3c3c3c;
   --ir-proc-with-changes-color: #264e77;
-  --ir-proc-selected: #1976D2;
+  --ir-proc-selected: #1976d2;
   --ir-proc-background-color: #131313;
 
   /* CFG styles */
@@ -113,9 +113,9 @@
 
   /* DropDown styles */
   --dropdown-background-color-hover: #bfbfbf;
-  --ir-proc-with-changes-color: #9BB8E1;
-  --ir-proc-selected: #007BFF;
-  --ir-proc-background-color: #F0F0F0;
+  --ir-proc-with-changes-color: #9bb8e1;
+  --ir-proc-selected: #007bff;
+  --ir-proc-background-color: #f0f0f0;
 
   /* CFG styles */
   --cfg-header-background--color: #e0e0e0;

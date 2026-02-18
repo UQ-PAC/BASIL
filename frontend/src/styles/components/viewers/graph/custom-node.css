@@ -19,9 +19,7 @@
   font-family: 'Mono', monospace;
   font-size: 0.8em;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-
 }
-
 
 /* Specific styling for selected nodes */
 .custom-flow-node.selected {
@@ -32,7 +30,6 @@
   flex-grow: 1;
   color: var(--cfg-node-text-color);
   align-items: center;
-
 }
 
 .custom-node-header-text pre,

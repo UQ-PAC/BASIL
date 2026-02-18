@@ -17,11 +17,7 @@ import java.lang
 
 case class ConfigSelection(adt: String, relf: Option[String])
 
-case class ProcedureMetadataResponse(
-                                      name: String,
-                                      beforeHash: String,
-                                      afterHash: String,
-                                    )
+case class ProcedureMetadataResponse(name: String, beforeHash: String, afterHash: String)
 
 implicit val selectionDecoder: EntityDecoder[IO, ConfigSelection] = jsonOf[IO, ConfigSelection]
 implicit val statusEncoder: EntityEncoder[IO, AnalysisStatus] = jsonEncoderOf[AnalysisStatus]
@@ -178,39 +174,37 @@ class IrServiceRoutes(
           epochStore.getEpoch(epochName).flatMap {
             case Some(epoch) =>
               val beforeProcedures = epoch.beforeTransform.procedures.toList
-              val afterProcedures  = epoch.afterTransform.procedures.toList
+              val afterProcedures = epoch.afterTransform.procedures.toList
 
               val beforeMap = beforeProcedures.map(p => p.procName -> p).toMap
 
-              afterProcedures.traverse { afterProc =>
-                val name = afterProc.procName
-                val beforeProcOpt = beforeMap.get(name)
+              afterProcedures
+                .traverse { afterProc =>
+                  val name = afterProc.procName
+                  val beforeProcOpt = beforeMap.get(name)
 
-                val beforeCode = beforeProcOpt.map(PrettyPrinter.pp_proc)
-                val afterCode  = PrettyPrinter.pp_proc(afterProc)
+                  val beforeCode = beforeProcOpt.map(PrettyPrinter.pp_proc)
+                  val afterCode = PrettyPrinter.pp_proc(afterProc)
 
-                val beforeHash = beforeCode.map { code =>
-                  java.security.MessageDigest
+                  val beforeHash = beforeCode.map { code =>
+                    java.security.MessageDigest
+                      .getInstance("SHA-256")
+                      .digest(code.getBytes("UTF-8"))
+                      .map("%02x".format(_))
+                      .mkString
+                  }
+
+                  val afterHash = java.security.MessageDigest
                     .getInstance("SHA-256")
-                    .digest(code.getBytes("UTF-8"))
+                    .digest(afterCode.getBytes("UTF-8"))
                     .map("%02x".format(_))
                     .mkString
-                }
 
-                val afterHash = java.security.MessageDigest
-                  .getInstance("SHA-256")
-                  .digest(afterCode.getBytes("UTF-8"))
-                  .map("%02x".format(_))
-                  .mkString
-
-                IO.pure(
-                  ProcedureMetadataResponse(
-                    name = name,
-                    beforeHash = beforeHash.getOrElse(""),
-                    afterHash  = afterHash
+                  IO.pure(
+                    ProcedureMetadataResponse(name = name, beforeHash = beforeHash.getOrElse(""), afterHash = afterHash)
                   )
-                )
-              }.flatMap(metadata => Ok(metadata.asJson))
+                }
+                .flatMap(metadata => Ok(metadata.asJson))
 
             case None =>
               NotFound(s"Epoch '$epochName' not found.")
