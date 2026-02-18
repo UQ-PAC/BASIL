@@ -44,7 +44,6 @@ class IrServiceRoutes(
     statusRoute <+>
       listEpochsRoute <+>
       getProcedureIndexRoute <+>
-      getProceduresWithLinesRoute <+>
       getProceduresRoute <+>
       getBeforeIrRoute <+>
       getAfterIrRoute <+>
@@ -172,57 +171,6 @@ class IrServiceRoutes(
     }
   }
 
-  /**
-   * **Endpoint:** `GET /ir/:epochName/procedures-with-lines`
-   *
-   * Retrieves a list of procedures for the "after" IR, along with their approximate start and end
-   * line numbers in the pretty-printed text.
-   *
-   * This endpoint takes an `epochName` as a path parameter.
-   *
-   * @return A JSON array of objects, each containing the procedure name, start line, and end line.
-   * @throws NotFound if the specified `epochName` does not exist.
-   * @note The line number calculation relies on `PrettyPrinter` consistency and might be approximate.
-   */
-  private val getProceduresWithLinesRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case GET -> Root / "ir" / epochName / "procedures_with_lines" =>
-      ensureReady {
-        logger.info(s"Received GET /ir/$epochName/procedures_with_lines request.") *>
-          epochStore
-            .getEpoch(epochName)
-            .flatMap {
-              case Some(epoch) =>
-                val fullAfterTransformText = PrettyPrinter.pp_prog(epoch.afterTransform)
-                var currentOffset = 0
-
-                epoch.afterTransform.procedures.toList
-                  .traverse { proc =>
-                    val procName = proc.procName
-                    val procPrettyPrint = PrettyPrinter.pp_proc(proc)
-
-                    val startIndex = fullAfterTransformText.indexOf(procPrettyPrint, currentOffset)
-
-                    if (startIndex != -1) {
-                      val startLine = LineCounter.countLines(fullAfterTransformText, startIndex)
-                      currentOffset = startIndex + procPrettyPrint.length
-
-                      IO.pure(ProcedureTextLocation(procName, startLine))
-                    } else {
-                      logger.warn(
-                        s"Warning: Could not find text for procedure '$procName' " +
-                          s"in the full afterTransform output. Is PrettyPrinter consistent or procedure text unique?"
-                      ) *>
-                        IO.pure(ProcedureTextLocation(procName, -1))
-                    }
-                  }
-                  .flatMap { locationsList =>
-                    Ok(locationsList.asJson)
-                  }
-              case None => NotFound(s"Epoch '$epochName' not found.")
-            }
-      }
-  }
-
   private val getProcedureIndexRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
     case GET -> Root / "ir" / epochName / "procedures" =>
       ensureReady {
@@ -269,8 +217,6 @@ class IrServiceRoutes(
           }
       }
   }
-
-
 
   /**
    * **Endpoint:** `GET /procedures/:epochName`
