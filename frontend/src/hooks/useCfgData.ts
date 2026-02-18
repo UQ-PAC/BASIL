@@ -6,9 +6,7 @@ import {
   useNodesState,
   useEdgesState,
 } from '@xyflow/react';
-import {
-  getLayoutedElementsFromJSON,
-} from '../utils/graphLayout.ts';
+import { getLayoutedElementsFromJSON } from '../utils/graphLayout.ts';
 import { extractProcedureGraph } from '../utils/graphUtils.ts';
 import { fetchGraphJson } from '../api/viewer.ts';
 import { compareAndColourElements } from '../utils/cfgColouring.ts';

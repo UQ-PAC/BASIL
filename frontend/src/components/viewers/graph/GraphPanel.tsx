@@ -25,7 +25,7 @@ interface GraphPanelProps {
   onNodesChange: (changes: NodeChange<Node<CustomNodeData>>[]) => void;
   onEdgesChange: (changes: EdgeChange<Edge>[]) => void;
   onNodeDoubleClick?: (nodeId: string) => void;
-  onExpandAll?: () => void;
+  onExpandAll?: () => Promise<void>;
   allNodesExpanded?: boolean;
   title: string;
   fitViewOptions: FitViewOptions;
@@ -53,16 +53,29 @@ const GraphPanel: React.FC<GraphPanelProps> = ({
   const { fitView } = useReactFlow();
   const [reactFlowInstanceReady, setReactFlowInstanceReady] = useState(false);
   const fitViewExecutedRef = useRef<number | null>(null);
+  const [expandTriggered, setExpandTriggered] = useState(false);
+
+  const handleExpandAll = useCallback(async () => {
+    if (!onExpandAll || !reactFlowInstanceReady) return;
+
+    await onExpandAll();
+    setExpandTriggered(true);
+  }, [onExpandAll, reactFlowInstanceReady]);
 
   useEffect(() => {
-    if (nodes.length === 0 || !reactFlowInstanceReady) return;
+    if (!reactFlowInstanceReady || !expandTriggered) return;
 
-    const rafId = requestAnimationFrame(() => {
-      fitView(fitViewOptions as FitViewOptions<Node<CustomNodeData>>);
+    requestAnimationFrame(() => {
+      fitView(fitViewOptions as FitViewOptions<Node<CustomNodeData>>)
+        .then(() => {
+          /* success */
+        })
+        .catch((err) => {
+          console.error('fitView failed:', err);
+        });
+      setExpandTriggered(false);
     });
-
-    return () => cancelAnimationFrame(rafId);
-  }, [nodes, reactFlowInstanceReady, fitView, fitViewOptions]);
+  }, [nodes, reactFlowInstanceReady, expandTriggered, fitView, fitViewOptions]);
 
   const getMiniMapNodeColor = (node: ReactFlowNode<CustomNodeData>): string => {
     return node.data.nodeBorderColour || '#E0E0E0';
@@ -145,7 +158,7 @@ const GraphPanel: React.FC<GraphPanelProps> = ({
               >
                 <button
                   type="button"
-                  onClick={onExpandAll}
+                  onClick={handleExpandAll}
                   className="react-flow__controls-button"
                   title={
                     allNodesExpanded ? 'Collapse All Nodes' : 'Expand All Nodes'

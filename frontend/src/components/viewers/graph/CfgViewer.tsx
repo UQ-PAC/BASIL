@@ -41,7 +41,7 @@ const CfgViewer: React.FC<CfgViewerProps> = ({
     graphRenderKey,
   } = useCfgData(selectedStartEpoch, selectedEndEpoch, selectedProcedureName);
 
-  const beforeController = useGraphController([], []); // TODO: Fix duplication here
+  const beforeController = useGraphController([], []);
   const afterController = useGraphController([], []);
 
   useEffect(() => {

@@ -37,6 +37,7 @@
 
 .proc-btn.unchanged {
   opacity: 0.4;
+  color: white;
 }
 
 .proc-btn.active {
@@ -44,6 +45,14 @@
   background-color: var(--ir-proc-selected);
   color: white;
 }
+
+.proc-btn.unchanged.active {
+  background-color: #4b5563;
+  outline: 2px solid #9ca3af;
+  color: white;
+  opacity: 0.9;
+}
+
 #diff,
 #diff-container {
   width: 100%;

@@ -62,7 +62,7 @@ const CombinedViewer: React.FC<CombinedViewerProps> = ({
   const graphWrapperRef = useRef<HTMLDivElement>(null);
   const stickyTopOffset = 105; /* The distance the headers above it take up */
 
-  const beforeController = useGraphController([], []); // TODO: Remove duplication
+  const beforeController = useGraphController([], []);
   const afterController = useGraphController([], []);
 
   useEffect(() => {

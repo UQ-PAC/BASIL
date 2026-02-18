@@ -179,9 +179,5 @@ export function useCombinedData(
     beforeEdges,
     afterNodes,
     afterEdges,
-    onBeforeNodesChange,
-    onBeforeEdgesChange,
-    onAfterNodesChange,
-    onAfterEdgesChange,
   };
 }
