@@ -58,26 +58,29 @@ export function useCfgData(
           fetchGraphJson(selectedEndEpoch!, 'after'),
         ]);
 
-        const beforeDotString = beforeResponse; // TODO: A lot of renaming to be done now
-        const afterDotString = afterResponse;
-
         let processedBeforeNodes: Node<CustomNodeData>[] = [];
         let processedBeforeEdges: Edge[] = [];
         let processedAfterNodes: Node<CustomNodeData>[] = [];
         let processedAfterEdges: Edge[] = [];
 
-        if (beforeDotString) {
+        if (!selectedProcedureName) {
+          throw new Error(
+            'selectedProcedureName is required to extract procedure graph'
+          );
+        }
+
+        if (beforeResponse) {
           const singleProcGraph = extractProcedureGraph(
             beforeResponse,
-            selectedProcedureName! // TODO: Is there a better way then !
+            selectedProcedureName
           );
           ({ nodes: processedBeforeNodes, edges: processedBeforeEdges } =
             await getLayoutedElementsFromJSON(singleProcGraph, 'before-'));
         }
-        if (afterDotString) {
+        if (afterResponse) {
           const singleProcGraph = extractProcedureGraph(
             afterResponse,
-            selectedProcedureName! // TODO: Is there a better way then !
+            selectedProcedureName
           );
           ({ nodes: processedAfterNodes, edges: processedAfterEdges } =
             await getLayoutedElementsFromJSON(singleProcGraph, 'after-'));
