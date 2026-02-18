@@ -66,14 +66,10 @@ const GraphPanel: React.FC<GraphPanelProps> = ({
     if (!reactFlowInstanceReady || !expandTriggered) return;
 
     requestAnimationFrame(() => {
-      fitView(fitViewOptions as FitViewOptions<Node<CustomNodeData>>)
-        .then(() => {
-          /* success */
-        })
-        .catch((err) => {
-          console.error('fitView failed:', err);
-        });
-      setExpandTriggered(false);
+      requestAnimationFrame(() => {
+        fitView(fitViewOptions as FitViewOptions<Node<CustomNodeData>>);
+        setExpandTriggered(false);
+      });
     });
   }, [nodes, reactFlowInstanceReady, expandTriggered, fitView, fitViewOptions]);
 

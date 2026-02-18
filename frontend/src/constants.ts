@@ -6,6 +6,6 @@ export const FIT_VIEW_OPTIONS: FitViewOptions = {
 };
 
 export const ZOOM_CONFIGS = {
-  min: 0.3,
-  max: 3,
+  min: 0.1,
+  max: 5,
 };
