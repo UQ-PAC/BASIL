@@ -76,6 +76,22 @@ private def isHeapPreserve(map: Expr = mem_encoding, old_map: Expr = OldExpr(mem
 private def bIsHeapPreserve(map: BExpr = mem_encoding.toBoogie, old_map: BExpr = Old(mem_encoding.toBoogie)): BExpr =
   BFunctionCall("me_addr_is_heap_preserve", List(old_map, map), BoolBType)
 
+// private def mePreserve(map: Expr = mem_encoding, old_map: Expr = OldExpr(mem_encoding)): Expr =
+//   FApplyExpr("me_preserve", Seq(old_map, map), BoolType)
+
+    // BFunction(
+    //   "me_preserve",
+    //   List(mem_encoding_in, mem_encoding_out),
+    //   bool_r_param,
+    //   Some(BinaryBExpr(BoolAND,
+    //     BinaryBExpr(BoolAND,
+    //       BinaryBExpr(EQ, alloc_live_access_out, alloc_live_access_in),
+    //       BinaryBExpr(EQ, alloc_size_access_out, alloc_size_access_in)
+    //     ),
+    //     BinaryBExpr(EQ, addr_is_heap_access_out, addr_is_heap_access_in)
+    //   )),
+    //   attributes = List(BAttribute("inline", Some("true")))
+    // ),
 private def in_bounds(lower: Expr, upper: Expr, n: Expr) =
   BinaryExpr(BoolAND, BinaryExpr(BVULE, lower, n), BinaryExpr(BVULT, n, upper))
 
@@ -170,7 +186,19 @@ class SplitTransform(ctx: IRContext, simplify: Boolean) extends CILVisitor {
   private def transform_main(p: Procedure) = {
     p.requires ++= List()
 
+    val x = SharedMemorySplit("bv_bv_mem", 64, 64, 8);
     p.requiresExpr ++= List(
+      BinaryExpr(EQ, x, x),
+      BinaryExpr(
+        EQ,
+        BinaryExpr(BVAND, BitVecLiteral(0xff00, 64), BitVecLiteral(0xff00, 64)),
+        BitVecLiteral(0xff00, 64)
+      ),
+      BinaryExpr(
+        EQ,
+        BinaryExpr(BVSHL, BitVecLiteral(0xffffffffL, 64), BitVecLiteral(32, 64)),
+        BinaryExpr(BVSHL, BitVecLiteral(0xffffffffL, 64), BitVecLiteral(32, 64))
+      ),
       // Cheaty way to carve out some heap pointers that wont conflict:
       QuantifierExpr(
         QuantifierSort.forall,
@@ -292,14 +320,29 @@ def memoryEncodingDecls(): List[BDeclaration] = {
       "me_addr_offset",
       List(addr_param),
       offset_param,
-      Some(BinaryBExpr(BVCONCAT, BitVecBLiteral(0, 64 - offset_size), BVExtract(offset_size, 0, addr_param))),
+      // Some(BinaryBExpr(BVCONCAT, BitVecBLiteral(0, 64 - offset_size), BVExtract(offset_size, 0, addr_param))),
+      Some(BinaryBExpr(BVAND, addr_param, BitVecBLiteral(0xffffffffL, 64))),
       attributes = List(BAttribute("inline", Some("true")))
     ),
     BFunction(
       "me_addr_base",
       List(addr_param),
       base_param,
-      Some(BinaryBExpr(BVCONCAT, BVExtract(64, 64 - base_size, addr_param), BitVecBLiteral(0, 64 - base_size))),
+      // Some(BinaryBExpr(BVCONCAT, BVExtract(64, 64 - base_size, addr_param), BitVecBLiteral(0, 64 - base_size))),
+      Some(BinaryBExpr(BVAND, addr_param, BinaryBExpr(BVSHL, BitVecBLiteral(0xffffffffL, 64), BitVecBLiteral(32, 64)))),
+      attributes = List(BAttribute("inline", Some("true")))
+    ),
+    BFunction(
+      "me_preserve",
+      List(mem_encoding_in, mem_encoding_out),
+      bool_r_param,
+      Some(BinaryBExpr(BoolAND,
+        BinaryBExpr(BoolAND,
+          BinaryBExpr(EQ, alloc_live_access_out, alloc_live_access_in),
+          BinaryBExpr(EQ, alloc_size_access_out, alloc_size_access_in)
+        ),
+        BinaryBExpr(EQ, addr_is_heap_access_out, addr_is_heap_access_in)
+      )),
       attributes = List(BAttribute("inline", Some("true")))
     ),
     BFunction(
