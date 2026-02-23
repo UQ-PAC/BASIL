@@ -309,37 +309,31 @@ object ReadWriteAnalysis {
   def processProc(state: st, p: Procedure): RW = {
     p.foldLeft(state(p))((ir, s) => {
       s match {
-        case SimulAssign(assigns, _) => {
+        case SimulAssign(assigns, _) =>
           val lhs = assigns.map(_._1)
           val rhs = assigns.flatMap(_._2.variables)
           ir.map(addWrites(lhs)).map(addReads(rhs))
-        }
-        case s: MemoryAssign => {
+        case s: MemoryAssign =>
           ir.map(addWrites(Seq(s.lhs)))
             .map(addReads(s.rhs.variables))
-        }
-        case s: MemoryLoad => {
+        case s: MemoryLoad =>
           ir.map(addWrites(Seq(s.lhs)))
             .map(addReads(s.index.variables))
-        }
-        case s: Return => {
-          ir.map(addReads(s.outParams.flatMap(_._2.variables)))
-        }
-        case s: MemoryStore => {
+        case s: Return =>
+          ir.map(addReads(s.outParams.values.flatMap(_.variables)))
+        case s: MemoryStore =>
           ir.map(addReads(s.index.variables ++ s.value.variables))
-        }
-        case s: DirectCall if (s.target.isExternal.contains(true)) => {
+        case s: DirectCall if s.target.isExternal.contains(true) =>
           ir.map(addReads(externalCallReads(s.target.procName)))
             .map(addWrites(externalCallWrites(s.target.procName)))
-        }
-        case s: DirectCall => {
+        case s: DirectCall =>
           ir.map(x => join(x, state(s.target)))
-            .map(addReads(s.actualParams.flatMap(_._2.variables)))
-            .map(addWrites(s.outParams.flatMap(_._2.variables)))
-        }
+            .map(addReads(s.actualParams.values.flatMap(_.variables)))
+            .map(addWrites(s.outParams.values.flatMap(_.variables)))
         case s: IndirectCall => Top
         case s: Assert => ir.map(addReads(s.body.variables))
         case s: Assume => ir.map(addReads(s.body.variables))
+        case h: Havoc => ir.map(addWrites(h.vars))
         case p: Procedure => ir
         case b: Block => ir
         case b: NOP => ir

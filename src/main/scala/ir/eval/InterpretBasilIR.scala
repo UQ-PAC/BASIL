@@ -477,6 +477,7 @@ object InterpFuns {
         }
       }
       case _: NOP => f.setNext(Run(s.successor))
+      case _: Havoc => ???
     }
   }
 

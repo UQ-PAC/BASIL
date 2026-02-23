@@ -490,7 +490,7 @@ class BasilIRPrettyPrinter(
 
   override def vassign(lhs: PPProg[Variable], rhs: PPProg[Expr]): PPProg[LocalAssign] = BST(s"${lhs} := ${rhs}")
   override def vmemassign(lhs: PPProg[Variable], rhs: PPProg[Expr]): PPProg[LocalAssign] = BST(s"${lhs} mem:= ${rhs}")
-  override def vsimulassign(assignments: List[(PPProg[Variable], PPProg[Expr])]): PPProg[SimulAssign] =
+  override def vsimulassign(assignments: List[(PPProg[Variable], PPProg[Expr])]): PPProg[SimulAssign] = {
     val pref = "( "
     val suffix = " )"
     val str = assignments
@@ -499,6 +499,9 @@ class BasilIRPrettyPrinter(
       }
       .mkString(",\n")
     BST(pref + indent(str, "  ") + suffix)
+  }
+
+  override def vhavoc(variables: List[PPProg[Variable]]): PPProg[Havoc] = BST(s"havoc ${variables.mkString(", ")}")
 
   override def vstore(
     mem: Memory,

@@ -35,6 +35,7 @@ trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[Variable, Lat
       case c: MemoryStore => m
       case c: Assume => m
       case c: Assert => m
+      case h: Havoc => m ++ h.vars.map(v => v -> botTerm).toMap
       case c: IndirectCall => top
       case c: DirectCall => top
       case c: GoTo => m
@@ -115,6 +116,7 @@ class ReachabilityConditions extends PredicateEncodingDomain[Predicate] {
       case m: MemoryStore => b
       case a: Assume => b
       case a: Assert => b
+      case _: Havoc => b
       case i: IndirectCall => b
       case c: DirectCall => b
       case g: GoTo => if g.targets.size == 1 then b else Predicate.False
@@ -170,14 +172,17 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
           .simplify
       case a: MemoryLoad => b.remove(BVTerm.Var(a.lhs), True).remove(GammaTerm.Var(a.lhs), True).simplify
       case m: MemoryStore => b
-      case a: Assume => {
+      case a: Assume =>
         if (a.checkSecurity) {
           and(b, expectPredicate(a.body), lowExpr(a.body)).simplify
         } else {
           and(b, expectPredicate(a.body)).simplify
         }
-      }
       case a: Assert => and(b, expectPredicate(a.body)).simplify
+      case h: Havoc =>
+        h.vars.foldLeft(b) { (a, v) =>
+          a.remove(BVTerm.Var(v), True).remove(GammaTerm.Var(v), True).simplify
+        }
       case i: IndirectCall => top
       case c: DirectCall =>
         c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>
@@ -226,7 +231,7 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
 
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
-      case SimulAssign(assigns, _) => {
+      case SimulAssign(assigns, _) =>
         val terms = assigns.map((l, r) => (BVTerm.Var(l), exprToBVTerm(r)))
         val gammas = assigns.map((l, r) => (GammaTerm.Var(l), exprToGammaTerm(r)))
         val nb = terms.foldLeft(b) { case (acc, (l, r)) =>
@@ -241,22 +246,24 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
             case None => acc.remove(l, top)
           }
         }
-      }
       case a: MemoryAssign =>
         b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get)
           .replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get)
           .simplify
       case a: MemoryLoad => b.remove(BVTerm.Var(a.lhs), top).remove(GammaTerm.Var(a.lhs), top).simplify
       case m: MemoryStore => b
-      case a: Assume => {
+      case a: Assume =>
         if (a.checkSecurity) {
           or(and(b, expectPredicate(a.body)), not(lowExpr(a.body))).simplify
         } else {
           and(b, expectPredicate(a.body)).simplify
         }
-      }
       case a: Assert => or(b, not(expectPredicate(a.body))).simplify
       case i: IndirectCall => top
+      case h: Havoc =>
+        h.vars.foldLeft(b) { (p, v) =>
+          p.remove(BVTerm.Var(v), True).remove(GammaTerm.Var(v), True).simplify
+        }
       case c: DirectCall =>
         not(c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>
           p.replace(BVTerm.Var(v), exprToBVTerm(e).get).replace(GammaTerm.Var(v), exprToGammaTerm(e).get).simplify

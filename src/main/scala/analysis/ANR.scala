@@ -18,8 +18,13 @@ trait ANRAnalysis(program: Program, ignoreStackPtrs: Boolean = false) {
   private val linkRegister = Register("R30", 64)
   private val framePointer = Register("R29", 64)
 
-  private val ignoreRegions: Set[Expr] =
-    if (ignoreStackPtrs) then Set(linkRegister, framePointer, stackPointer) else Set()
+  private val ignoreRegions: Set[Variable] = {
+    if (ignoreStackPtrs) {
+      Set(linkRegister, framePointer, stackPointer)
+    } else {
+      Set()
+    }
+  }
 
   /** Default implementation of eval.
     */
@@ -34,8 +39,8 @@ trait ANRAnalysis(program: Program, ignoreStackPtrs: Boolean = false) {
       case indirectCall: IndirectCall =>
         s - indirectCall.target
       case call: DirectCall =>
-        s.diff(call.actualParams.flatMap(_._2.variables).toSet.filterNot(ignoreRegions.contains(_)))
-          ++ call.outParams.map(_._2).toSet
+        s.diff(call.actualParams.values.flatMap(_.variables).toSet.diff(ignoreRegions))
+          ++ call.outParams.values.toSet
       case assign: LocalAssign =>
         val m = s.diff(assign.rhs.variables)
         if (ignoreRegions.contains(assign.lhs)) {
@@ -50,6 +55,9 @@ trait ANRAnalysis(program: Program, ignoreStackPtrs: Boolean = false) {
         } else {
           m + memoryLoad.lhs
         }
+      case havoc: Havoc =>
+        val notIgnored = havoc.vars.diff(ignoreRegions)
+        s ++ notIgnored
       case _ =>
         s
     }
