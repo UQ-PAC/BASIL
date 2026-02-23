@@ -328,7 +328,6 @@ object Main {
       }
       Some(
         StaticAnalysisConfig(
-          conf.dumpIL,
           conf.analysisResults,
           conf.analysisResultsDot,
           conf.threadSplit.value,
@@ -488,7 +487,7 @@ object Main {
       outputPrefix = conf.outFileName,
       dsaConfig = dsa,
       memoryTransform = conf.memoryTransform.value,
-      assertCalleeSaved = calleeSaved
+      assertCalleeSaved = calleeSaved,
     )
 
     Logger.info(programNameVersionHeader)
