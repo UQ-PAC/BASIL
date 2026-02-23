@@ -457,9 +457,9 @@ def freeVarsPos(s: CFGPosition): Set[Variable] = s match {
       case _ => Set()
     }.toSet
   case p: Block => p.statements.flatMap(freeVarsPos).toSet
-  case p: DirectCall => p.actualParams.flatMap(_._2.variables).toSet
-  case p: Return => p.outParams.flatMap(_._2.variables).toSet
-  case _: Unreachable | _: GoTo | _: NOP => Set[Variable]()
+  case p: DirectCall => p.actualParams.values.flatMap(_.variables).toSet
+  case p: Return => p.outParams.values.flatMap(_.variables).toSet
+  case _: Unreachable | _: GoTo | _: NOP | _: Havoc => Set[Variable]()
 }
 
 def allVarsPos(s: CFGPosition): Set[Variable] = s match {

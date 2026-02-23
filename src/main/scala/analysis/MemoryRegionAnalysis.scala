@@ -152,6 +152,7 @@ trait MemoryRegionAnalysis(
                 throw Exception(
                   s"Memory Regions Analysis attempted to retrieve stack regions from direct call, unsupported: $unhandled"
                 )
+              case _: Havoc => ???
             }
             for (stackRegion <- stackRegions) yield {
               val negB = bv2SignedInt(b)
@@ -189,6 +190,7 @@ trait MemoryRegionAnalysis(
           case m: MemoryLoad => eval(m.index, stackPointerVariables, m, m.size)
           case d: DirectCall =>
             throw Exception(s"attempted to reduce variables from direct call, unssupported: $d")
+          case _: Havoc => ???
         }
       } else {
         Set()

@@ -73,6 +73,10 @@ def getCommonDefinitionVariableRenaming(
             case None =>
               x
           }
+        case h: Havoc =>
+          h.vars.foldLeft(x) { (u, v) =>
+            u.updated(v, nextSSACount())
+          }
         case _: GoTo | _: MemoryStore | _: Assume | _: Assert | _: Block | _: NOP | _: IndirectCall | _: Unreachable |
             _: Return =>
           x
@@ -115,7 +119,7 @@ def getCommonDefinitionVariableRenaming(
     case b: Procedure => () /* formal params */
     case a: DirectCall => () /* actual params */
     case _: Return => () /* return params */
-    case _: Block | _: Unreachable | _: GoTo | _: NOP => ()
+    case _: Block | _: Unreachable | _: GoTo | _: NOP | _: Havoc => ()
   }
 
   // extract result

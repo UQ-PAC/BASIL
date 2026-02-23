@@ -148,8 +148,8 @@ class CILVisitorImpl(val v: CILVisitor) {
   def visit_stmt(s: Statement): List[Statement] = {
     def continue(n: Statement) = n match {
       case d: DirectCall =>
-        val actuals = d.actualParams.map(i => i._1 -> visit_expr(i._2))
-        val outs = d.outParams.map(i => i._1 -> visit_lvar(i._2))
+        val actuals = d.actualParams.map((i1, i2) => i1 -> visit_expr(i2))
+        val outs = d.outParams.map((i1, i2) => i1 -> visit_lvar(i2))
         d.outParams = outs
         d.actualParams = actuals
         d
@@ -174,22 +174,32 @@ class CILVisitorImpl(val v: CILVisitor) {
         m.rhs = visit_expr(m.rhs)
         m.lhs = visit_lvar(m.lhs)
         m
-      case m: SimulAssign => {
+      case m: SimulAssign =>
         var changed = false
-        val ns = m.assignments.map { case (lhs, rhs) =>
+        val ns = m.assignments.map { (lhs, rhs) =>
           val (nl, nr) = (visit_lvar(lhs), visit_expr(rhs))
           changed = changed || nl != lhs || nr != rhs
           (nl, nr)
         }
         if changed then m.assignments = ns
         m
-      }
       case s: Assert =>
         s.body = visit_expr(s.body)
         s
       case s: Assume =>
         s.body = visit_expr(s.body)
         s
+      case h: Havoc =>
+        val result: Map[Variable, Variable] = h.vars.map { (u: Variable) =>
+          u -> visit_lvar(u)
+        }.toMap
+        result.foreach { (oldVar, newVar) =>
+          if (oldVar != newVar) {
+            h.removeVariable(oldVar)
+            h.addVariable(newVar)
+          }
+        }
+        h
       case n: NOP => n
     }
     doVisitList(v, v.vstmt(s), s, continue)
