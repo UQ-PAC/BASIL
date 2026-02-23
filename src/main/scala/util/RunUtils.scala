@@ -140,7 +140,8 @@ object RunUtils {
 
         assert(ir.invariant.readUninitialised(ctx.program))
         assert(ir.invariant.programDiamondForm(ctx.program))
-        doSimplify(ctx, conf.staticAnalysis)
+        doSimplify(ctx, q.loading.dumpIL)
+        assert(ir.invariant.programDiamondForm(ctx.program))
       }
       case SimplifyMode.Disabled => ()
     }

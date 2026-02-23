@@ -78,9 +78,9 @@ abstract class DifferentialTest extends AnyFunSuite, CaptureOutput, TestCustomis
     testName: String,
     examplePath: String,
     suffix: String = ".adt",
-    staticAnalysisConfig: Option[StaticAnalysisConfig] = Some(StaticAnalysisConfig(None, None, None)),
+    staticAnalysisConfig: Option[StaticAnalysisConfig] = Some(StaticAnalysisConfig()),
     simplify: Boolean = false
-  ) = {
+  ): Unit = {
 
     val loading = ILLoadingConfig(
       inputFile = examplePath + testName + suffix,
@@ -106,7 +106,7 @@ abstract class DifferentialTest extends AnyFunSuite, CaptureOutput, TestCustomis
     if (simplify) {
       ictx = ir.transforms.liftProcedureCallAbstraction(ictx)
       comparectx = ir.transforms.liftProcedureCallAbstraction(comparectx)
-      ir.transforms.doSimplify(ictx, staticAnalysisConfig)
+      ir.transforms.doSimplify(ictx, None)
     }
 
     diffTest(ictx, comparectx)

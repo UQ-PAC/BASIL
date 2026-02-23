@@ -16,7 +16,7 @@ class PCTrackingTest extends AnyFunSuite with CaptureOutput {
           dumpIL = None,
           pcTracking = pcTracking
         ),
-        staticAnalysis = Some(StaticAnalysisConfig(None)),
+        staticAnalysis = Some(StaticAnalysisConfig()),
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
         simplify = if simplify then SimplifyMode.Simplify else SimplifyMode.Disabled

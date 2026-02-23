@@ -55,7 +55,6 @@ case class ILLoadingConfig(
 }
 
 case class StaticAnalysisConfig(
-  dumpILToPath: Option[String] = None,
   analysisResultsPath: Option[String] = None,
   analysisDotPath: Option[String] = None,
   threadSplit: Boolean = false,
