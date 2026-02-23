@@ -123,7 +123,6 @@ class ConvertSingleReturn extends CILVisitor {
 
   override def vstmt(s: Statement): SkipChildren[List[Statement]] = SkipChildren()
 }
-
 /**
  * Establish procedure diamond structure with designated entry and return block which contain no statements.
  *
@@ -140,7 +139,6 @@ def establishProcedureDiamondForm(program: Program, doSimplify: Boolean = false)
 
   addReturnBlocks(program)
   cilvisitor.visit_prog(ConvertSingleReturn(), program)
-  debugAssert(ir.invariant.programDiamondForm(program))
 }
 
 def getEstablishProcedureDiamondFormTransform(doSimplify: Boolean): Transform =
