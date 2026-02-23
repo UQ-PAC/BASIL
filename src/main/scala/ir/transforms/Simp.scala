@@ -1327,16 +1327,24 @@ object OffsetProp {
     def analyse(p: Procedure): Map[Variable, Expr] = {
       reversePostOrder(p)
       val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
+      val worklistSet = mutable.HashSet[Block]()
       worklist.addAll(p.entryBlock)
+      worklistSet.addAll(p.entryBlock)
       while (worklist.nonEmpty && !giveUp) {
         val b = worklist.dequeue()
-        val seq = lastUpdate.get(b).getOrElse(0)
+        worklistSet.remove(b)
+        val seq = lastUpdate.getOrElse(b, 0)
 
         b.statements.foreach(transfer)
 
         if (stSequenceNo != seq || seq == 0) {
           lastUpdate(b) = stSequenceNo
-          worklist.addAll(b.nextBlocks)
+          for (block <- b.nextBlocks) {
+            if (!worklistSet.contains(block)) {
+              worklist.enqueue(block)
+              worklistSet.add(block)
+            }
+          }
         }
       }
 
@@ -1450,16 +1458,24 @@ object MinCopyProp {
     def analyse(p: Procedure): Map[Variable, Variable | Literal] = {
       reversePostOrder(p)
       val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
+      val worklistSet = mutable.HashSet[Block]()
       worklist.addAll(p.entryBlock)
+      worklistSet.addAll(p.entryBlock)
       while (worklist.nonEmpty && !giveUp) {
         val b = worklist.dequeue()
-        val seq = lastUpdate.get(b).getOrElse(0)
+        worklistSet.remove(b)
+        val seq = lastUpdate.getOrElse(b, 0)
 
         b.statements.foreach(transfer)
 
         if (stSequenceNo != seq || seq == 0) {
           lastUpdate(b) = stSequenceNo
-          worklist.addAll(b.nextBlocks)
+          for (block <- b.nextBlocks) {
+            if (!worklistSet.contains(block)) {
+              worklist.enqueue(block)
+              worklistSet.add(block)
+            }
+          }
         }
       }
 
