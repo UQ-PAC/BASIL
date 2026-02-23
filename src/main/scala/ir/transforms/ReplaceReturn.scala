@@ -123,6 +123,7 @@ class ConvertSingleReturn extends CILVisitor {
 
   override def vstmt(s: Statement): SkipChildren[List[Statement]] = SkipChildren()
 }
+
 /**
  * Establish procedure diamond structure with designated entry and return block which contain no statements.
  *
