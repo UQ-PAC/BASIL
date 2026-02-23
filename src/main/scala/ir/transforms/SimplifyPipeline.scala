@@ -21,7 +21,7 @@ def doSimplify(ctx: IRContext, dumpILToPath: Option[String] = None): Unit = {
   ctx.program.sortProceduresRPO()
 
   transforms.liftSVComp(ctx.program)
-  
+
   dumpILToPath.foreach { s =>
     DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-simp.il"), pp_prog(program))
   }
@@ -74,7 +74,7 @@ def doSimplify(ctx: IRContext, dumpILToPath: Option[String] = None): Unit = {
 
   // brute force run the analysis twice because it cleans up more stuff
   // assert(program.procedures.forall(transforms.rdDSAProperty))
-  
+
   Logger.info("Copyprop Start")
   transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
 
