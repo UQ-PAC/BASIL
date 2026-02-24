@@ -3,7 +3,7 @@ package ir.transforms
 import analysis.{AnalysisManager, Interval as _, *}
 import ir.*
 import translating.PrettyPrinter.*
-import util.{AnalysisResultDotLogger, DebugDumpIRLogger, Logger, PerformanceTimer, StaticAnalysisConfig}
+import util.{DebugDumpIRLogger, Logger, PerformanceTimer}
 
 import java.io.{BufferedWriter, File, FileWriter}
 
