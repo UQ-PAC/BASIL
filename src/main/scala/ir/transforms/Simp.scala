@@ -1269,13 +1269,14 @@ object OffsetProp {
 
     def specJoinState(lhs: Variable, rhs: Expr): Option[(Variable, Value)] = {
       rhs match {
-        case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if (!st.contains(lhs)) =>
+        case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if !st.contains(lhs) =>
           Some(lhs -> (Some(l), Some(r)))
         case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if findOff(l, r) == find(lhs) => None
-        case v: Variable if (!st.contains(lhs)) => Some(lhs -> (Some(v), None))
-        case v: BitVecLiteral if (!st.contains(lhs)) => Some(lhs -> (None, Some(v)))
-        case v: Variable if (find(lhs) == find(v)) => None
-        case c: BitVecLiteral if (find(lhs) != c) => Some(lhs -> (None, None))
+        case v: Variable if !st.contains(lhs) => Some(lhs -> (Some(v), None))
+        case v: BitVecLiteral if !st.contains(lhs) => Some(lhs -> (None, Some(v)))
+        case v: Variable if find(lhs) == find(v) => None
+        case c: BitVecLiteral if find(lhs) != c => Some(lhs -> (None, None))
+        case c: BitVecLiteral if find(lhs) == c => Some(lhs -> (None, Some(c)))
         case _ => Some(lhs -> (None, None))
       }
     }
