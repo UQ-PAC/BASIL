@@ -29,7 +29,7 @@ class InterpretTestConstProp
     val ictx = IRLoading.load(loading)
     ir.transforms.doCleanupWithoutSimplify(ictx, AnalysisManager(ictx.program))
     ir.transforms.clearParams(ictx.program)
-    val analyses = AnalysisPipelineMRA.runToFixpoint(StaticAnalysisConfig(None, None, None), ictx)
+    val analyses = AnalysisPipelineMRA.runToFixpoint(StaticAnalysisConfig(), ictx)
 
     val analysisres = analyses.intraProcConstProp.collect { case (block: Block, v) =>
       block -> v

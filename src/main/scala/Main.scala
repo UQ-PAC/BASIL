@@ -328,7 +328,6 @@ object Main {
       }
       Some(
         StaticAnalysisConfig(
-          conf.dumpIL,
           conf.analysisResults,
           conf.analysisResultsDot,
           conf.threadSplit.value,
