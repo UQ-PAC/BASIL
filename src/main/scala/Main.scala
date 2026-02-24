@@ -391,7 +391,13 @@ object Main {
     val memoryEncodingRepresentation = conf.memoryEncoding match
       case None => None
       case Some("flat") | Some("") => Some(MemoryEncodingRepresentation.Flat)
-      case Some("split") => Some(MemoryEncodingRepresentation.Split())
+      case Some(s) if s.slice(0, 5) == "split" => {
+        val parts = s.split(',')
+        Some(MemoryEncodingRepresentation.Split(
+          splitMem = parts.contains("splitMem"),
+          baseFirst = !parts.contains("reverseOrder")
+        ))
+      }
       case Some(_) =>
         throw new IllegalArgumentException("Illegal option to memory-encoding, allowed are: flat | split(,reverseOrder)(,splitMem)")
 
