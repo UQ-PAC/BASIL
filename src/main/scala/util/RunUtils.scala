@@ -152,8 +152,8 @@ object RunUtils {
       case Some(MemoryEncodingRepresentation.Flat) => {
         visit_prog(transforms.memoryEncoding.flat.FlatTransform(ctx, conf.simplify), ctx.program)
       }
-      case Some(MemoryEncodingRepresentation.BOO) => {
-        visit_prog(transforms.memoryEncoding.split.SplitTransform(ctx, conf.simplify), ctx.program)
+      case Some(s: MemoryEncodingRepresentation.Split) => {
+        visit_prog(transforms.memoryEncoding.split.SplitTransform(ctx, conf.simplify, s), ctx.program)
       }
       case _ => {}
     }

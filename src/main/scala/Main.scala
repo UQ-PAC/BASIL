@@ -268,7 +268,9 @@ object Main {
     noDebug: Flag,
     @arg(
       name = "memory-encoding",
-      doc = "Enable memory encoding. (options: flat|boo|obo). flat addressing maps pointers directly to offset. boo/obo split pointers into base and offset: boo = base -> offset -> object, obo = offset -> base -> object."
+      doc = """Enable memory encoding. options: flat | split(,reverseOrder)(,splitMem).
+      | flat: maps pointers to abstract metadata leveraging quantifiers + triggers for regions.
+      | split: embeds base + offset into pointers, reducing maximum allocations/allocation size but eliminating quantifiers and most pointer metadata. reverseOrder changes mapping to (offset -> base) and splitMem splits heap load/stores."""
     )
     memoryEncoding: Option[String]
   )
@@ -387,13 +389,11 @@ object Main {
     }
 
     val memoryEncodingRepresentation = conf.memoryEncoding match
-      case Some("flat") => Some(MemoryEncodingRepresentation.Flat)
-      case Some("") => Some(MemoryEncodingRepresentation.Flat)
-      case Some("boo") => Some(MemoryEncodingRepresentation.BOO)
-      case Some("obo") => Some(MemoryEncodingRepresentation.OBO)
       case None => None
+      case Some("flat") | Some("") => Some(MemoryEncodingRepresentation.Flat)
+      case Some("split") => Some(MemoryEncodingRepresentation.Split())
       case Some(_) =>
-        throw new IllegalArgumentException("Illegal option to memory-encoding, allowed are: (flat|obo|boo)")
+        throw new IllegalArgumentException("Illegal option to memory-encoding, allowed are: flat | split(,reverseOrder)(,splitMem)")
 
     val boogieMemoryAccessMode = if (conf.lambdaStores.value) {
       BoogieMemoryAccessMode.LambdaStoreSelect

@@ -455,20 +455,23 @@ case class StackMemory(override val name: String, override val addressSize: Int,
 case class SharedMemory(override val name: String, override val addressSize: Int, override val valueSize: Int)
     extends Memory {}
 
-case class SharedMemorySplit(override val name: String, override val addressSize: Int, val offsetSize: Int, override val valueSize: Int)
-    extends Memory {
+case class SharedMemorySplit(
+  override val name: String,
+  override val addressSize: Int,
+  override val valueSize: Int
+) extends Memory {
   override def toBoogie: BMapVar = BMapVar(
     name,
-    MapBType(BitVecBType(addressSize), MapBType(BitVecBType(offsetSize), BitVecBType(valueSize))),
+    MapBType(BitVecBType(addressSize), MapBType(BitVecBType(addressSize), BitVecBType(valueSize))),
     Scope.Global
   )
   override def toGamma = BMapVar(
     s"Gamma_$name",
-    MapBType(BitVecBType(addressSize), MapBType(BitVecBType(offsetSize), BoolBType)),
+    MapBType(BitVecBType(addressSize), MapBType(BitVecBType(addressSize), BoolBType)),
     Scope.Global
   )
   override val getType: IRType =
-    MapType(BitVecType(addressSize), MapType(BitVecType(offsetSize), BitVecType(valueSize)))
+    MapType(BitVecType(addressSize), MapType(BitVecType(addressSize), BitVecType(valueSize)))
 }
 
 enum QuantifierSort:

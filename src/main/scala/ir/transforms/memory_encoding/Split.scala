@@ -4,6 +4,7 @@ import boogie.*
 import ir.*
 import ir.cilvisitor.*
 import scala.math.pow
+import util.MemoryEncodingRepresentation
 
 // Final n bytes of "addr" are offset into allocation.
 // If set to 0, addresses are treated as raw pointers.
@@ -15,6 +16,7 @@ private val base_size = 64 - offset_size;
 
 private val mem_encoding = GlobalVar("mem_encoding", CustomSort("MemEncoding"))
 private val mem = SharedMemory("mem", 64, 8)
+private val split_mem = SharedMemorySplit("split_mem", 64, 8)
 
 private def disjoint(addr1: Expr, addr2: Expr): Expr =
   FApplyExpr("me_alloc_disjoint", Seq(addr1, addr2), BoolType)
@@ -79,19 +81,19 @@ private def bIsHeapPreserve(map: BExpr = mem_encoding.toBoogie, old_map: BExpr =
 // private def mePreserve(map: Expr = mem_encoding, old_map: Expr = OldExpr(mem_encoding)): Expr =
 //   FApplyExpr("me_preserve", Seq(old_map, map), BoolType)
 
-    // BFunction(
-    //   "me_preserve",
-    //   List(mem_encoding_in, mem_encoding_out),
-    //   bool_r_param,
-    //   Some(BinaryBExpr(BoolAND,
-    //     BinaryBExpr(BoolAND,
-    //       BinaryBExpr(EQ, alloc_live_access_out, alloc_live_access_in),
-    //       BinaryBExpr(EQ, alloc_size_access_out, alloc_size_access_in)
-    //     ),
-    //     BinaryBExpr(EQ, addr_is_heap_access_out, addr_is_heap_access_in)
-    //   )),
-    //   attributes = List(BAttribute("inline", Some("true")))
-    // ),
+// BFunction(
+//   "me_preserve",
+//   List(mem_encoding_in, mem_encoding_out),
+//   bool_r_param,
+//   Some(BinaryBExpr(BoolAND,
+//     BinaryBExpr(BoolAND,
+//       BinaryBExpr(EQ, alloc_live_access_out, alloc_live_access_in),
+//       BinaryBExpr(EQ, alloc_size_access_out, alloc_size_access_in)
+//     ),
+//     BinaryBExpr(EQ, addr_is_heap_access_out, addr_is_heap_access_in)
+//   )),
+//   attributes = List(BAttribute("inline", Some("true")))
+// ),
 private def in_bounds(lower: Expr, upper: Expr, n: Expr) =
   BinaryExpr(BoolAND, BinaryExpr(BVULE, lower, n), BinaryExpr(BVULT, n, upper))
 
@@ -107,7 +109,7 @@ private def implies_else(cond: Expr, true_br: Expr, false_br: Expr) = BinaryExpr
   BinaryExpr(BoolIMPLIES, UnaryExpr(BoolNOT, cond), false_br)
 )
 
-class SplitTransform(ctx: IRContext, simplify: Boolean) extends CILVisitor {
+class SplitTransform(ctx: IRContext, simplify: Boolean, mer: MemoryEncodingRepresentation.Split) extends CILVisitor {
   private var global_addresses = ctx.symbols.flatMap(s => Range(s.value.intValue, s.value.intValue + s.size)).toSet
 
   private def r(n: Int) = if simplify then LocalVar(s"R${n}_out", BitVecType(64))
@@ -174,7 +176,15 @@ class SplitTransform(ctx: IRContext, simplify: Boolean) extends CILVisitor {
         BinaryBExpr(
           BoolIMPLIES,
           in_bounds(addrBase(pre_r(0)), BinaryExpr(BVADD, addrBase(pre_r(0)), allocSize(pre_r(0))), i).toBoogie,
-          BinaryBExpr(EQ, MapAccess(mem.toGamma, i.toBoogie), TrueBLiteral)
+          (if mer.splitMem then {
+             BinaryBExpr(
+               EQ,
+               ExprMapAccess(MapAccess(split_mem.toGamma, bAddrBase(i.toBoogie)), bAddrOffset(i.toBoogie), BoolBType),
+               TrueBLiteral
+             )
+           } else {
+             BinaryBExpr(EQ, MapAccess(mem.toGamma, i.toBoogie), TrueBLiteral)
+           })
         )
       )
     )
@@ -186,9 +196,7 @@ class SplitTransform(ctx: IRContext, simplify: Boolean) extends CILVisitor {
   private def transform_main(p: Procedure) = {
     p.requires ++= List()
 
-    val x = SharedMemorySplit("bv_bv_mem", 64, 64, 8);
     p.requiresExpr ++= List(
-      BinaryExpr(EQ, x, x),
       BinaryExpr(
         EQ,
         BinaryExpr(BVAND, BitVecLiteral(0xff00, 64), BitVecLiteral(0xff00, 64)),
@@ -240,11 +248,29 @@ class SplitTransform(ctx: IRContext, simplify: Boolean) extends CILVisitor {
     s match {
       case s: MemoryStore => {
         val size = BitVecLiteral(s.size / 8, 64);
-        ChangeTo(List(Assert(validAccess(s.index, size), comment = Some("Requires Valid Memory")), s))
+        ChangeTo(
+          List(
+            Assert(validAccess(s.index, size), comment = Some("Requires Valid Memory")),
+            (if (mer.splitMem) then {
+               MemoryStore(split_mem, s.index, s.value, s.endian, s.size, s.label)
+             } else {
+               s
+             })
+          )
+        )
       }
       case s: MemoryLoad => {
         val size = BitVecLiteral(s.size / 8, 64);
-        ChangeTo(List(Assert(validAccess(s.index, size), comment = Some("Requires Valid Memory")), s))
+        ChangeTo(
+          List(
+            Assert(validAccess(s.index, size), comment = Some("Requires Valid Memory")),
+            (if (mer.splitMem) then {
+               MemoryLoad(s.lhs, split_mem, s.index, s.endian, s.size, s.label)
+             } else {
+               s
+             })
+          )
+        )
       }
       case _ => {
         DoChildren()
@@ -263,11 +289,14 @@ class SplitTransform(ctx: IRContext, simplify: Boolean) extends CILVisitor {
       case _ => {}
     }
 
+    // Visit all of the ensures/requires and map memory load/store on $mem to $split_mem
+    // p.requires = p.requires.map(r => r)
+
     DoChildren()
   }
 }
 
-def memoryEncodingDecls(): List[BDeclaration] = {
+def memoryEncodingDecls(mer: MemoryEncodingRepresentation.Split): List[BDeclaration] = {
   val r_alloc_live_param = BMapVar("r_alloc_live", MapBType(BitVecBType(64), BitVecBType(2)), Scope.Parameter)
   val r_alloc_size_param = BMapVar("r_alloc_size", MapBType(BitVecBType(64), BitVecBType(64)), Scope.Parameter)
   val mem_param = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter)
@@ -332,19 +361,23 @@ def memoryEncodingDecls(): List[BDeclaration] = {
       Some(BinaryBExpr(BVAND, addr_param, BinaryBExpr(BVSHL, BitVecBLiteral(0xffffffffL, 64), BitVecBLiteral(32, 64)))),
       attributes = List(BAttribute("inline", Some("true")))
     ),
-    BFunction(
-      "me_preserve",
-      List(mem_encoding_in, mem_encoding_out),
-      bool_r_param,
-      Some(BinaryBExpr(BoolAND,
-        BinaryBExpr(BoolAND,
-          BinaryBExpr(EQ, alloc_live_access_out, alloc_live_access_in),
-          BinaryBExpr(EQ, alloc_size_access_out, alloc_size_access_in)
-        ),
-        BinaryBExpr(EQ, addr_is_heap_access_out, addr_is_heap_access_in)
-      )),
-      attributes = List(BAttribute("inline", Some("true")))
-    ),
+    // BFunction(
+    //   "me_preserve",
+    //   List(mem_encoding_in, mem_encoding_out),
+    //   bool_r_param,
+    //   Some(
+    //     BinaryBExpr(
+    //       BoolAND,
+    //       BinaryBExpr(
+    //         BoolAND,
+    //         BinaryBExpr(EQ, alloc_live_access_out, alloc_live_access_in),
+    //         BinaryBExpr(EQ, alloc_size_access_out, alloc_size_access_in)
+    //       ),
+    //       BinaryBExpr(EQ, addr_is_heap_access_out, addr_is_heap_access_in)
+    //     )
+    //   ),
+    //   attributes = List(BAttribute("inline", Some("true")))
+    // ),
     BFunction(
       "me_alloc_disjoint",
       List(addr_param, addr_param2),

@@ -75,7 +75,8 @@ enum MemoryRegionsMode {
 }
 
 enum MemoryEncodingRepresentation {
-  case Flat, BOO, OBO
+  case Flat
+  case Split(baseFirst: Boolean = true, splitMem: Boolean = true)
 }
 
 case class BASILConfig(
