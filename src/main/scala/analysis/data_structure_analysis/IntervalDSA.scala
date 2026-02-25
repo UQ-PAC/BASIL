@@ -46,8 +46,9 @@ class IntervalGraph(
     }
   }
 
-  def exprToSymVal(expr: Expr): SymValSet[OSet] =
+  def exprToSymVal(expr: Expr): SymValSet[OSet] = {
     SymValues.exprToSymValSet(sva, i => isGlobal(i, irContext), glIntervals)(expr)
+  }
 
   protected def symValToNodes(
     symVal: SymValSet[OSet],
@@ -247,19 +248,18 @@ class IntervalGraph(
         debugAssert(IntervalDSA.equiv(valueCells), s"value cells should be unified instead got $valueCells")
 
         val indexCells = constraintArgToCells(constraint.arg1, ignoreContents = true).map(get)
-        if indexCells.nonEmpty then
-          if indexCells.nonEmpty && valueCells.nonEmpty then
-            indexCells.foreach(indexCell =>
-              valueCells.foreach(valueCell =>
-                debugAssert(indexCell.node.isUptoDate, "outdated cell in local correctness check")
-                debugAssert(indexCell.getPointee.node.isUptoDate, "outdated cell in local correctness check")
-                debugAssert(valueCell.node.isUptoDate, "outdated cell in local correctness check")
-                debugAssert(
-                  indexCell.hasPointee && indexCell.getPointee.equiv(valueCell),
-                  s"$constraint, $indexCell doesn't point to ${valueCell} instead ${indexCell.getPointee}"
-                )
-              )
-            )
+        for {
+          indexCell <- indexCells
+          valueCell <- valueCells
+        } {
+          debugAssert(indexCell.node.isUptoDate, "outdated cell in local correctness check")
+          debugAssert(indexCell.getPointee.node.isUptoDate, "outdated cell in local correctness check")
+          debugAssert(valueCell.node.isUptoDate, "outdated cell in local correctness check")
+          debugAssert(
+            indexCell.hasPointee && indexCell.getPointee.equiv(valueCell),
+            s"$constraint, $indexCell doesn't point to $valueCell instead ${indexCell.getPointee}"
+          )
+        }
       case _ =>
     }
   }
@@ -361,8 +361,12 @@ class IntervalGraph(
     val cells = exprToCells(constraintArg.value, newEqv)
     val exprCells = cells.map(find)
 
-    if constraintArg.contents && !ignoreContents then exprCells.map(_.getPointee)
-    else exprCells
+    if (constraintArg.contents && !ignoreContents) {
+      val pointees = exprCells.map(_.getPointee)
+      pointees
+    } else {
+      exprCells
+    }
 
   }
 
@@ -916,13 +920,17 @@ class IntervalCell(val node: IntervalNode, val interval: DSInterval) {
    * Can check if a cell has pointee without creating one for it with hasPointee
    */
   def getPointee: IntervalCell = {
-    if node.get(this.interval) ne this then node.get(this.interval).getPointee
-    else if _pointee.isEmpty then
-//      throw Exception("expected a pointee")
-      debugAssert(this.node.isUptoDate)
+    val cell = node.get(this.interval)
+    if (cell ne this) {
+      cell.getPointee
+    } else if (_pointee.isEmpty) {
+      //      throw Exception("expected a pointee")
+      debugAssert(node.isUptoDate)
       _pointee = Some(IntervalNode(graph, Map.empty).add(0))
       graph.find(_pointee.get)
-    else graph.find(_pointee.get)
+    } else {
+      graph.find(_pointee.get)
+    }
   }
 
   def hasPointee: Boolean = node.get(this.interval)._pointee.nonEmpty
@@ -1338,8 +1346,10 @@ object IntervalDSA {
     require(scc.forall(graphs.keySet.contains))
     require(scc.size > 1)
     val sscc = scc.toSeq.sortBy(_.formalInParam.size).reverse
-    val head = graphs(scc.head)
-    sscc.tail.foreach(p => IntervalDSA.unifyGraphs(graphs(p), head))
+    val head = graphs(sscc.head)
+    sscc.tail.foreach { p =>
+      IntervalDSA.unifyGraphs(graphs(p), head)
+    }
     scc.foreach(p => graphs.update(p, head))
   }
 
