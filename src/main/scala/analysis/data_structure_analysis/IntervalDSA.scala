@@ -28,7 +28,7 @@ class IntervalGraph(
   var phase: DSAPhase,
   val irContext: IRContext,
   var sva: SymValues[OSet],
-  val constraints: Set[Constraint],
+  var constraints: Set[Constraint],
   val glIntervals: Seq[DSInterval],
   val eqCells: Boolean,
   val nodeBuilder: Option[() => Map[SymBase, IntervalNode]]
@@ -1350,12 +1350,15 @@ object IntervalDSA {
     sscc.tail.foreach { p =>
       IntervalDSA.unifyGraphs(graphs(p), head)
     }
+    val allConstraints = scc.flatMap(graphs(_).constraints)
+    head.constraints = allConstraints
     scc.foreach(p => graphs.update(p, head))
   }
 
   /**
    * resolves bottom up constraints
-   * @param init root node in call graph (main)
+   *
+   * @param init   root node in call graph (main)
    * @param locals mapping from procedures to their DSG after the local phase
    * @return procedures
    */
