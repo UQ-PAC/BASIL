@@ -1057,14 +1057,22 @@ object IntervalDSA {
 
   def unifyGraphs(source: IntervalGraph, target: IntervalGraph)(using svDomain: SymValSetDomain[OSet]) = {
     val oldToNew = mutable.Map[IntervalNode, IntervalNode]()
-    source.proc.formalInParam.foreach(p =>
+    source.proc.formalInParam.foreach { p =>
       val base = Par(target.proc, p)
-      if !target.nodes.contains(base) then {
-        target.nodes += (base -> IntervalNode(target, Map(base -> Set(0))))
-        target.sva = SymValues(target.sva.state + (p -> svDomain.init(base)))
+      if (!target.nodes.contains(base)) {
+        val node = IntervalNode(target, Map(base -> Set(0)))
+        target.nodes += (base -> node)
+        if (target.sva.state.contains(p)) {
+          val cells = target.exprToCells(p).map(target.find)
+          val newNodeCell = node.get(0)
+          val allCells = cells + newNodeCell
+          target.mergeCells(allCells)
+        } else {
+          target.sva = SymValues(target.sva.state + (p -> svDomain.init(base)))
+        }
       }
       exprTransfer(p, p, source, target, oldToNew)
-    )
+    }
 
     /*source.proc.formalOutParam.foreach(
       p =>
