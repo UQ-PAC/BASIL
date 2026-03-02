@@ -69,7 +69,7 @@ object AnalysisPipelineMRA {
     StaticAnalysisLogger.debug(subroutines)
 
     // reducible loops
-    if (config.irreducibleLoops) {
+    if (config.removeIrreducibleLoops) {
       reducibleLoops(IRProgram)
 
       config.analysisDotPath.foreach { s =>

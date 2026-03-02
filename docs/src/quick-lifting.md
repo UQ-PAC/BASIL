@@ -57,9 +57,11 @@ in the OUTPUTDIR.
 positional arguments:
   INPUTDIR     input directory (this will be copied! make sure it is not too big)
   OUTPUTDIR    output directory to place binary and lifted files
-  COMMAND      custom compiler command and arguments. this should produce an
-                   'a.out' file (available compilers: gcc, clang)
-                   (default: gcc with all C files in directory)
+  COMMAND      custom compiler command and arguments. this must produce an
+                   'a.out' file. this will be interpreted by the shell within
+                   Nix and so may contain globs or environment variable definitions.
+                   (available compilers: gcc, clang)
+                   (default: gcc *.c)
 ```
 
 ## Example output
@@ -96,6 +98,26 @@ Successfully lifted 107 instructions in 2.776012 sec (2.774692 user time) (0 fai
 'a.objdump' -> '/tmp/basil-out/a.objdump'
 'a.out' -> '/tmp/basil-out/a.out'
 'a.relf' -> '/tmp/basil-out/a.relf'
+```
+
+## Custom commands and compile flags
+
+By default, this script will compile with gcc and use all C files inside the
+input directory. The Bash command used for compiling can be customised by
+specifying it after the input and output parameters. The command should be
+passed as a string, so shell syntax can be expanded by the shell within Nix.
+
+For example, this will run gcc with -O3:
+```bash
+scripts/nix-cc.sh src/test/correct/arrays_simple /tmp/basil-out 'gcc -O3 *.c'
+```
+To propagate the CFLAGS from your shell into the nix-cc, you can use:
+```bash
+scripts/nix-cc.sh src/test/correct/arrays_simple /tmp/basil-out "CFLAGS='$CFLAGS' gcc *.c"
+```
+Finally, to use clang instead of gcc, you might use:
+```bash
+scripts/nix-cc.sh src/test/correct/arrays_simple /tmp/basil-out 'clang *.c'
 ```
 
 ## Important notes

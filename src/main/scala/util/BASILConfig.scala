@@ -45,12 +45,11 @@ case class ILLoadingConfig(
 }
 
 case class StaticAnalysisConfig(
-  dumpILToPath: Option[String] = None,
   analysisResultsPath: Option[String] = None,
   analysisDotPath: Option[String] = None,
   threadSplit: Boolean = false,
   memoryRegions: MemoryRegionsMode = MemoryRegionsMode.Disabled,
-  irreducibleLoops: Boolean = true
+  removeIrreducibleLoops: Boolean = true
 )
 
 enum DSAPhase {
@@ -81,6 +80,7 @@ case class BASILConfig(
   validateSimp: Boolean = false,
   tvSimp: Boolean = false,
   dsaConfig: Option[DSConfig] = None,
+  transformIrreducibleLoops: Boolean = false,
   summariseProcedures: Boolean = false,
   generateLoopInvariants: Boolean = false,
   generateRelyGuarantees: Boolean = false,

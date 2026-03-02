@@ -42,6 +42,7 @@ class LoopInvariantTests extends AnyFunSuite, CaptureOutput {
         context = Some(context),
         loading = ILLoadingConfig(inputFile = "", relfFile = None),
         simplify = true,
+        transformIrreducibleLoops = true,
         generateLoopInvariants = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
