@@ -41,9 +41,7 @@ class IntervalGraph(
   val isCalledBySCC = calledBySCC(proc)
 
   def calledBySCC(p: Procedure): Boolean = {
-    proc.scc.isDefined || {
-      CallGraph.pred(p).exists(calledBySCC)
-    }
+    p.scc.isDefined || CallGraph.pred(p).exists(calledBySCC)
   }
 
   def exprToSymVal(expr: Expr): SymValSet[OSet] =
