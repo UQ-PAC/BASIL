@@ -35,7 +35,7 @@ trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[Variable, Lat
       case c: MemoryStore => m
       case c: Assume => m
       case c: Assert => m
-      case h: Havoc => m ++ h.vars.map(v => v -> botTerm).toMap
+      case h: Havoc => m ++ h.vars.map(v => v -> topTerm).toMap
       case c: IndirectCall => top
       case c: DirectCall => top
       case c: GoTo => m
@@ -262,7 +262,7 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
       case i: IndirectCall => top
       case h: Havoc =>
         h.vars.foldLeft(b) { (p, v) =>
-          p.remove(BVTerm.Var(v), True).remove(GammaTerm.Var(v), True).simplify
+          p.remove(BVTerm.Var(v), top).remove(GammaTerm.Var(v), top).simplify
         }
       case c: DirectCall =>
         not(c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>

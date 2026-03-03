@@ -727,7 +727,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
         s.updated(lhs, TNum.top(size))
 
       case i: IndirectCall => Map()
-      case h: Havoc => s.removedAll(h.vars)
+      case h: Havoc => s ++ h.vars.map(v => v -> TNum.top(sizeBits(v.irType)))
       case a: Assign => s ++ a.assignees.map(l => l -> TNum.top(sizeBits(l.irType)))
       // Default case
       case _: NOP => s
