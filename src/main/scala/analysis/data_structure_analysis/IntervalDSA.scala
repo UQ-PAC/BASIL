@@ -1076,23 +1076,24 @@ object IntervalDSA {
   }
 
   def resolveGlobalOverlapping(graph: IntervalGraph): Unit = {
-    graph.glIntervals.zipWithIndex.foreach {
-      case (interval, i) if i < graph.glIntervals.size =>
+    graph.glIntervals.zipWithIndex.foreach { (interval, i) =>
+      val j = i + 1
+      if (j < graph.glIntervals.size) {
         val base = GlobSym(interval)
         val node = graph.find(base)
         val offsets = node.bases(base)
         assert(offsets.size == 1)
         val offset = offsets.head
-        if node.cells.last.interval.end.getOrElse(0) > interval.size.get + offset then {
-          val next = graph.glIntervals(i + 1)
+        if (node.cells.last.interval.end.getOrElse(0) > interval.size.get + offset) {
+          val next = graph.glIntervals(j)
           val nextOffset = next.start.get - interval.start.get + offset
-          if nextOffset < node.cells.last.interval.end.get then {
+          if (nextOffset < node.cells.last.interval.end.get) {
             val nextCell = graph.find(graph.nodes(GlobSym(next)).get(0))
             val cell = node.add(nextOffset)
             graph.mergeCells(nextCell, cell)
           }
         }
-      case _ =>
+      }
     }
   }
 
