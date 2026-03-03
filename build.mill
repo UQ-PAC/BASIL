@@ -91,8 +91,19 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
     Some(BuildCtx.workspaceRoot / ".scalafix.conf")
   }
 
-  object test extends ScalaTests with TestModule.ScalaTest with ScalafixModule {
+  def rootObject = this
 
+  object debug extends RunModule {
+    override def forkArgs = Task {
+      super.forkArgs() ++ z3.forkArgs() ++ Seq("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005")
+    }
+    override def runClasspath = rootObject.runClasspath
+    override def finalMainClass = rootObject.finalMainClass
+    override def localRunClasspath = rootObject.localRunClasspath
+    override def mainClass = rootObject.mainClass
+  }
+
+  trait BASILTestModule extends ScalaTests with TestModule.ScalaTest with ScalafixModule {
     override def ammoniteVersion = build.ammoniteVersion
     override def mvnDeps = Seq(scalaTests, scalaCheck, javaTests)
 
@@ -102,9 +113,6 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
     override def scalafixConfig = build.scalafixConfig
 
     // inherit fork options with shared libraries from main package
-    override def forkArgs = Task {
-      super.forkArgs() ++ build.forkArgs()
-    }
     override def forkEnv = Task {
       super.forkEnv() ++ build.forkEnv()
     }
@@ -112,6 +120,18 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
     override def testParallelism = false
     override def testForkGrouping = Task {
       Seq(discoveredTestClasses())
+    }
+  }
+
+  object test extends BASILTestModule {
+    override def forkArgs = Task {
+      super.forkArgs() ++ build.forkArgs()
+    }
+  }
+
+  object debugTest extends BASILTestModule {
+    override def forkArgs = Task {
+      super.forkArgs() ++ build.forkArgs() ++ Seq("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005")
     }
   }
 

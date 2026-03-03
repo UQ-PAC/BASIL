@@ -6,14 +6,14 @@ import ir.dsl.IRToDSL
 import server.IREpoch
 import translating.PrettyPrinter.*
 import util.RunUtils.logTransform
-import util.{AnalysisResultDotLogger, DebugDumpIRLogger, Logger, PerformanceTimer, StaticAnalysisConfig}
+import util.{DebugDumpIRLogger, Logger, PerformanceTimer}
 
 import java.io.{BufferedWriter, File, FileWriter}
 import scala.collection.mutable.ArrayBuffer
 
 def doSimplify(
   ctx: IRContext,
-  config: Option[StaticAnalysisConfig],
+  dumpILToPath: Option[String] = None,
   collectedSnapshots: Option[ArrayBuffer[IREpoch]] = None
 ): Unit = {
   // writeToFile(dotBlockGraph(program, program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
@@ -34,10 +34,8 @@ def doSimplify(
   val beforeLiftSVComp = IRToDSL.convertProgram(ctx.program).resolve
   logTransform(collectedSnapshots)("lift_svcomp", c => transforms.liftSVComp(c.program))(ctx)
 
-  config.foreach {
-    _.dumpILToPath.foreach { s =>
-      DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-simp.il"), pp_prog(program))
-    }
+  dumpILToPath.foreach { s =>
+    DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-simp.il"), pp_prog(program))
   }
 
   transforms.applyRPO(program)
@@ -51,17 +49,9 @@ def doSimplify(
     }
   )(ctx)
 
-  config.foreach {
-    _.analysisDotPath.foreach { s =>
-      DebugDumpIRLogger.writeToFile(File(s"${s}_blockgraph-before-dsa.dot"), dotBlockGraph(program.mainProcedure))
-    }
-  }
-
   Logger.info("[!] Simplify :: DynamicSingleAssignment")
-  config.foreach {
-    _.dumpILToPath.foreach { s =>
-      DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-dsa.il"), pp_prog(program))
-    }
+  dumpILToPath.foreach { s =>
+    DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-dsa.il"), pp_prog(program))
   }
 
   logTransform(collectedSnapshots)("SSA/DSA", c => transforms.OnePassDSA().applyTransform(c.program))(ctx)
@@ -72,23 +62,8 @@ def doSimplify(
 
   logTransform(collectedSnapshots)("removeEmptyBlock", c => transforms.removeEmptyBlocks(c.program))(ctx)
 
-  config.foreach {
-    _.analysisDotPath.foreach { s =>
-      AnalysisResultDotLogger.writeToFile(
-        File(s"${s}_blockgraph-after-dsa.dot"),
-        dotBlockGraph(
-          program,
-          (program.collect { case b: Block =>
-            b -> pp_block(b)
-          }).toMap
-        )
-      )
-    }
-  }
-  config.foreach {
-    _.dumpILToPath.foreach { s =>
-      DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-dsa.il"), pp_prog(program))
-    }
+  dumpILToPath.foreach { s =>
+    DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-dsa.il"), pp_prog(program))
   }
 
   if (ir.eval.SimplifyValidation.validate) {
@@ -107,22 +82,13 @@ def doSimplify(
     assert(invariant.blocksUniqueToEachProcedure(program))
   }
 
-  config.foreach {
-    _.dumpILToPath.foreach { s =>
-      DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-copyprop.il"), pp_prog(program))
-    }
+  dumpILToPath.foreach { s =>
+    DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-copyprop.il"), pp_prog(program))
   }
 
   // brute force run the analysis twice because it cleans up more stuff
   // assert(program.procedures.forall(transforms.rdDSAProperty))
-  config.foreach {
-    _.analysisDotPath.foreach { s =>
-      AnalysisResultDotLogger.writeToFile(
-        File(s"${s}_blockgraph-before-copyprop.dot"),
-        dotBlockGraph(program.mainProcedure)
-      )
-    }
-  }
+
   Logger.info("Copyprop Start")
   logTransform(collectedSnapshots)(
     "linear expr prop",
@@ -136,11 +102,6 @@ def doSimplify(
       transforms.removeDuplicateGuard(c.program)
     }
   )(ctx)
-  config.foreach {
-    _.analysisDotPath.foreach { s =>
-      AnalysisResultDotLogger.writeToFile(File(s"${s}_blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
-    }
-  }
   logTransform(collectedSnapshots)("lift linux assert", transforms.liftLinuxAssertFail)(ctx)
 
   // assert(program.procedures.forall(transforms.rdDSAProperty))
@@ -148,10 +109,8 @@ def doSimplify(
   assert(invariant.blockUniqueLabels(program))
   Logger.info(s"CopyProp ${timer.checkPoint("Simplify")} ms ")
 
-  config.foreach {
-    _.dumpILToPath.foreach { s =>
-      DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-copyprop.il"), pp_prog(program))
-    }
+  dumpILToPath.foreach { s =>
+    DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-copyprop.il"), pp_prog(program))
   }
 
   // val x = program.procedures.forall(transforms.rdDSAProperty)
@@ -164,10 +123,8 @@ def doSimplify(
   }
   // run this after cond recovery because sign bit calculations often need high bits
   // which go away in high level conss
-  config.foreach {
-    _.dumpILToPath.foreach { s =>
-      DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-slices.il"), pp_prog(program))
-    }
+  dumpILToPath.foreach { s =>
+    DebugDumpIRLogger.writeToFile(File(s"${s}_il-after-slices.il"), pp_prog(program))
   }
 
   // re-apply dsa

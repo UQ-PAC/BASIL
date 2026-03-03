@@ -16,7 +16,7 @@ class RemovePCTest extends AnyFunSuite with CaptureOutput {
           dumpIL = None,
           pcTracking = if keepPC then PCTrackingOption.Assert else PCTrackingOption.None
         ),
-        staticAnalysis = Some(StaticAnalysisConfig(None)),
+        staticAnalysis = Some(StaticAnalysisConfig()),
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out"
       )

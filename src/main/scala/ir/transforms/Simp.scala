@@ -1243,15 +1243,6 @@ object OffsetProp {
   // None, Some(Lit) -> Lit
   type Value = (Option[Variable], Option[BitVecLiteral])
 
-  def joinValue(l: Value, r: Value) = {
-    (l, r) match {
-      case ((None, None), _) => (None, None)
-      case (_, (None, None)) => (None, None)
-      case (l, r) if l != r => (None, None)
-      case (l, r) => l
-    }
-  }
-
   class CopyProp() {
     val st = mutable.Map[Variable, Value]()
     var giveUp = false
@@ -1276,33 +1267,25 @@ object OffsetProp {
       }
     }
 
-    def joinState(lhs: Variable, rhs: Expr) = {
-      specJoinState(lhs, rhs) match {
-        case Some((l, r)) => {
-          if (st.contains(l) && st(l) != r) {
-            stSequenceNo += 1
-          }
-          st(l) = r
-        }
-        case _ => ()
-      }
-    }
-
     def specJoinState(lhs: Variable, rhs: Expr): Option[(Variable, Value)] = {
       rhs match {
-        case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if (!st.contains(lhs)) =>
+        case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if !st.contains(lhs) =>
           Some(lhs -> (Some(l), Some(r)))
         case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if findOff(l, r) == find(lhs) => None
-        case v: Variable if (!st.contains(lhs)) => Some(lhs -> (Some(v), None))
-        case v: BitVecLiteral if (!st.contains(lhs)) => Some(lhs -> (None, Some(v)))
-        case v: Variable if (find(lhs) == find(v)) => None
-        case c: BitVecLiteral if (find(lhs) != c) => Some(lhs -> (None, None))
+        case v: Variable if !st.contains(lhs) => Some(lhs -> (Some(v), None))
+        case v: BitVecLiteral if !st.contains(lhs) => Some(lhs -> (None, Some(v)))
+        case v: Variable if find(lhs) == find(v) => None
+        case c: BitVecLiteral if find(lhs) != c => Some(lhs -> (None, None))
+        case c: BitVecLiteral if find(lhs) == c => Some(lhs -> (None, Some(c)))
         case _ => Some(lhs -> (None, None))
       }
     }
 
-    def clob(v: Variable) = {
-      st(v) = (None, None)
+    def update(v: Variable, r: Value) = {
+      if (!st.get(v).exists(_ == r)) {
+        stSequenceNo += 1
+        st(v) = r
+      }
     }
 
     def transfer(s: Statement) = s match {
@@ -1315,11 +1298,11 @@ object OffsetProp {
             case (l: Variable, _) => Seq(l -> (None, None))
           }
           .foreach { case (l, r) =>
-            st(l) = r
+            update(l, r)
           }
       case a: Assign => {
         // memoryload and DirectCall
-        a.assignees.foreach(clob)
+        a.assignees.foreach(v => update(v, (None, None)))
       }
       case _: MemoryStore => ()
       case _: NOP => ()
@@ -1331,16 +1314,24 @@ object OffsetProp {
     def analyse(p: Procedure): Map[Variable, Expr] = {
       reversePostOrder(p)
       val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
+      val worklistSet = mutable.HashSet[Block]()
       worklist.addAll(p.entryBlock)
+      worklistSet.addAll(p.entryBlock)
       while (worklist.nonEmpty && !giveUp) {
         val b = worklist.dequeue()
-        val seq = lastUpdate.get(b).getOrElse(0)
+        worklistSet.remove(b)
+        val seq = lastUpdate.getOrElse(b, 0)
 
         b.statements.foreach(transfer)
 
         if (stSequenceNo != seq || seq == 0) {
           lastUpdate(b) = stSequenceNo
-          worklist.addAll(b.nextBlocks)
+          for (block <- b.nextBlocks) {
+            if (!worklistSet.contains(block)) {
+              worklist.enqueue(block)
+              worklistSet.add(block)
+            }
+          }
         }
       }
 
@@ -1454,16 +1445,24 @@ object MinCopyProp {
     def analyse(p: Procedure): Map[Variable, Variable | Literal] = {
       reversePostOrder(p)
       val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
+      val worklistSet = mutable.HashSet[Block]()
       worklist.addAll(p.entryBlock)
+      worklistSet.addAll(p.entryBlock)
       while (worklist.nonEmpty && !giveUp) {
         val b = worklist.dequeue()
-        val seq = lastUpdate.get(b).getOrElse(0)
+        worklistSet.remove(b)
+        val seq = lastUpdate.getOrElse(b, 0)
 
         b.statements.foreach(transfer)
 
         if (stSequenceNo != seq || seq == 0) {
           lastUpdate(b) = stSequenceNo
-          worklist.addAll(b.nextBlocks)
+          for (block <- b.nextBlocks) {
+            if (!worklistSet.contains(block)) {
+              worklist.enqueue(block)
+              worklistSet.add(block)
+            }
+          }
         }
       }
 
