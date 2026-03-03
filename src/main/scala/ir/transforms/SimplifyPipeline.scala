@@ -54,7 +54,7 @@ def doSimplify(
     DebugDumpIRLogger.writeToFile(File(s"${s}_il-before-dsa.il"), pp_prog(program))
   }
 
-  logTransform(collectedSnapshots)("SSA/DSA", c => transforms.OnePassDSA().applyTransform(c.program))(ctx)
+  logTransform(collectedSnapshots)("SSA-DSA", c => transforms.OnePassDSA().applyTransform(c.program))(ctx)
 
   logTransform(collectedSnapshots)("inline PLT", c => transforms.inlinePLTLaunchpad(ctx, AnalysisManager(ctx.program)))(
     ctx

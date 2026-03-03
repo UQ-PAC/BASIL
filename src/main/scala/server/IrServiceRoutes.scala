@@ -47,10 +47,11 @@ class IrServiceRoutes(
       getAfterCfgRoute <+>
       getSpecificBeforeIrRoute <+>
       getSpecificAfterIrRoute <+>
-      postSelectDirectoryRoute
-  }
+      postSelectDirectoryRoute <+> 
+      frontend
+    }
 
-  private val statusRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "status" =>
+  private val statusRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "api" / "status" =>
     isReady.get.flatMap { ready =>
       val status = if (ready) "completed" else "running"
       Ok(AnalysisStatus(status).asJson)
@@ -89,52 +90,30 @@ class IrServiceRoutes(
    *         or a `BadRequest` with an error message if configuration loading or analysis fails.
    */
   private val postSelectDirectoryRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case req @ POST -> Root / "config" / "select-directory" =>
+    case req @ POST -> Root / "api"/ "config" / "select-directory" =>
 
       val coreLogic: IO[Response[IO]] = req.as[DirectorySelection].flatMap { selection =>
 
-        val hardcodedPath = "src/test/correct/secret_write/gcc/secret_write"
+      for {
+        config <- IO(loadDirectory(ChooseInput.Gtirb, selection.directoryPath))
+          .handleErrorWith { e =>
+            logger.error(e)(s"Failed to load directory: ${selection.directoryPath}. Error: ${e.getMessage}") >>
+              IO.raiseError(new Exception(s"Configuration failed: ${e.getMessage}"))
+          }
 
-        if (selection.directoryPath == hardcodedPath) {
+        _ <- logger.info(s"Successfully loaded config from directory. Input: ${config.inputFile}")
 
-          val inputFile = "src/test/correct/secret_write/gcc/secret_write.adt"
-          val relfFile = Some("src/test/correct/secret_write/gcc/secret_write.relf")
+        fiber <- generateIRAsync(config.inputFile, config.relfFile)
+          .handleErrorWith(e => logger.error(e)("IR analysis failed"))
+          .start
 
-          for {
-            _ <- logger.info(s"Using default hardcoded path: $inputFile")
+        _ <- fiber.join
 
-            fiber <- generateIRAsync(inputFile, relfFile)
-              .handleErrorWith(e => logger.error(e)("IR analysis failed"))
-              .start
-
-            _ <- fiber.join
-
-            resp <- Ok(s"Analysis successfully triggered for default path: $inputFile / ${relfFile.getOrElse("none")}")
-          } yield resp
-
-        } else {
-
-          for {
-            config <- IO(loadDirectory(ChooseInput.Gtirb, selection.directoryPath))
-              .handleErrorWith { e =>
-                logger.error(e)(s"Failed to load directory: ${selection.directoryPath}. Error: ${e.getMessage}") >>
-                  IO.raiseError(new Exception(s"Configuration failed: ${e.getMessage}"))
-              }
-
-            _ <- logger.info(s"Successfully loaded config from directory. Input: ${config.inputFile}")
-
-            fiber <- generateIRAsync(config.inputFile, config.relfFile)
-              .handleErrorWith(e => logger.error(e)("IR analysis failed"))
-              .start
-
-            _ <- fiber.join
-
-            resp <- Ok(
-              s"Analysis successfully triggered for directory: ${config.inputFile} / ${config.relfFile.getOrElse("none")}"
-            )
-          } yield resp
-        }
-      }
+        resp <- Ok(
+          s"Analysis successfully triggered for directory: ${config.inputFile} / ${config.relfFile.getOrElse("none")}"
+        )
+      } yield resp
+    }
 
       coreLogic.handleErrorWith { e =>
         logger.warn(s"Request failed: ${e.getMessage}") >>
@@ -150,7 +129,7 @@ class IrServiceRoutes(
    *
    * @return A JSON array of strings, where each string is an epoch name.
    */
-  private val listEpochsRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "epochs" =>
+  private val listEpochsRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "api"/ "epochs" =>
     ensureReady {
       logger.info(s"Received GET /epochs request.") *>
         epochStore.epochsRef.get
@@ -168,7 +147,7 @@ class IrServiceRoutes(
   }
 
   private val getProcedureIndexRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case GET -> Root / "ir" / epochName / "procedures" =>
+    case GET -> Root / "api" / "ir" / epochName / "procedures" =>
       ensureReady {
         logger.info(s"Received GET /ir/$epochName/procedures request.") *>
           epochStore.getEpoch(epochName).flatMap {
@@ -222,7 +201,7 @@ class IrServiceRoutes(
    * @return A JSON array of strings, where each string is a procedure name.
    * @throws NotFound if the specified `epochName` does not exist.
    */
-  private val getProceduresRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "procedures" / epochName =>
+  private val getProceduresRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "api" / "procedures" / epochName =>
     ensureReady {
       logger.info(s"Received GET /procedures/$epochName request.") *>
         epochStore
@@ -246,7 +225,7 @@ class IrServiceRoutes(
    *
    * @return The raw, pretty-printed text of the IR. Returns a `404 Not Found` if the epoch does not exist.
    */
-  private val getBeforeIrRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "ir" / epochName / "before" =>
+  private val getBeforeIrRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "api" / "ir" / epochName / "before" =>
     ensureReady {
       logger.info(s"Received GET /ir/$epochName/before request.") *>
         prettyPrintProgram(epochName, _.beforeTransform)
@@ -263,7 +242,7 @@ class IrServiceRoutes(
    *
    * @return The raw, pretty-printed text of the IR. Returns a `404 Not Found` if the epoch does not exist.
    */
-  private val getAfterIrRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "ir" / epochName / "after" =>
+  private val getAfterIrRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "api" / "ir" / epochName / "after" =>
     ensureReady {
       logger.info(s"Received GET /ir/$epochName/after request.") *>
         prettyPrintProgram(epochName, _.afterTransform)
@@ -280,7 +259,7 @@ class IrServiceRoutes(
    * @return A JSON object where keys are procedure names and values are their corresponding DOT graph strings.
    * @throws NotFound if the specified `epochName` does not exist or its "before" CFG is not available.
    */
-  private val getBeforeCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "cfg" / epochName / "before" =>
+  private val getBeforeCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "api" / "cfg" / epochName / "before" =>
     ensureReady {
       logger.info(s"Received GET /cfg/$epochName/before request.") *>
         epochStore
@@ -316,7 +295,7 @@ class IrServiceRoutes(
    * @return A JSON object where keys are procedure names and values are their corresponding DOT graph strings.
    * @throws NotFound if the specified `epochName` does not exist or its "after" CFG is not available.
    */
-  private val getAfterCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "cfg" / epochName / "after" =>
+  private val getAfterCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "api" / "cfg" / epochName / "after" =>
     ensureReady {
       logger.info(s"Received GET /cfg/$epochName/after request.") *>
         epochStore
@@ -352,7 +331,7 @@ class IrServiceRoutes(
    * @throws NotFound if the specified `epochName` or `procedureName` does not exist.
    */
   private val getSpecificBeforeIrRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case GET -> Root / "ir" / epochName / procedureName / "before" =>
+    case GET -> Root / "api" / "ir" / epochName / procedureName / "before" =>
       ensureReady {
         logger.info(s"Received GET /ir/$epochName/$procedureName/before request.") *>
           epochStore
@@ -385,7 +364,7 @@ class IrServiceRoutes(
    * @throws NotFound if the specified `epochName` or `procedureName` does not exist.
    */
   private val getSpecificAfterIrRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case GET -> Root / "ir" / epochName / procedureName / "after" =>
+    case GET -> Root / "api" / "ir" / epochName / procedureName / "after" =>
       ensureReady {
         logger.info(s"Received GET /ir/$epochName/$procedureName/after request.") *>
           epochStore
@@ -403,6 +382,16 @@ class IrServiceRoutes(
                 InternalServerError("An internal server error occurred.")
             }
       }
+  }
+
+  private val frontend: HttpRoutes[IO] = HttpRoutes.of[IO] {
+    case request @ GET -> Root => 
+      val p = fs2.io.file.Path("src/frontend/index.html")
+      StaticFile.fromPath(p).getOrElseF(NotFound())
+    case request @ GET -> path => 
+      val p = fs2.io.file.Path("src/frontend") / path.toString
+      println(p)
+      StaticFile.fromPath(p).getOrElseF(NotFound())
   }
 
   private def prettyPrintProgram(epochName: String, getProgram: IREpoch => Program): IO[Response[IO]] = {

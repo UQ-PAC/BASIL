@@ -1,45 +1,12 @@
 # REST API for Decompiler User Interface 
 
-This page discusses the set-up and use of BASIL's API and frontend development interface. 
-
-## Set up
-To ensure all required dependencies are available, follow these steps:
-1. Install Frontend Dependencies: The web component uses a tool Vite that requires Node modules. 
-Install this before running the development server:
-```shell
-npm install
-```
-2. Run the _API_ Server (Backend). The following command uses the Mill build tool to automatically 
-download and compile all necessary Scala libraries, then starts the _API_ server.
-```shell
-./mill runMain server/ApiServer
-```
-3. Run the Web Interface (Frontend): In a separate terminal, start the development server
-for the user interface. 
-```shell
-npm run dev
-```
----
 
 ### To run with custom host and port use the following CLI
 To integrate the client (Vite) with a server running on a non-default host or port, 
 you must configure both the server execution and the client's environment variables.
 1. Start the server, specifying the desired host and port using flags.
 ```shell
-./mill runMain server.ApiServer --host <HOST> --port <PORT>
-```
-**Example:** To run the server and expose it publicly on port 8081:
-```shell
-./mill runMain server.ApiServer --host 0.0.0.0 --port 8081
-```
-2. The client must be informed of the server's address by setting the 
-VITE_SERVER_HOST and VITE_SERVER_PORT environment variables.
-Either create a file named .env.development in the root of your project directory 
-or set the variables inline when executing the client command. 
-
-An example of setting the variables inline on Linux/macOS is:
-```shell
-VITE_SERVER_PORT=8081 VITE_SERVER_HOST=0.0.0.0 npm run dev
+./mill runMain server.ApiServer <reguar main args>
 ```
 
 ## Development Style Guide for Future Development

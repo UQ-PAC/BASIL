@@ -43,7 +43,7 @@ object RunUtils {
     val ctxPost = res match {
       case ctx: IRContext => ctx
       case p: Program => ctx.copy(program = p)
-      case () => ctx
+      case _ => ctx
     }
     val after = collectedSnapshots.map(_ => IRToDSL.convertProgram(ctxPost.program).resolve)
     for {
@@ -109,7 +109,7 @@ object RunUtils {
 
     if (q.loading.parameterForm && !q.simplify) {
 
-      logTransform(collectedSnapshots)("clear params", c => ir.transforms.clearParams(c.program))(ctx)
+      logTransform(collectedSnapshots)("clear params a", c => ir.transforms.clearParams(c.program))(ctx)
 
       logTransform(collectedSnapshots)("liftProcedureCallAbstraction", ir.transforms.liftProcedureCallAbstraction)(ctx)
 
@@ -120,7 +120,7 @@ object RunUtils {
         )(ctx)
       }
     } else {
-      logTransform(collectedSnapshots)("clear params", c => ir.transforms.clearParams(c.program))(ctx)
+      logTransform(collectedSnapshots)("clear params b", c => ir.transforms.clearParams(c.program))(ctx)
 
       assert(invariant.correctCalls(ctx.program))
     }

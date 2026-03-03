@@ -1,11 +1,10 @@
 package server
 
 import cats.effect.std.Semaphore
-import cats.effect.{ExitCode, IO, Ref}
+import cats.effect.{ExitCode, IO, Ref, IOApp}
 import cats.syntax.all.*
 import com.comcast.ip4s.{Host, Port, host, port}
 import com.monovore.decline.Opts
-import com.monovore.decline.effect.CommandIOApp
 import ir.{Procedure, Program}
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.server.Router
@@ -52,24 +51,26 @@ object LineCounter {
   }
 }
 
-object ApiServer
-    extends CommandIOApp(name = "basil-api-server", header = "BASIL API Server for IR analysis and visualization.") {
+object ApiServer extends IOApp {
   implicit val loggerFactory: LoggerFactory[IO] = Slf4jFactory.create[IO]
   private val logger: Logger[IO] = loggerFactory.getLogger(LoggerName(getClass.getName))
 
-  private val hostOpt: Opts[Host] = Opts
-    .option[String](long = "host", short = "h", help = "The IP address to bind to (e.g., 127.0.0.1 or 0.0.0.0).")
-    .mapValidated(s => Host.fromString(s).toValidNel("Invalid host address"))
-    .withDefault(host"127.0.0.1")
+  def defaultConfig(adt: String, relf: Option[String]) = {
+      val ilConfig = ILLoadingConfig(inputFile = adt, relfFile = relf, dumpIL = None)
+      val basilConfig = BASILConfig(
+        context = None,
+        loading = ilConfig,
+        simplify = true,
+        dsaConfig = None,
+        memoryTransform = true,
+        summariseProcedures = true,
+        staticAnalysis = None,
+        outputPrefix = "out/test_output"
+      )
+  }
 
-  private val portOpt: Opts[Port] = Opts
-    .option[Int](long = "port", short = "p", help = "The port number to listen on.")
-    .mapValidated(i => Port.fromInt(i).toValidNel("Invalid port number (must be 1-65535)"))
-    .withDefault(port"8080")
-
-  private val configOpts: Opts[(Host, Port)] = (hostOpt, portOpt).tupled
-
-  override def main: Opts[IO[ExitCode]] = configOpts.map { case (host, port) =>
+  def run(args: List[String]) = {
+    val (_, conf) = basil.main.Main.configOfArgs(Array.from(args))
     for {
       isReady <- Ref[IO].of(false)
       semaphoreInstance <- Semaphore[IO](1)
@@ -78,14 +79,14 @@ object ApiServer
         epochStore,
         isReady,
         semaphoreInstance,
-        generateIRAsync(epochStore, semaphoreInstance, isReady)
+        generateIRAsync(epochStore, semaphoreInstance, isReady, conf)
       ).routes
       httpApp = Router("/" -> irServiceRoutes).orNotFound
 
       exitCode <- EmberServerBuilder
         .default[IO]
-        .withHost(host)
-        .withPort(port)
+        .withHost(host"localhost")
+        .withPort(port"8080")
         .withHttpApp(httpApp)
         .build
         .use { server =>
@@ -96,10 +97,12 @@ object ApiServer
 
   }
 
+
   private def generateIRAsync(
     epochStore: IREpochStore,
     irProcessingSemaphore: Semaphore[IO],
-    isReady: Ref[IO, Boolean]
+    isReady: Ref[IO, Boolean],
+    basilConfig: BASILConfig,
   )(adt: String, relf: Option[String]): IO[Unit] = {
 
     irProcessingSemaphore.permit.use { _ =>
@@ -111,17 +114,6 @@ object ApiServer
         _ <- logger.info("Starting BASIL analysis (inside locked section)...")
         collectedEpochs <- IO.blocking {
           val buffer = ArrayBuffer.empty[IREpoch]
-          val ilConfig = ILLoadingConfig(inputFile = adt, relfFile = relf, dumpIL = None)
-          val basilConfig = BASILConfig(
-            context = None,
-            loading = ilConfig,
-            simplify = true,
-            dsaConfig = None,
-            memoryTransform = true,
-            summariseProcedures = true,
-            staticAnalysis = None,
-            outputPrefix = "out/test_output"
-          )
           val finalBasilResult = RunUtils.run(basilConfig, Some(buffer))
           RunUtils.writeOutput(finalBasilResult)
           buffer.toList
@@ -133,7 +125,7 @@ object ApiServer
         _ <- isReady.set(true)
       } yield ()
       analysis.handleErrorWith { e =>
-        logger.error(e)(s"BASIL analysis failed for ADT=$adt, RELF=${relf.getOrElse("none")}") *>
+        logger.error(e)(s"BASIL analysis failed for $adt ${relf.getOrElse("none")}") *>
           isReady.set(true)
       }
     }
