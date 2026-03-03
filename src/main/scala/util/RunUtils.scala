@@ -35,15 +35,25 @@ case class BASILResult(
 
 object RunUtils {
 
-  def addEpochSnapshot(
-    name: String,
-    beforeState: Program,
-    afterState: Program,
+  def logTransform[T](
     collectedEpochs: Option[ArrayBuffer[IREpoch]]
-  ): Unit = {
-    collectedEpochs.foreach { buffer =>
-      buffer += IREpoch(name, beforeState, afterState)
+  )(name: String, f: IRContext => T)(ctx: IRContext): T = {
+    val before = collectedEpochs.map(_ => IRToDSL.convertProgram(ctx.program).resolve)
+    val res: T = f(ctx)
+    val ctxPost = res match {
+      case ctx: IRContext => ctx
+      case p: Program => ctx.copy(program = p)
+      case () => ctx
     }
+    val after = collectedEpochs.map(_ => IRToDSL.convertProgram(ctxPost.program).resolve)
+    for {
+      epochs <- collectedEpochs
+      b <- before
+      a <- after
+    } yield {
+      epochs += IREpoch(name, b, a)
+    }
+    res
   }
 
   def run(q: BASILConfig, collectedEpochsOpt: Option[ArrayBuffer[IREpoch]] = None): BASILResult = {
@@ -99,29 +109,18 @@ object RunUtils {
 
     if (q.loading.parameterForm && !q.simplify) {
 
-      val beforeClearParamsProg = IRToDSL.convertProgram(ctx.program).resolve
-      ir.transforms.clearParams(ctx.program)
-      val afterClearParamsProg = IRToDSL.convertProgram(ctx.program).resolve
-      addEpochSnapshot("clear_params_before_lift", beforeClearParamsProg, afterClearParamsProg, collectedEpochs)
+      logTransform(collectedEpochs)("clear params", c => ir.transforms.clearParams(c.program))(ctx)
 
-      val beforeLiftProcCallAbstrProg = IRToDSL.convertProgram(ctx.program).resolve
-      ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
-      val afterLiftProcCallAbstrProg = IRToDSL.convertProgram(ctx.program).resolve
-      addEpochSnapshot(
-        "lift_procedure_call_abstraction",
-        beforeLiftProcCallAbstrProg,
-        afterLiftProcCallAbstrProg,
-        collectedEpochs
-      )
+      logTransform(collectedEpochs)("liftProcedureCallAbstraction", ir.transforms.liftProcedureCallAbstraction)(ctx)
 
       if (conf.assertCalleeSaved) {
-        transforms.CalleePreservedParam.transform(ctx.program)
+        logTransform(collectedEpochs)(
+          "callee preserved params",
+          ctx => transforms.CalleePreservedParam.transform(ctx.program)
+        )(ctx)
       }
     } else {
-      val beforeClearParamsProg = IRToDSL.convertProgram(ctx.program).resolve
-      ir.transforms.clearParams(ctx.program)
-      val afterClearParamsProg = IRToDSL.convertProgram(ctx.program).resolve
-      addEpochSnapshot("clear_params_only", beforeClearParamsProg, afterClearParamsProg, collectedEpochs)
+      logTransform(collectedEpochs)("clear params", c => ir.transforms.clearParams(c.program))(ctx)
 
       assert(invariant.correctCalls(ctx.program))
     }
@@ -136,40 +135,30 @@ object RunUtils {
 
     val beforeStaticAnalysisProg = IRToDSL.convertProgram(ctx.program).resolve
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-before-analysis.il"), pp_prog(ctx.program)))
-    val analysis = q.staticAnalysis.map { conf =>
-      AnalysisPipelineMRA.runToFixpoint(conf, ctx)
-    }
-    q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
-    val afterStaticAnalysisProg = IRToDSL.convertProgram(ctx.program).resolve
-    addEpochSnapshot("static_analysis", beforeStaticAnalysisProg, afterStaticAnalysisProg, collectedEpochs)
+    val analysis = logTransform(collectedEpochs)(
+      "static analysis",
+      ctx =>
+        q.staticAnalysis.map { conf =>
+          AnalysisPipelineMRA.runToFixpoint(conf, ctx)
+        }
+    )(ctx)
 
     assert(ir.invariant.programDiamondForm(ctx.program))
     ir.eval.SimplifyValidation.validate = conf.validateSimp
     if (conf.simplify) {
 
-      val beforeClearParamsProg = IRToDSL.convertProgram(ctx.program).resolve
-      ir.transforms.clearParams(ctx.program)
-      val afterClearParamsProg = IRToDSL.convertProgram(ctx.program).resolve
-      addEpochSnapshot("clear_params_and_simplify", beforeClearParamsProg, afterClearParamsProg, collectedEpochs)
+      logTransform(collectedEpochs)("clear params", ctx => ir.transforms.clearParams(ctx.program))(ctx)
 
-      val beforeLiftIndirectCallProg = IRToDSL.convertProgram(ctx.program).resolve
-      ir.transforms.liftIndirectCall(ctx.program)
-      val afterLiftIndirectCallProg = IRToDSL.convertProgram(ctx.program).resolve
-      addEpochSnapshot("lift_indirect_calls", beforeLiftIndirectCallProg, afterLiftIndirectCallProg, collectedEpochs)
-
-      transforms.liftSVCompNonDetEarlyIR(ctx.program)
+      logTransform(collectedEpochs)(
+        "lift indir call",
+        ctx =>
+          ir.transforms.liftIndirectCall(ctx.program)
+          transforms.liftSVCompNonDetEarlyIR(ctx.program)
+      )(ctx)
 
       DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
 
-      val beforeLiftProcCallAbstrProg = IRToDSL.convertProgram(ctx.program).resolve
-      ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
-      val afterLiftProcCallAbstrProg = IRToDSL.convertProgram(ctx.program).resolve
-      addEpochSnapshot(
-        "lift_procedure_call_abstraction_simp",
-        beforeLiftProcCallAbstrProg,
-        afterLiftProcCallAbstrProg,
-        collectedEpochs
-      )
+      logTransform(collectedEpochs)("liftprocedurecallabstraction", ir.transforms.liftProcedureCallAbstraction)(ctx)
 
       DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
 

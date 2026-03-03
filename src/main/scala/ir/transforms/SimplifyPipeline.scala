@@ -5,7 +5,7 @@ import ir.*
 import ir.dsl.IRToDSL
 import server.IREpoch
 import translating.PrettyPrinter.*
-import util.RunUtils.addEpochSnapshot
+import util.RunUtils.logTransform
 import util.{AnalysisResultDotLogger, DebugDumpIRLogger, Logger, PerformanceTimer, StaticAnalysisConfig}
 
 import java.io.{BufferedWriter, File, FileWriter}
@@ -14,31 +14,25 @@ import scala.collection.mutable.ArrayBuffer
 def doSimplify(
   ctx: IRContext,
   config: Option[StaticAnalysisConfig],
-  collectedEpochs: Option[ArrayBuffer[IREpoch]] = None
+  collectedSnapshots: Option[ArrayBuffer[IREpoch]] = None
 ): Unit = {
   // writeToFile(dotBlockGraph(program, program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
   Logger.info("[!] Running Simplify")
   val timer = PerformanceTimer("Simplify")
   val program = ctx.program
 
-  val beforeIrreducibleLoops = IRToDSL.convertProgram(ctx.program).resolve
-  IrreducibleLoops.transform_all_and_update(program)
-  val afterIrreducibleLoops = IRToDSL.convertProgram(ctx.program).resolve
-  addEpochSnapshot("irreducible_loops", beforeIrreducibleLoops, afterIrreducibleLoops, collectedEpochs)
+  logTransform(collectedSnapshots)("irreducible_loops", ctx => IrreducibleLoops.transform_all_and_update(ctx.program))(
+    ctx
+  )
 
-  val beforeNormaliseBlockNames = IRToDSL.convertProgram(ctx.program).resolve
-  for (p <- program.procedures) {
-    p.normaliseBlockNames()
-  }
-  val afterNormaliseBlockNames = IRToDSL.convertProgram(ctx.program).resolve
-  addEpochSnapshot("normalise_block_names", beforeNormaliseBlockNames, afterNormaliseBlockNames, collectedEpochs)
+  logTransform(collectedSnapshots)("normalise block names", _.program.procedures.foreach(p => p.normaliseBlockNames()))(
+    ctx
+  )
 
   ctx.program.sortProceduresRPO()
 
   val beforeLiftSVComp = IRToDSL.convertProgram(ctx.program).resolve
-  transforms.liftSVComp(ctx.program)
-  val afterLiftSVComp = IRToDSL.convertProgram(ctx.program).resolve
-  addEpochSnapshot("lift_svcomp", beforeLiftSVComp, afterLiftSVComp, collectedEpochs)
+  logTransform(collectedSnapshots)("lift_svcomp", c => transforms.liftSVComp(c.program))(ctx)
 
   config.foreach {
     _.dumpILToPath.foreach { s =>
@@ -48,16 +42,15 @@ def doSimplify(
 
   transforms.applyRPO(program)
 
-  // example of printing a simple analysis
+  logTransform(collectedSnapshots)(
+    "simplifyCFG",
+    c => {
+      transforms.removeEmptyBlocks(c.program)
+      transforms.coalesceBlocks(c.program)
+      transforms.removeEmptyBlocks(c.program)
+    }
+  )(ctx)
 
-  val beforeSimplify = IRToDSL.convertProgram(ctx.program).resolve
-  transforms.removeEmptyBlocks(program)
-  transforms.coalesceBlocks(program)
-  transforms.removeEmptyBlocks(program)
-  val afterSimplify = IRToDSL.convertProgram(ctx.program).resolve
-  addEpochSnapshot("simplify_blocks", beforeSimplify, afterSimplify, collectedEpochs)
-
-  // transforms.coalesceBlocksCrossBranchDependency(program)
   config.foreach {
     _.analysisDotPath.foreach { s =>
       DebugDumpIRLogger.writeToFile(File(s"${s}_blockgraph-before-dsa.dot"), dotBlockGraph(program.mainProcedure))
@@ -71,21 +64,13 @@ def doSimplify(
     }
   }
 
-  val beforeOnePassDSA = IRToDSL.convertProgram(ctx.program).resolve
-  transforms.OnePassDSA().applyTransform(program)
-  val afterOnePassDSA = IRToDSL.convertProgram(ctx.program).resolve
-  addEpochSnapshot("one_pass_DSA", beforeOnePassDSA, afterOnePassDSA, collectedEpochs)
+  logTransform(collectedSnapshots)("SSA/DSA", c => transforms.OnePassDSA().applyTransform(c.program))(ctx)
 
-  val beforeInlinePLTLaunchpad = IRToDSL.convertProgram(ctx.program).resolve
-  // fixme: this used to be a plain function but now we have to supply an analysis manager!
-  transforms.inlinePLTLaunchpad(ctx, AnalysisManager(ctx.program))
-  val afterInlinePLTLaunchpad = IRToDSL.convertProgram(ctx.program).resolve
-  addEpochSnapshot("inline_plt_launchpad", beforeInlinePLTLaunchpad, afterInlinePLTLaunchpad, collectedEpochs)
+  logTransform(collectedSnapshots)("inline PLT", c => transforms.inlinePLTLaunchpad(ctx, AnalysisManager(ctx.program)))(
+    ctx
+  )
 
-  val beforeEmptyBlocksRemovedProg = IRToDSL.convertProgram(ctx.program).resolve
-  transforms.removeEmptyBlocks(program)
-  val afterEmptyBlocksRemovedProg = IRToDSL.convertProgram(ctx.program).resolve
-  addEpochSnapshot("remove_empty_blocks", beforeEmptyBlocksRemovedProg, afterEmptyBlocksRemovedProg, collectedEpochs)
+  logTransform(collectedSnapshots)("removeEmptyBlock", c => transforms.removeEmptyBlocks(c.program))(ctx)
 
   config.foreach {
     _.analysisDotPath.foreach { s =>
@@ -139,36 +124,24 @@ def doSimplify(
     }
   }
   Logger.info("Copyprop Start")
-  val beforeCopyPropagationProg = IRToDSL.convertProgram(program).resolve
-  transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
-  val afterCopyPropagationProg = IRToDSL.convertProgram(program).resolve
-  addEpochSnapshot("copy_propagation", beforeCopyPropagationProg, afterCopyPropagationProg, collectedEpochs)
+  logTransform(collectedSnapshots)(
+    "linear expr prop",
+    c => { transforms.copyPropParamFixedPoint(c.program, c.globalOffsets); c }
+  )(ctx)
 
-  val beforeGuardOptimizationsProgram = IRToDSL.convertProgram(program).resolve
-  transforms.fixupGuards(program)
-  transforms.removeDuplicateGuard(program)
+  logTransform(collectedSnapshots)(
+    "simplify guards",
+    c => {
+      transforms.fixupGuards(c.program)
+      transforms.removeDuplicateGuard(c.program)
+    }
+  )(ctx)
   config.foreach {
     _.analysisDotPath.foreach { s =>
       AnalysisResultDotLogger.writeToFile(File(s"${s}_blockgraph-after-simp.dot"), dotBlockGraph(program.mainProcedure))
     }
   }
-  val afterGuardOptimizationsProgram = IRToDSL.convertProgram(program).resolve
-  addEpochSnapshot(
-    "guard_optimisations",
-    beforeGuardOptimizationsProgram,
-    afterGuardOptimizationsProgram,
-    collectedEpochs
-  )
-
-  val beforeLiftLinuxAssertFailProg = IRToDSL.convertProgram(ctx.program).resolve
-  transforms.liftLinuxAssertFail(ctx)
-  val afterLiftLinuxAssertFailProg = IRToDSL.convertProgram(ctx.program).resolve
-  addEpochSnapshot(
-    "lift_linux_assert_fail",
-    beforeLiftLinuxAssertFailProg,
-    afterLiftLinuxAssertFailProg,
-    collectedEpochs
-  )
+  logTransform(collectedSnapshots)("lift linux assert", transforms.liftLinuxAssertFail)(ctx)
 
   // assert(program.procedures.forall(transforms.rdDSAProperty))
 
