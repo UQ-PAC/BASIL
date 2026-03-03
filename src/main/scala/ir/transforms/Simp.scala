@@ -1269,13 +1269,14 @@ object OffsetProp {
 
     def specJoinState(lhs: Variable, rhs: Expr): Option[(Variable, Value)] = {
       rhs match {
-        case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if (!st.contains(lhs)) =>
+        case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if !st.contains(lhs) =>
           Some(lhs -> (Some(l), Some(r)))
         case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if findOff(l, r) == find(lhs) => None
-        case v: Variable if (!st.contains(lhs)) => Some(lhs -> (Some(v), None))
-        case v: BitVecLiteral if (!st.contains(lhs)) => Some(lhs -> (None, Some(v)))
-        case v: Variable if (find(lhs) == find(v)) => None
-        case c: BitVecLiteral if (find(lhs) != c) => Some(lhs -> (None, None))
+        case v: Variable if !st.contains(lhs) => Some(lhs -> (Some(v), None))
+        case v: BitVecLiteral if !st.contains(lhs) => Some(lhs -> (None, Some(v)))
+        case v: Variable if find(lhs) == find(v) => None
+        case c: BitVecLiteral if find(lhs) != c => Some(lhs -> (None, None))
+        case c: BitVecLiteral if find(lhs) == c => Some(lhs -> (None, Some(c)))
         case _ => Some(lhs -> (None, None))
       }
     }
@@ -1313,16 +1314,24 @@ object OffsetProp {
     def analyse(p: Procedure): Map[Variable, Expr] = {
       reversePostOrder(p)
       val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
+      val worklistSet = mutable.HashSet[Block]()
       worklist.addAll(p.entryBlock)
+      worklistSet.addAll(p.entryBlock)
       while (worklist.nonEmpty && !giveUp) {
         val b = worklist.dequeue()
-        val seq = lastUpdate.get(b).getOrElse(0)
+        worklistSet.remove(b)
+        val seq = lastUpdate.getOrElse(b, 0)
 
         b.statements.foreach(transfer)
 
         if (stSequenceNo != seq || seq == 0) {
           lastUpdate(b) = stSequenceNo
-          worklist.addAll(b.nextBlocks)
+          for (block <- b.nextBlocks) {
+            if (!worklistSet.contains(block)) {
+              worklist.enqueue(block)
+              worklistSet.add(block)
+            }
+          }
         }
       }
 
@@ -1436,16 +1445,24 @@ object MinCopyProp {
     def analyse(p: Procedure): Map[Variable, Variable | Literal] = {
       reversePostOrder(p)
       val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
+      val worklistSet = mutable.HashSet[Block]()
       worklist.addAll(p.entryBlock)
+      worklistSet.addAll(p.entryBlock)
       while (worklist.nonEmpty && !giveUp) {
         val b = worklist.dequeue()
-        val seq = lastUpdate.get(b).getOrElse(0)
+        worklistSet.remove(b)
+        val seq = lastUpdate.getOrElse(b, 0)
 
         b.statements.foreach(transfer)
 
         if (stSequenceNo != seq || seq == 0) {
           lastUpdate(b) = stSequenceNo
-          worklist.addAll(b.nextBlocks)
+          for (block <- b.nextBlocks) {
+            if (!worklistSet.contains(block)) {
+              worklist.enqueue(block)
+              worklistSet.add(block)
+            }
+          }
         }
       }
 
