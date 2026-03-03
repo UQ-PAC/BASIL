@@ -111,7 +111,10 @@ object RunUtils {
 
       logTransform(collectedSnapshots)("clear params a", c => ir.transforms.clearParams(c.program))(ctx)
 
-      logTransform(collectedSnapshots)("liftProcedureCallAbstraction", ir.transforms.liftProcedureCallAbstraction)(ctx)
+      ctx =
+        logTransform(collectedSnapshots)("liftProcedureCallAbstraction", ir.transforms.liftProcedureCallAbstraction)(
+          ctx
+        )
 
       if (conf.assertCalleeSaved) {
         logTransform(collectedSnapshots)(
@@ -133,7 +136,6 @@ object RunUtils {
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
     assert(invariant.correctCalls(ctx.program))
 
-    val beforeStaticAnalysisProg = IRToDSL.convertProgram(ctx.program).resolve
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-before-analysis.il"), pp_prog(ctx.program)))
     val analysis = logTransform(collectedSnapshots)(
       "static analysis",
@@ -142,6 +144,7 @@ object RunUtils {
           AnalysisPipelineMRA.runToFixpoint(conf, ctx)
         }
     )(ctx)
+    q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
 
     assert(ir.invariant.programDiamondForm(ctx.program))
     ir.eval.SimplifyValidation.validate = conf.validateSimp
@@ -158,7 +161,10 @@ object RunUtils {
 
       DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
 
-      logTransform(collectedSnapshots)("liftprocedurecallabstraction", ir.transforms.liftProcedureCallAbstraction)(ctx)
+      ctx =
+        logTransform(collectedSnapshots)("liftprocedurecallabstraction", ir.transforms.liftProcedureCallAbstraction)(
+          ctx
+        )
 
       DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
 
