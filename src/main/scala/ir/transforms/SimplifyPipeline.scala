@@ -43,6 +43,7 @@ def doSimplify(ctx: IRContext, dumpILToPath: Option[String] = None): Unit = {
 
   transforms.OnePassDSA().applyTransform(program)
 
+  assert(ir.invariant.readUninitialised(ctx.program))
   // fixme: this used to be a plain function but now we have to supply an analysis manager!
   transforms.inlinePLTLaunchpad(ctx, AnalysisManager(ctx.program))
 
@@ -76,6 +77,7 @@ def doSimplify(ctx: IRContext, dumpILToPath: Option[String] = None): Unit = {
   // assert(program.procedures.forall(transforms.rdDSAProperty))
 
   Logger.info("Copyprop Start")
+  assert(ir.invariant.readUninitialised(ctx.program))
   transforms.copyPropParamFixedPoint(program, ctx.globalOffsets)
 
   transforms.fixupGuards(program)
