@@ -1,6 +1,5 @@
 package basil.main
 
-import scala.collection.mutable.ArrayBuffer
 import gtirb.GTIRBReadELF
 import ir.{FrontendMode, IRLoading}
 import mainargs.{Flag, ParserForClass, arg, main}
@@ -268,7 +267,7 @@ object Main {
     noDebug: Flag
   )
 
-  def configOfArgs(args: Array[String]) : (Config, BASILConfig) = {
+  def configOfArgs(args: Array[String]): (Config, BASILConfig) = {
     val parser = ParserForClass[Config]
     val parsed = parser.constructEither(args.toSeq, autoPrintHelpAndExit = None)
 
@@ -490,12 +489,13 @@ object Main {
       memoryTransform = conf.memoryTransform.value,
       assertCalleeSaved = calleeSaved
     )
-    (conf,q)
+    (conf, q)
   }
 
   def main(args: Array[String]): Unit = {
-    val (conf,q) = try configOfArgs(args) catch 
-      case _ : IllegalArgumentException => return
+    val (conf, q) =
+      try configOfArgs(args)
+      catch case _: IllegalArgumentException => return
 
     Logger.info(programNameVersionHeader)
 

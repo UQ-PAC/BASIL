@@ -1,10 +1,9 @@
 package server
 
 import cats.effect.std.Semaphore
-import cats.effect.{ExitCode, IO, Ref, IOApp}
+import cats.effect.{ExitCode, IO, IOApp, Ref}
 import cats.syntax.all.*
-import com.comcast.ip4s.{Host, Port, host, port}
-import com.monovore.decline.Opts
+import com.comcast.ip4s.{host, port}
 import ir.{Procedure, Program}
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.server.Router
@@ -56,17 +55,17 @@ object ApiServer extends IOApp {
   private val logger: Logger[IO] = loggerFactory.getLogger(LoggerName(getClass.getName))
 
   def defaultConfig(adt: String, relf: Option[String]) = {
-      val ilConfig = ILLoadingConfig(inputFile = adt, relfFile = relf, dumpIL = None)
-      val basilConfig = BASILConfig(
-        context = None,
-        loading = ilConfig,
-        simplify = true,
-        dsaConfig = None,
-        memoryTransform = true,
-        summariseProcedures = true,
-        staticAnalysis = None,
-        outputPrefix = "out/test_output"
-      )
+    val ilConfig = ILLoadingConfig(inputFile = adt, relfFile = relf, dumpIL = None)
+    val basilConfig = BASILConfig(
+      context = None,
+      loading = ilConfig,
+      simplify = true,
+      dsaConfig = None,
+      memoryTransform = true,
+      summariseProcedures = true,
+      staticAnalysis = None,
+      outputPrefix = "out/test_output"
+    )
   }
 
   def run(args: List[String]) = {
@@ -97,12 +96,11 @@ object ApiServer extends IOApp {
 
   }
 
-
   private def generateIRAsync(
     epochStore: IREpochStore,
     irProcessingSemaphore: Semaphore[IO],
     isReady: Ref[IO, Boolean],
-    basilConfig: BASILConfig,
+    basilConfig: BASILConfig
   )(adt: String, relf: Option[String]): IO[Unit] = {
 
     irProcessingSemaphore.permit.use { _ =>

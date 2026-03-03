@@ -1,6 +1,7 @@
 # Transform Viewer GUI
 
-Ensure the submodule contianing the frontend is checked out:
+The frontend project is stored in a separate repository: [UQ-PAC/basil-gui-frontend](https://github.com/UQ-PAC/basil-gui-frontend).
+It is included here as a git submodule, to use the gui ensure this submodule is checked out:
 
 ```
 git submodule init
@@ -10,7 +11,7 @@ git submodule update
 Then run basil with the server entrypoint:
 
 ```shell
-./mill runMain server.ApiServer <reguar main args>
+./mill runMain server.ApiServer <reguar basil args>
 ```
 
 And open `http://localhost:8080` in a browser.

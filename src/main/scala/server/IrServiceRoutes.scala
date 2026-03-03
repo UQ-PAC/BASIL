@@ -47,9 +47,9 @@ class IrServiceRoutes(
       getAfterCfgRoute <+>
       getSpecificBeforeIrRoute <+>
       getSpecificAfterIrRoute <+>
-      postSelectDirectoryRoute <+> 
+      postSelectDirectoryRoute <+>
       frontend
-    }
+  }
 
   private val statusRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "api" / "status" =>
     isReady.get.flatMap { ready =>
@@ -90,30 +90,29 @@ class IrServiceRoutes(
    *         or a `BadRequest` with an error message if configuration loading or analysis fails.
    */
   private val postSelectDirectoryRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case req @ POST -> Root / "api"/ "config" / "select-directory" =>
+    case req @ POST -> Root / "api" / "config" / "select-directory" =>
 
       val coreLogic: IO[Response[IO]] = req.as[DirectorySelection].flatMap { selection =>
+        for {
+          config <- IO(loadDirectory(ChooseInput.Gtirb, selection.directoryPath))
+            .handleErrorWith { e =>
+              logger.error(e)(s"Failed to load directory: ${selection.directoryPath}. Error: ${e.getMessage}") >>
+                IO.raiseError(new Exception(s"Configuration failed: ${e.getMessage}"))
+            }
 
-      for {
-        config <- IO(loadDirectory(ChooseInput.Gtirb, selection.directoryPath))
-          .handleErrorWith { e =>
-            logger.error(e)(s"Failed to load directory: ${selection.directoryPath}. Error: ${e.getMessage}") >>
-              IO.raiseError(new Exception(s"Configuration failed: ${e.getMessage}"))
-          }
+          _ <- logger.info(s"Successfully loaded config from directory. Input: ${config.inputFile}")
 
-        _ <- logger.info(s"Successfully loaded config from directory. Input: ${config.inputFile}")
+          fiber <- generateIRAsync(config.inputFile, config.relfFile)
+            .handleErrorWith(e => logger.error(e)("IR analysis failed"))
+            .start
 
-        fiber <- generateIRAsync(config.inputFile, config.relfFile)
-          .handleErrorWith(e => logger.error(e)("IR analysis failed"))
-          .start
+          _ <- fiber.join
 
-        _ <- fiber.join
-
-        resp <- Ok(
-          s"Analysis successfully triggered for directory: ${config.inputFile} / ${config.relfFile.getOrElse("none")}"
-        )
-      } yield resp
-    }
+          resp <- Ok(
+            s"Analysis successfully triggered for directory: ${config.inputFile} / ${config.relfFile.getOrElse("none")}"
+          )
+        } yield resp
+      }
 
       coreLogic.handleErrorWith { e =>
         logger.warn(s"Request failed: ${e.getMessage}") >>
@@ -129,7 +128,7 @@ class IrServiceRoutes(
    *
    * @return A JSON array of strings, where each string is an epoch name.
    */
-  private val listEpochsRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "api"/ "epochs" =>
+  private val listEpochsRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "api" / "epochs" =>
     ensureReady {
       logger.info(s"Received GET /epochs request.") *>
         epochStore.epochsRef.get
@@ -201,18 +200,19 @@ class IrServiceRoutes(
    * @return A JSON array of strings, where each string is a procedure name.
    * @throws NotFound if the specified `epochName` does not exist.
    */
-  private val getProceduresRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "api" / "procedures" / epochName =>
-    ensureReady {
-      logger.info(s"Received GET /procedures/$epochName request.") *>
-        epochStore
-          .getEpoch(epochName)
-          .flatMap {
-            case Some(epoch) =>
-              val allProcedureNames = epoch.afterTransform.procedures.toList.map(_.procName)
-              Ok(allProcedureNames.asJson)
-            case None => NotFound(s"Epoch '$epochName' not found.")
-          }
-    }
+  private val getProceduresRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
+    case GET -> Root / "api" / "procedures" / epochName =>
+      ensureReady {
+        logger.info(s"Received GET /procedures/$epochName request.") *>
+          epochStore
+            .getEpoch(epochName)
+            .flatMap {
+              case Some(epoch) =>
+                val allProcedureNames = epoch.afterTransform.procedures.toList.map(_.procName)
+                Ok(allProcedureNames.asJson)
+              case None => NotFound(s"Epoch '$epochName' not found.")
+            }
+      }
   }
 
   /**
@@ -225,11 +225,12 @@ class IrServiceRoutes(
    *
    * @return The raw, pretty-printed text of the IR. Returns a `404 Not Found` if the epoch does not exist.
    */
-  private val getBeforeIrRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "api" / "ir" / epochName / "before" =>
-    ensureReady {
-      logger.info(s"Received GET /ir/$epochName/before request.") *>
-        prettyPrintProgram(epochName, _.beforeTransform)
-    }
+  private val getBeforeIrRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
+    case GET -> Root / "api" / "ir" / epochName / "before" =>
+      ensureReady {
+        logger.info(s"Received GET /ir/$epochName/before request.") *>
+          prettyPrintProgram(epochName, _.beforeTransform)
+      }
   }
 
   /**
@@ -242,11 +243,12 @@ class IrServiceRoutes(
    *
    * @return The raw, pretty-printed text of the IR. Returns a `404 Not Found` if the epoch does not exist.
    */
-  private val getAfterIrRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "api" / "ir" / epochName / "after" =>
-    ensureReady {
-      logger.info(s"Received GET /ir/$epochName/after request.") *>
-        prettyPrintProgram(epochName, _.afterTransform)
-    }
+  private val getAfterIrRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
+    case GET -> Root / "api" / "ir" / epochName / "after" =>
+      ensureReady {
+        logger.info(s"Received GET /ir/$epochName/after request.") *>
+          prettyPrintProgram(epochName, _.afterTransform)
+      }
   }
 
   /**
@@ -259,30 +261,31 @@ class IrServiceRoutes(
    * @return A JSON object where keys are procedure names and values are their corresponding DOT graph strings.
    * @throws NotFound if the specified `epochName` does not exist or its "before" CFG is not available.
    */
-  private val getBeforeCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "api" / "cfg" / epochName / "before" =>
-    ensureReady {
-      logger.info(s"Received GET /cfg/$epochName/before request.") *>
-        epochStore
-          .getEpoch(epochName)
-          .flatMap {
-            case Some(epoch) =>
-              logger.info(s"Generating 'before' CFG models for epoch: $epochName.") *>
-                IO.blocking(generateProcedureGraphs(epoch.beforeTransform)).flatMap { graphs =>
-                  logger.info(
-                    s"Successfully generated ${graphs.size} 'before' procedure graphs. Responding with JSON."
-                  ) *>
-                    Ok(graphs.asJson)
-                }
+  private val getBeforeCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
+    case GET -> Root / "api" / "cfg" / epochName / "before" =>
+      ensureReady {
+        logger.info(s"Received GET /cfg/$epochName/before request.") *>
+          epochStore
+            .getEpoch(epochName)
+            .flatMap {
+              case Some(epoch) =>
+                logger.info(s"Generating 'before' CFG models for epoch: $epochName.") *>
+                  IO.blocking(generateProcedureGraphs(epoch.beforeTransform)).flatMap { graphs =>
+                    logger.info(
+                      s"Successfully generated ${graphs.size} 'before' procedure graphs. Responding with JSON."
+                    ) *>
+                      Ok(graphs.asJson)
+                  }
 
-            case None =>
-              logger.warn(s"Epoch '$epochName' not found for 'before' CFG request.") *>
-                NotFound(AnalysisStatus(s"Epoch '$epochName' not found").asJson)
-          }
-          .handleErrorWith { e =>
-            logger.error(e)(s"Error processing 'before' CFG request: ${e.getMessage}") *>
-              InternalServerError(AnalysisStatus("Internal server error during CFG generation").asJson)
-          }
-    }
+              case None =>
+                logger.warn(s"Epoch '$epochName' not found for 'before' CFG request.") *>
+                  NotFound(AnalysisStatus(s"Epoch '$epochName' not found").asJson)
+            }
+            .handleErrorWith { e =>
+              logger.error(e)(s"Error processing 'before' CFG request: ${e.getMessage}") *>
+                InternalServerError(AnalysisStatus("Internal server error during CFG generation").asJson)
+            }
+      }
   }
 
   /**
@@ -295,29 +298,30 @@ class IrServiceRoutes(
    * @return A JSON object where keys are procedure names and values are their corresponding DOT graph strings.
    * @throws NotFound if the specified `epochName` does not exist or its "after" CFG is not available.
    */
-  private val getAfterCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] { case GET -> Root / "api" / "cfg" / epochName / "after" =>
-    ensureReady {
-      logger.info(s"Received GET /cfg/$epochName/after request.") *>
-        epochStore
-          .getEpoch(epochName)
-          .flatMap {
-            case Some(epoch) =>
-              logger.info(s"Generating 'after' CFG models for epoch: $epochName.") *>
-                // Use evalOn with a blocking pool if generateProcedureGraphs is CPU intensive
-                IO.blocking(generateProcedureGraphs(epoch.afterTransform)).flatMap { graphs =>
-                  logger.info(s"Successfully generated ${graphs.size} procedure graphs. Responding with JSON.") *>
-                    Ok(graphs.asJson)
-                }
+  private val getAfterCfgRoute: HttpRoutes[IO] = HttpRoutes.of[IO] {
+    case GET -> Root / "api" / "cfg" / epochName / "after" =>
+      ensureReady {
+        logger.info(s"Received GET /cfg/$epochName/after request.") *>
+          epochStore
+            .getEpoch(epochName)
+            .flatMap {
+              case Some(epoch) =>
+                logger.info(s"Generating 'after' CFG models for epoch: $epochName.") *>
+                  // Use evalOn with a blocking pool if generateProcedureGraphs is CPU intensive
+                  IO.blocking(generateProcedureGraphs(epoch.afterTransform)).flatMap { graphs =>
+                    logger.info(s"Successfully generated ${graphs.size} procedure graphs. Responding with JSON.") *>
+                      Ok(graphs.asJson)
+                  }
 
-            case None =>
-              logger.warn(s"Epoch '$epochName' not found for 'after' CFG request.") *>
-                NotFound(AnalysisStatus(s"Epoch '$epochName' not found").asJson)
-          }
-          .handleErrorWith { e =>
-            logger.error(e)(s"Error processing CFG request: ${e.getMessage}") *>
-              InternalServerError(AnalysisStatus("Internal server error during CFG generation").asJson)
-          }
-    }
+              case None =>
+                logger.warn(s"Epoch '$epochName' not found for 'after' CFG request.") *>
+                  NotFound(AnalysisStatus(s"Epoch '$epochName' not found").asJson)
+            }
+            .handleErrorWith { e =>
+              logger.error(e)(s"Error processing CFG request: ${e.getMessage}") *>
+                InternalServerError(AnalysisStatus("Internal server error during CFG generation").asJson)
+            }
+      }
   }
 
   /**
@@ -385,10 +389,10 @@ class IrServiceRoutes(
   }
 
   private val frontend: HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case request @ GET -> Root => 
+    case request @ GET -> Root =>
       val p = fs2.io.file.Path("src/frontend/index.html")
       StaticFile.fromPath(p).getOrElseF(NotFound())
-    case request @ GET -> path => 
+    case request @ GET -> path =>
       val p = fs2.io.file.Path("src/frontend") / path.toString
       println(p)
       StaticFile.fromPath(p).getOrElseF(NotFound())
