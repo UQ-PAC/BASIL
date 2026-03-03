@@ -906,6 +906,9 @@ class IRToBoogie(
         }
         .unzip
       List(AssignCmd(lhs.flatten, rhs.flatten))
+    case h: Havoc =>
+      val havoced = h.vars.map(_.toBoogie) ++ h.vars.map(_.toGamma)
+      List(BHavoc(havoced, h.comment))
     case m: MemoryAssign =>
       val lhs = m.lhs.toBoogie
       val rhs = m.rhs.toBoogie

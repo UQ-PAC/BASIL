@@ -714,11 +714,10 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
   override def transfer(s: Map[Variable, TNum], b: Command): Map[Variable, TNum] = {
     val r = b match {
       // Assign variable to variable (e.g. x = y)
-      case SimulAssign(assignments, _) => {
-        s ++ assignments.map { case (lhs, rhs) =>
+      case SimulAssign(assignments, _) =>
+        s ++ assignments.map { (lhs, rhs) =>
           lhs -> evaluateExprToTNum(s, rhs)
         }
-      }
       case LocalAssign(lhs: Variable, rhs: Expr, _) =>
         s.updated(lhs, evaluateExprToTNum(s, rhs))
 
@@ -728,6 +727,7 @@ class TNumDomain extends AbstractDomain[Map[Variable, TNum]] {
         s.updated(lhs, TNum.top(size))
 
       case i: IndirectCall => Map()
+      case h: Havoc => s ++ h.vars.map(v => v -> TNum.top(sizeBits(v.irType)))
       case a: Assign => s ++ a.assignees.map(l => l -> TNum.top(sizeBits(l.irType)))
       // Default case
       case _: NOP => s

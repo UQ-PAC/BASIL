@@ -80,7 +80,7 @@ case class MapAssignCmd(lhs: MapAccess, rhs: BExpr, comment: Option[String] = No
   override def globals: Set[BVar] = lhs.globals ++ rhs.globals
 }
 
-case class Havoc(vars: Set[BVar], comment: Option[String] = None) extends BCmd {
+case class BHavoc(vars: Set[BVar], comment: Option[String] = None) extends BCmd {
   override def toString: String = {
     if (vars.isEmpty) {
       "havoc;"

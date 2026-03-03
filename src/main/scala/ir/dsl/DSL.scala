@@ -61,7 +61,7 @@ import scala.collection.mutable.ArrayBuffer
  *  Together, NonCallStatement and Call should partition Statement.
  */
 type NonCallStatement =
-  LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume | MemoryAssign | SimulAssign
+  LocalAssign | MemoryStore | MemoryLoad | NOP | Assert | Assume | MemoryAssign | SimulAssign | Havoc
 
 type DSLStatement = NonCallStatement | EventuallyStatement | EventuallyJump
 
@@ -75,6 +75,7 @@ def cloneStatement(x: NonCallStatement): NonCallStatement =
     case Assert(a, b, c) => Assert(a, b, c)
     case Assume(a, b, c, d) => Assume(a, b, c, d)
     case a: SimulAssign => SimulAssign(a.assignments, a.label)
+    case Havoc(vs, l) => Havoc(vs, l)
   }
   newstmt.setComment(x.comment)
 
