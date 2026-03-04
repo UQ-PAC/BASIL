@@ -68,6 +68,7 @@ object ApiServer extends IOApp {
     )
   }
 
+  /** Runs. */
   override def run(args: List[String]): IO[ExitCode] = {
     val (_, conf) = basil.main.Main.configOfArgs(Array.from(args))
     for {
