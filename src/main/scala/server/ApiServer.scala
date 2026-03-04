@@ -68,7 +68,7 @@ object ApiServer extends IOApp {
     )
   }
 
-  def run(args: List[String]) = {
+  override def run(args: List[String]): IO[ExitCode] = {
     val (_, conf) = basil.main.Main.configOfArgs(Array.from(args))
     for {
       isReady <- Ref[IO].of(false)
