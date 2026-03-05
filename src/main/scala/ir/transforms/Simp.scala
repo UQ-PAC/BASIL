@@ -2015,13 +2015,13 @@ val removeExternalFunctionReferences = Transform(
 def getDoCleanupTransform(doSimplify: Boolean): Transform = TransformBatch(
   "DoCleanup",
   List(
-    makeProcEntriesNonLoops,
     // useful for ReplaceReturns
     // (pushes single block with `Unreachable` into its predecessor)
     coalesceBlocksFixpoint,
     applyRpoTransform,
     replaceJumpsInNonReturningProcs,
     getEstablishProcedureDiamondFormTransform(doSimplify),
+    makeProcEntriesNonLoops,
     removeExternalFunctionReferences
   ),
   notice = "Removing external function calls", // fixme: is this all the cleanup is doing?
@@ -2030,6 +2030,7 @@ def getDoCleanupTransform(doSimplify: Boolean): Transform = TransformBatch(
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
     assert(invariant.procEntryNoIncoming(ctx.program))
+    assert(invariant.programDiamondForm(ctx.program))
   }
 )
 

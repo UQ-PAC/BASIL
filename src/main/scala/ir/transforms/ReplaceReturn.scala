@@ -153,7 +153,6 @@ def establishProcedureDiamondForm(program: Program, doSimplify: Boolean = false)
 
   addReturnBlocks(program)
   cilvisitor.visit_prog(ConvertSingleReturn(), program)
-  debugAssert(ir.invariant.programDiamondForm(program))
 }
 
 def getEstablishProcedureDiamondFormTransform(doSimplify: Boolean): Transform =
