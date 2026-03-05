@@ -158,8 +158,6 @@ object RunUtils {
         ir.transforms.clearParams(ctx.program)
         ir.transforms.liftIndirectCall(ctx.program)
         DebugDumpIRLogger.writeToFile(File("il-beforetvsimp.il"), pp_prog(ctx.program))
-        val (tvres, nctx) = transforms.validate.validatedSimplifyPipeline(ctx, conf.simplify)
-        ctx = nctx
         logTransform(collectedSnapshots)("clear params", ctx => ir.transforms.clearParams(ctx.program))(ctx)
         logTransform(collectedSnapshots)(
           "lift indir call",
@@ -182,6 +180,7 @@ object RunUtils {
         }
         val (tvres, nctx) = transforms.validate.validatedSimplifyPipeline(ctx, conf.simplify)
         ctx = nctx
+      }
       case SimplifyMode.Simplify => {
         assert(ir.invariant.readUninitialised(ctx.program))
         logTransform(collectedSnapshots)("clear params", ctx => ir.transforms.clearParams(ctx.program))(ctx)
@@ -206,6 +205,7 @@ object RunUtils {
         }
         assert(ir.invariant.programDiamondForm(ctx.program))
         doSimplify(ctx, q.loading.dumpIL, collectedSnapshots)
+      }
       case SimplifyMode.Disabled => ()
     }
 
@@ -238,7 +238,7 @@ object RunUtils {
     }
 
     if q.summariseProcedures then
-      getGenerateProcedureSummariesTransform(q.loading.parameterForm || q.simplify)(ctx, analysisManager)
+      getGenerateProcedureSummariesTransform(q.loading.parameterForm || (q.simplify != util.SimplifyMode.Disabled))(ctx, analysisManager)
 
     if (conf.generateLoopInvariants) {
       StaticAnalysisLogger.info("[!] Generating Loop Invariants")

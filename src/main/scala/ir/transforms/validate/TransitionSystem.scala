@@ -1,5 +1,4 @@
 package ir.transforms.validate
-import analysis.Loop
 import ir.*
 import ir.dsl.IRToDSL
 

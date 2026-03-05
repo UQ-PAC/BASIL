@@ -1260,7 +1260,31 @@ object OffsetProp {
         case _ => throw Exception("Unexpected expression structure created by find() at some point")
       }
 
-==== BASE ====
+    def find(v: Variable, fuel: Int = 10000): BitVecLiteral | Variable | BinaryExpr = {
+      if (fuel == 0) {
+        var chain = List(v)
+        for (i <- 0 to 10) {
+          chain = st.get(chain.head) match {
+            case Some((Some(v: Variable), _)) => v :: chain
+            case o =>
+              chain
+          }
+        }
+
+        update(v, (None, None))
+        SimplifyLogger.error(
+          s"Ran out of fuel recursively resolving copyprop (at $v): probable cycle. Next lookups are: $chain"
+        )
+      }
+      st.get(v) match {
+        case None => v
+        case Some((None, None)) => v
+        case Some((None, Some(c))) => c
+        case Some((Some(v), None)) => find(v, fuel - 1)
+        case Some((Some(v), Some(c))) => findOff(v, c, fuel - 1)
+      }
+    }
+
     def joinState(lhs: Variable, rhs: Expr) = {
       specJoinState(lhs, rhs) match {
         case Some((l, r)) => {
@@ -1273,7 +1297,6 @@ object OffsetProp {
       }
     }
 
-==== BASE ====
     def specJoinState(lhs: Variable, rhs: Expr): Option[(Variable, Value)] = {
       rhs match {
         case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if !st.contains(lhs) =>
