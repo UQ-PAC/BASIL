@@ -54,6 +54,7 @@ object RunUtils {
     Logger.info("[!] Loading Program")
     val q = conf
     var ctx = q.context.getOrElse(IRLoading.load(q.loading))
+    writeToFile(pp_prog(ctx.program), "temp.il")
     assert(invariant.readUninitialised(ctx.program))
     postLoad(ctx) // allows extracting information from the original loaded program
 
@@ -92,7 +93,7 @@ object RunUtils {
         transforms.CalleePreservedParam.transform(ctx.program)
       }
     } else {
-      ir.transforms.clearParams(ctx.program)
+      //ir.transforms.clearParams(ctx.program)
       assert(invariant.correctCalls(ctx.program))
     }
     assert(invariant.correctCalls(ctx.program))

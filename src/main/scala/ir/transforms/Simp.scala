@@ -1350,11 +1350,9 @@ object OffsetProp {
 
         b.statements.foreach(transfer)
 
-        if (!breakTransform) {
-          if (stSequenceNo != seq || seq == 0) {
-            lastUpdate(b) = stSequenceNo
-            worklist.addAll(b.nextBlocks)
-          }
+        if (stSequenceNo != seq || seq == 0) {
+          lastUpdate(b) = stSequenceNo
+          worklist.addAll(b.nextBlocks)
         }
       }
 

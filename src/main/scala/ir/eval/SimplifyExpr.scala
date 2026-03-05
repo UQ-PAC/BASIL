@@ -708,17 +708,19 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
     // (declare-const Var2 (_ BitVec 64))
     // (assert (! (not (= (or (not (= (bvnot (bool2bv1 (= (concat (_ bv0 64) (bvadd Var2 (_ bv18446744073705224440 64))) (bvadd (concat (_ bv0 64) (bvadd Var2 (_ bv8 64))) (_ bv18446744073705224432 128))))) (_ bv1 1))) (= (bvadd Var2 (_ bv18446744073705224440 64)) (_ bv0 64))) (bvule Var2 (_ bv4327176 64)))) :named simp.209SimplifyExpr.scala..62))
     // (check-sat)
-    // case BinaryExpr(
-    //      EQ,
-    //      extended @ ZeroExtend(exts, orig @ BinaryExpr(o1, x1, z1)),
-    //      BinaryExpr(o2, compar @ ZeroExtend(ext2, BinaryExpr(o4, x2, y2)), z2)
-    //    )
-    //    if exts == ext2 && size(x1).get >= 8 && (o1 == o2) && o2 == o4 && o1 == BVADD
-    //      && simplifyCond(BinaryExpr(o1, ZeroExtend(exts, x1), ZeroExtend(exts, z1)))
-    //      == simplifyCond(BinaryExpr(BVADD, ZeroExtend(exts, x2), (BinaryExpr(BVADD, ZeroExtend(exts, y2), z2)))) => {
-    //  // C not Set
-    //  logSimp(e, UnaryExpr(BoolNOT, BinaryExpr(BVUGT, x1, UnaryExpr(BVNOT, z1))))
-    // }
+    case BinaryExpr(
+         EQ,
+         extended @ ZeroExtend(exts, orig @ BinaryExpr(o1, x1, z1)),
+         BinaryExpr(o2, compar @ ZeroExtend(ext2, BinaryExpr(o4, x2, y2)), z2)
+       )
+       if ir.transforms.breakTransform && exts == ext2 && size(x1).get >= 8 && (o1 == o2) && o2 == o4 && o1 == BVADD
+         && simplifyCond(BinaryExpr(o1, ZeroExtend(exts, x1), ZeroExtend(exts, z1)))
+         == simplifyCond(BinaryExpr(BVADD, ZeroExtend(exts, x2), (BinaryExpr(BVADD, ZeroExtend(exts, y2), z2)))) => {
+     // C not Set
+     
+     println("BUG PRESENT")
+     logSimp(e, UnaryExpr(BoolNOT, BinaryExpr(BVUGT, x1, UnaryExpr(BVNOT, z1))))
+    }
 
     case BinaryExpr(
           EQ,
@@ -1039,6 +1041,9 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
 
     case BinaryExpr(BVSHL, body, BitVecLiteral(n, _)) if size(body).get <= n =>
       logSimp(e, BitVecLiteral(0, size(body).get))
+
+    case BinaryExpr(BVSHL, body, BitVecLiteral(0, _))  =>
+      logSimp(e, body)
 
     // simplify convoluted bit test
     case BinaryExpr(EQ, BinaryExpr(BVSHL, ZeroExtend(n1, body), BitVecLiteral(n, _)), BitVecLiteral(0, _))

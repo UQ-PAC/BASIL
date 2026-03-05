@@ -217,9 +217,9 @@ def guardCleanupTransforms(p: Program) = {
 
   p.procedures.foreach(ir.eval.AlgebraicSimplifications(_))
   val guardProp = simplifyGuards(p)
-  println(guardProp)
   p.procedures.foreach(p => {
     ir.eval.AlgebraicSimplifications(p)
+    tvEvalLogger.debug("SimplifyConds:" + p.name)
     ir.eval.AssumeConditionSimplifications(p)
     ir.eval.AlgebraicSimplifications(p)
     ir.eval.cleanupSimplify(p)
