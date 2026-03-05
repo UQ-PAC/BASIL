@@ -1,4 +1,4 @@
-// package scala
+package basil.main
 
 import gtirb.GTIRBReadELF
 import ir.{FrontendMode, IRLoading}
@@ -274,7 +274,7 @@ object Main {
     noDebug: Flag
   )
 
-  def main(args: Array[String]): Unit = {
+  def configOfArgs(args: Array[String]): (Config, BASILConfig) = {
     val parser = ParserForClass[Config]
     val parsed = parser.constructEither(args.toSeq, autoPrintHelpAndExit = None)
 
@@ -282,7 +282,7 @@ object Main {
       case Right(r) => r
       case Left(l) =>
         println(l)
-        return
+        throw IllegalArgumentException()
     }
 
     if (conf.help.value) {
@@ -292,12 +292,12 @@ object Main {
       println("  -i prog.gtirb --lifter --verify -o prog.bpl         # output prog.bpl and run Boogie")
       println("  -i prog.gtirb --lifter --dsa= --transform-memory    # simplify and partition mem into regions")
       println("  --load-directory-gtirb <dir> --interpret            # interpret the program")
-      return
+      throw IllegalArgumentException()
     }
 
     if (conf.version.value) {
       println(programNameVersionHeader)
-      return
+      throw IllegalArgumentException()
     }
 
     Logger.setLevel(LogLevel.INFO, false)
@@ -430,7 +430,7 @@ object Main {
 
         // skip writing files if the given path is an empty string. this checks compatibility and exits.
         if (relfOut.trim.isEmpty)
-          return
+          throw IllegalArgumentException()
 
         relf match {
           case Some(relf) =>
@@ -447,7 +447,7 @@ object Main {
           case Some(relf) => writeToFile(relf.sorted.toScala, relfOut + "-gtsrelf.scala")
           case None => Logger.warn(s"Failed to load GTIRB information, $relfOut-gtsrelf.scala not written")
         }
-        return
+        throw IllegalArgumentException()
     }
 
     // patch in gtirb-as-relf if directed or if relf is omitted but we are using gtirb.
@@ -503,6 +503,13 @@ object Main {
       memoryTransform = conf.memoryTransform.value,
       assertCalleeSaved = calleeSaved
     )
+    (conf, q)
+  }
+
+  def main(args: Array[String]): Unit = {
+    val (conf, q) =
+      try configOfArgs(args)
+      catch case _: IllegalArgumentException => return
 
     Logger.info(programNameVersionHeader)
 

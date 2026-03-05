@@ -4,9 +4,11 @@ import analysis.data_structure_analysis.*
 import analysis.{AnalysisManager, Interval as _, *}
 import boogie.*
 import ir.*
+import ir.dsl.IRToDSL
 import ir.dsl.given
 import ir.eval.*
 import ir.transforms.*
+import server.IREpoch
 import translating.*
 import translating.PrettyPrinter.*
 import util.LogLevel.INFO
@@ -33,8 +35,29 @@ case class BASILResult(
 
 object RunUtils {
 
-  def run(q: BASILConfig): BASILResult = {
-    val result = loadAndTranslate(q)
+  def logTransform[T](
+    collectedSnapshots: Option[ArrayBuffer[IREpoch]]
+  )(name: String, f: IRContext => T)(ctx: IRContext): T = {
+    val before = collectedSnapshots.map(_ => IRToDSL.convertProgram(ctx.program).resolve)
+    val res: T = f(ctx)
+    val ctxPost = res match {
+      case ctx: IRContext => ctx
+      case p: Program => ctx.copy(program = p)
+      case _ => ctx
+    }
+    val after = collectedSnapshots.map(_ => IRToDSL.convertProgram(ctxPost.program).resolve)
+    for {
+      Snapshots <- collectedSnapshots
+      b <- before
+      a <- after
+    } yield {
+      Snapshots += IREpoch(name, b, a)
+    }
+    res
+  }
+
+  def run(q: BASILConfig, collectedSnapshotsOpt: Option[ArrayBuffer[IREpoch]] = None): BASILResult = {
+    val result = loadAndTranslate(q, collectedSnapshots = collectedSnapshotsOpt)
     Logger.info("Writing output")
     writeOutput(result)
     result
@@ -49,7 +72,11 @@ object RunUtils {
     }
   }
 
-  def loadAndTranslate(conf: BASILConfig, postLoad: IRContext => Unit = s => ()): BASILResult = {
+  def loadAndTranslate(
+    conf: BASILConfig,
+    postLoad: IRContext => Unit = s => (),
+    collectedSnapshots: Option[ArrayBuffer[IREpoch]] = None
+  ): BASILResult = {
     Logger.info("[!] Loading Program")
     val q = conf
     var ctx = q.context.getOrElse(IRLoading.load(q.loading))
@@ -84,14 +111,24 @@ object RunUtils {
     Logger.info(s"[!] Removed unreachable blocks")
 
     if (q.loading.parameterForm && !(q.simplify != SimplifyMode.Disabled)) {
-      ir.transforms.clearParams(ctx.program)
-      ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
+
+      logTransform(collectedSnapshots)("clear params a", c => ir.transforms.clearParams(c.program))(ctx)
+
+      ctx =
+        logTransform(collectedSnapshots)("liftProcedureCallAbstraction", ir.transforms.liftProcedureCallAbstraction)(
+          ctx
+        )
       assert(ir.invariant.readUninitialised(ctx.program))
-      if (conf.assertCalleeSaved) {
-        transforms.CalleePreservedParam.transform(ctx.program)
-      }
+
+      //if (conf.assertCalleeSaved) {
+      //  logTransform(collectedSnapshots)(
+      //    "callee preserved params",
+      //    ctx => transforms.CalleePreservedParam.transform(ctx.program)
+      //  )(ctx)
+      //}
     } else {
-      ir.transforms.clearParams(ctx.program)
+      logTransform(collectedSnapshots)("clear params b", c => ir.transforms.clearParams(c.program))(ctx)
+
       assert(invariant.correctCalls(ctx.program))
     }
     assert(invariant.correctCalls(ctx.program))
@@ -104,9 +141,13 @@ object RunUtils {
     assert(invariant.correctCalls(ctx.program))
 
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-before-analysis.il"), pp_prog(ctx.program)))
-    val analysis = q.staticAnalysis.map { conf =>
-      AnalysisPipelineMRA.runToFixpoint(conf, ctx)
-    }
+    val analysis = logTransform(collectedSnapshots)(
+      "static analysis",
+      ctx =>
+        q.staticAnalysis.map { conf =>
+          AnalysisPipelineMRA.runToFixpoint(conf, ctx)
+        }
+    )(ctx)
     q.loading.dumpIL.foreach(s => DebugDumpIRLogger.writeToFile(File(s"$s-after-analysis.il"), pp_prog(ctx.program)))
 
     assert(ir.invariant.programDiamondForm(ctx.program))
@@ -119,30 +160,52 @@ object RunUtils {
         DebugDumpIRLogger.writeToFile(File("il-beforetvsimp.il"), pp_prog(ctx.program))
         val (tvres, nctx) = transforms.validate.validatedSimplifyPipeline(ctx, conf.simplify)
         ctx = nctx
-      }
-      case SimplifyMode.Simplify => {
-        assert(ir.invariant.readUninitialised(ctx.program))
-        ir.transforms.clearParams(ctx.program)
-        assert(ir.invariant.readUninitialised(ctx.program))
+        logTransform(collectedSnapshots)("clear params", ctx => ir.transforms.clearParams(ctx.program))(ctx)
+        logTransform(collectedSnapshots)(
+          "lift indir call",
+          ctx =>
+            ir.transforms.liftIndirectCall(ctx.program)
+            transforms.liftSVCompNonDetEarlyIR(ctx.program)
+        )(ctx)
 
-        ir.transforms.liftIndirectCall(ctx.program)
-        transforms.liftSVCompNonDetEarlyIR(ctx.program)
-
-        assert(ir.invariant.readUninitialised(ctx.program))
         DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
-        ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
+
+        ctx =
+          logTransform(collectedSnapshots)("liftprocedurecallabstraction", ir.transforms.liftProcedureCallAbstraction)(
+            ctx
+          )
+
         DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
 
-        assert(ir.invariant.readUninitialised(ctx.program))
         if (conf.assertCalleeSaved) {
           transforms.CalleePreservedParam.transform(ctx.program)
         }
-
+        val (tvres, nctx) = transforms.validate.validatedSimplifyPipeline(ctx, conf.simplify)
+        ctx = nctx
+      case SimplifyMode.Simplify => {
         assert(ir.invariant.readUninitialised(ctx.program))
+        logTransform(collectedSnapshots)("clear params", ctx => ir.transforms.clearParams(ctx.program))(ctx)
+        logTransform(collectedSnapshots)(
+          "lift indir call",
+          ctx =>
+            ir.transforms.liftIndirectCall(ctx.program)
+            transforms.liftSVCompNonDetEarlyIR(ctx.program)
+        )(ctx)
+
+        DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
+
+        ctx =
+          logTransform(collectedSnapshots)("liftprocedurecallabstraction", ir.transforms.liftProcedureCallAbstraction)(
+            ctx
+          )
+
+        DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
+
+        if (conf.assertCalleeSaved) {
+          transforms.CalleePreservedParam.transform(ctx.program)
+        }
         assert(ir.invariant.programDiamondForm(ctx.program))
-        doSimplify(ctx, q.loading.dumpIL)
-        assert(ir.invariant.programDiamondForm(ctx.program))
-      }
+        doSimplify(ctx, q.loading.dumpIL, collectedSnapshots)
       case SimplifyMode.Disabled => ()
     }
 

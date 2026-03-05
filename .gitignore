@@ -26,7 +26,13 @@ examplesold/
 src/test/scala/dump/
 src/test/analysis/dump/
 *.gtirb
+# Ignore all JSON bug a select few for frontend
 *.json
+!/frontend/package.json
+!/frontend/package-lock.json
+!/frontend/tsconfig.app.json
+!/frontend/tsconfig.json
+!/frontend/tsconfig.node.json
 src/test/*.svg
 src/test/*.md.part
 src/test/summary-*.md
