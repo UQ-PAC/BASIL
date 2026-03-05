@@ -49,8 +49,19 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
   val aslpOffline = mvn"io.github.uq-pac::lifter:0.1.0"
   val javaSmt = mvn"org.sosy-lab:java-smt:5.0.0"
   val javaSmtZ3 = mvn"org.sosy-lab:javasmt-solver-z3:4.14.0"
+  val catsEffect = mvn"org.typelevel::cats-effect:3.5.4"
+  val http4sVersion = "1.0.0-M40"
+  val http4Dsl = mvn"org.http4s::http4s-dsl::$http4sVersion"
+  val http4Circe = mvn"org.http4s::http4s-circe::$http4sVersion"
+  val circleGeneric = mvn"io.circe::circe-generic:0.14.6"
+  val slf4j = mvn"org.slf4j:slf4j-simple:2.0.12"
+  val scalaXml = mvn"org.scala-lang.modules::scala-xml:2.1.0"
+  val emberServer = mvn"org.http4s::http4s-ember-server::$http4sVersion"
+  val log4cats = mvn"org.typelevel::log4cats-slf4j:2.6.0"
+  val declineEffect = mvn"com.monovore::decline-effect:2.2.0"
 
-  override def mvnDeps = Seq(scalactic, sourceCode, mainArgs, upickle, aslpOffline, javaSmt, javaSmtZ3)
+  override def mvnDeps = Seq(scalactic, sourceCode, mainArgs, upickle, aslpOffline, javaSmt, javaSmtZ3, catsEffect, http4Dsl,
+    http4Circe, circleGeneric, slf4j, scalaXml, emberServer, log4cats, declineEffect)
 
   override def repositoriesTask = Task.Anon {
     super.repositoriesTask() :+ MavenRepository(
@@ -63,7 +74,7 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
     )
   }
 
-  override def mainClass = Some("Main")
+  override def mainClass = Some("basil.main.Main")
 
   override def moduleDir = BuildCtx.workspaceRoot / "src"
 
