@@ -397,7 +397,8 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
     while (traversalQueue.nonEmpty) {
       val next = traversalQueue.pop()
 
-      def infix(b: BinaryBExpr): Unit = traversalQueue.pushAll(Seq("(", b.arg1, s" ${b.op} ", b.arg2, ")").reverse)
+      def infix(b: BinaryBExpr): Unit =
+        traversalQueue.pushAll(Seq("(", b.arg1, s" ${b.op} ", b.arg2, s"): ${b.getType}").reverse)
       def prefix(b: BinaryBExpr): Unit =
         traversalQueue.pushAll(Seq(s"bv${b.op}${b.inSize}(", b.arg1, ",", b.arg2, ")").reverse)
 
@@ -426,7 +427,7 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
     case bOp: BVBinOp =>
       bOp match {
         case BVCONCAT =>
-          s"($arg1 $bOp $arg2)"
+          s"(($arg1 $bOp $arg2): $getType)"
         case _ =>
           s"bv$bOp$inSize($arg1, $arg2)"
       }
@@ -486,9 +487,12 @@ case class IfThenElse(guard: BExpr, thenExpr: BExpr, elseExpr: BExpr) extends BE
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitIfThenElse(this)
 }
 
-trait BQuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr, triggers: List[BExpr] = List()) extends BExpr {
+trait BQuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr, triggers: List[List[BExpr]] = List())
+    extends BExpr {
   override def toString: String = {
-    val trstr = if triggers.nonEmpty then "{" + triggers.mkString(",") + "} " else ""
+    val trstr = if triggers.nonEmpty then {
+      triggers.filter(t => t.nonEmpty).map(t => "{" + t.mkString(",") + "}").mkString(" ")
+    } else ""
     val boundString = bound.map(_.withType).mkString(", ")
     s"($sort $boundString::  $trstr($body))"
   }
@@ -510,10 +514,10 @@ enum Quantifier {
   case lambda
 }
 
-case class ForAll(bound: List[BVar], body: BExpr, triggers: List[BExpr] = List())
+case class ForAll(bound: List[BVar], body: BExpr, triggers: List[List[BExpr]] = List())
     extends BQuantifierExpr(Quantifier.forall, bound, body, triggers)
 
-case class Exists(bound: List[BVar], body: BExpr, triggers: List[BExpr] = List())
+case class Exists(bound: List[BVar], body: BExpr, triggers: List[List[BExpr]] = List())
     extends BQuantifierExpr(Quantifier.exists, bound, body, triggers)
 
 case class Lambda(bound: List[BVar], body: BExpr) extends BQuantifierExpr(Quantifier.lambda, bound, body)
@@ -534,6 +538,16 @@ case class Old(body: BExpr) extends BExpr {
 case class MapAccess(mapVar: BMapVar, index: BExpr) extends BExpr {
   override def toString: String = s"$mapVar[$index]"
   override val getType: BType = mapVar.getType.result
+  override def functionOps: Set[FunctionOp] = index.functionOps
+  override def locals: Set[BVar] = index.locals
+  override def globals: Set[BVar] = index.globals ++ mapVar.globals
+  override def params: Set[BVar] = index.params ++ mapVar.params
+  override def loads: Set[BExpr] = index.loads
+}
+
+case class ExprMapAccess(mapVar: BExpr, index: BExpr, rType: BType) extends BExpr {
+  override def toString: String = s"$mapVar[$index]"
+  override val getType: BType = rType
   override def functionOps: Set[FunctionOp] = index.functionOps
   override def locals: Set[BVar] = index.locals
   override def globals: Set[BVar] = index.globals ++ mapVar.globals
@@ -579,6 +593,31 @@ case class GammaLoadOp(addressSize: Int, bits: Int, accesses: Int) extends Funct
 }
 case class GammaStoreOp(addressSize: Int, bits: Int, accesses: Int) extends FunctionOp {
   val fnName: String = s"gamma_store$bits"
+}
+case class SplitMemoryLoadOp(addressSize: Int, valueSize: Int, endian: Endian, bits: Int, bo_order: Boolean)
+    extends FunctionOp {
+  val accesses: Int = bits / valueSize
+  debugAssert(accesses > 0)
+
+  val fnName: String = endian match {
+    case Endian.LittleEndian => s"memory_load${bits}_split_le"
+    case Endian.BigEndian => s"memory_load${bits}_split_be"
+  }
+}
+case class SplitMemoryStoreOp(addressSize: Int, valueSize: Int, endian: Endian, bits: Int, bo_order: Boolean)
+    extends FunctionOp {
+  val accesses: Int = bits / valueSize
+
+  val fnName: String = endian match {
+    case Endian.LittleEndian => s"memory_store${bits}_split_le"
+    case Endian.BigEndian => s"memory_store${bits}_split_be"
+  }
+}
+case class SplitGammaLoadOp(addressSize: Int, bits: Int, accesses: Int) extends FunctionOp {
+  val fnName: String = s"gamma_load${bits}_split"
+}
+case class SplitGammaStoreOp(addressSize: Int, bits: Int, accesses: Int) extends FunctionOp {
+  val fnName: String = s"gamma_store${bits}_split"
 }
 case class LOp(indexType: BType) extends FunctionOp
 
@@ -650,13 +689,19 @@ case class BoolToBV1Op(arg: BExpr) extends FunctionOp {
   val fnName: String = "bool2bv1"
 }
 
-case class BMemoryLoad(memory: BMapVar, index: BExpr, endian: Endian, bits: Int) extends BExpr {
+case class BMemoryLoad(memory: BMapVar, index: BExpr, endian: Endian, bits: Int, isSplit: Boolean = false)
+    extends BExpr {
   override def toString: String = s"$fnName($memory, $index)"
   debugAssert(bits >= 8)
 
+  val split: String = isSplit match {
+    case true => "_split"
+    case false => ""
+  }
+
   val fnName: String = endian match {
-    case Endian.LittleEndian => s"memory_load${bits}_le"
-    case Endian.BigEndian => s"memory_load${bits}_be"
+    case Endian.LittleEndian => s"memory_load${bits}${split}_le"
+    case Endian.BigEndian => s"memory_load${bits}${split}_be"
   }
 
   val addressSize: Int = memory.getType.param match {
@@ -666,24 +711,39 @@ case class BMemoryLoad(memory: BMapVar, index: BExpr, endian: Endian, bits: Int)
 
   val valueSize: Int = memory.getType.result match {
     case b: BitVecBType => b.size
+    case MapBType(_, BitVecBType(s: Int)) => s
     case _ => throw new Exception(s"MemoryLoad does not have Bitvector type: $this")
   }
 
   override val getType: BType = BitVecBType(bits)
   override def functionOps: Set[FunctionOp] =
-    memory.functionOps ++ index.functionOps + MemoryLoadOp(addressSize, valueSize, endian, bits)
+    memory.functionOps ++ index.functionOps
+      + (if !isSplit then MemoryLoadOp(addressSize, valueSize, endian, bits)
+         else SplitMemoryLoadOp(addressSize, valueSize, endian, bits, false))
   override def locals: Set[BVar] = memory.locals ++ index.locals
   override def globals: Set[BVar] = index.globals ++ memory.globals
   override def params: Set[BVar] = index.params ++ memory.params
   override def loads: Set[BExpr] = Set(this) ++ index.loads
 }
 
-case class BMemoryStore(memory: BMapVar, index: BExpr, value: BExpr, endian: Endian, bits: Int) extends BExpr {
+case class BMemoryStore(
+  memory: BMapVar,
+  index: BExpr,
+  value: BExpr,
+  endian: Endian,
+  bits: Int,
+  isSplit: Boolean = false
+) extends BExpr {
   override def toString: String = s"$fnName($memory, $index, $value)"
 
+  val split: String = isSplit match {
+    case true => "_split"
+    case false => ""
+  }
+
   val fnName: String = endian match {
-    case Endian.LittleEndian => s"memory_store${bits}_le"
-    case Endian.BigEndian => s"memory_store${bits}_be"
+    case Endian.LittleEndian => s"memory_store${bits}${split}_le"
+    case Endian.BigEndian => s"memory_store${bits}${split}_be"
   }
 
   val addressSize: Int = memory.getType.param match {
@@ -692,13 +752,16 @@ case class BMemoryStore(memory: BMapVar, index: BExpr, value: BExpr, endian: End
   }
 
   val valueSize: Int = memory.getType.result match {
-    case b: BitVecBType => b.size
+    case BitVecBType(s: Int) => s
+    case MapBType(_, BitVecBType(s: Int)) => s
     case _ => throw new Exception(s"MemoryStore does not have Bitvector type: $this")
   }
 
   override val getType: BType = memory.getType
   override def functionOps: Set[FunctionOp] =
-    memory.functionOps ++ index.functionOps ++ value.functionOps + MemoryStoreOp(addressSize, valueSize, endian, bits)
+    memory.functionOps ++ index.functionOps ++ value.functionOps
+      + (if !isSplit then MemoryStoreOp(addressSize, valueSize, endian, bits)
+         else SplitMemoryStoreOp(addressSize, valueSize, endian, bits, false))
   override def locals: Set[BVar] = memory.locals ++ index.locals ++ value.locals
   override def globals: Set[BVar] = index.globals ++ memory.globals ++ value.globals
   override def params: Set[BVar] = index.params ++ memory.params ++ value.params
@@ -710,12 +773,20 @@ case class BDirectExpr(text: String, t: BType) extends BExpr {
   override def getType: BType = t
 }
 
-case class GammaLoad(gammaMap: BMapVar, index: BExpr, bits: Int, accesses: Int) extends BExpr {
+case class GammaLoad(gammaMap: BMapVar, index: BExpr, bits: Int, accesses: Int, isSplit: Boolean = false)
+    extends BExpr {
+
+  val split: String = isSplit match {
+    case true => "_split"
+    case false => ""
+  }
+
   override def toString: String = s"$fnName($gammaMap, $index)"
-  val fnName: String = s"gamma_load$bits"
+  val fnName: String = s"gamma_load$bits$split"
 
   val addressSize: Int = gammaMap.getType.param match {
     case b: BitVecBType => b.size
+    case MapBType(BitVecBType(s: Int), _) => s
     case _ => throw new Exception(s"GammaLoad does not have Bitvector type: $this")
   }
 
@@ -723,20 +794,29 @@ case class GammaLoad(gammaMap: BMapVar, index: BExpr, bits: Int, accesses: Int) 
 
   override val getType: BType = BoolBType
   override def functionOps: Set[FunctionOp] =
-    gammaMap.functionOps ++ index.functionOps + GammaLoadOp(addressSize, bits, accesses)
+    gammaMap.functionOps ++ index.functionOps
+      + (if !isSplit then GammaLoadOp(addressSize, bits, accesses) else SplitGammaLoadOp(addressSize, bits, accesses));
   override def locals: Set[BVar] = gammaMap.locals ++ index.locals
   override def globals: Set[BVar] = index.globals ++ gammaMap.globals
   override def params: Set[BVar] = index.params ++ gammaMap.params
   override def loads: Set[BExpr] = Set(this) ++ index.loads
 }
 
-case class GammaStore(gammaMap: BMapVar, index: BExpr, value: BExpr, bits: Int, accesses: Int) extends BExpr {
+case class GammaStore(gammaMap: BMapVar, index: BExpr, value: BExpr, bits: Int, accesses: Int, isSplit: Boolean = false)
+    extends BExpr {
   require(accesses > 0)
+
+  val split: String = isSplit match {
+    case true => "_split"
+    case false => ""
+  }
+
   override def toString: String = s"$fnName($gammaMap, $index, $value)"
-  val fnName: String = s"gamma_store$bits"
+  val fnName: String = s"gamma_store$bits$split"
 
   val addressSize: Int = gammaMap.getType.param match {
-    case b: BitVecBType => b.size
+    case BitVecBType(s: Int) => s
+    case MapBType(BitVecBType(s: Int), _) => s
     case _ => throw new Exception(s"GammaStore does not have Bitvector type: $this")
   }
 
@@ -744,7 +824,8 @@ case class GammaStore(gammaMap: BMapVar, index: BExpr, value: BExpr, bits: Int, 
 
   override val getType: BType = gammaMap.getType
   override def functionOps: Set[FunctionOp] =
-    gammaMap.functionOps ++ index.functionOps ++ value.functionOps + GammaStoreOp(addressSize, bits, accesses)
+    gammaMap.functionOps ++ index.functionOps ++ value.functionOps
+      + (if !isSplit then GammaStoreOp(addressSize, bits, accesses) else SplitGammaStoreOp(addressSize, bits, accesses));
   override def locals: Set[BVar] = gammaMap.locals ++ index.locals ++ value.locals
   override def globals: Set[BVar] = index.globals ++ gammaMap.globals ++ value.globals
   override def params: Set[BVar] = index.params ++ gammaMap.params ++ value.params
@@ -816,4 +897,9 @@ case class ArrayAccess(global: SpecGlobal, index: Int) extends SpecGlobalOrAcces
   override val toOldGamma: BVar = BVariable(s"Gamma_${global.name}$$${index}_old", BoolBType, Scope.Local)
   override def specGlobals: Set[SpecGlobalOrAccess] = Set(this)
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitArrayAccess(this)
+}
+
+case class BFieldAccessExpr(record: BVar, field: BVar, rType: BType) extends BExpr {
+  override def toString(): String = s"$record->$field"
+  override def getType: BType = field.getType
 }

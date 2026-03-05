@@ -3,7 +3,16 @@ import test_util.BASILTest.*
 import test_util.{BASILTest, CaptureOutput, Histogram, TestConfig, TestCustomisation}
 import util.DSAPhase.TD
 import util.boogie_interaction.*
-import util.{DSConfig, DebugDumpIRLogger, LogLevel, Logger, MemoryRegionsMode, PerformanceTimer, StaticAnalysisConfig}
+import util.{
+  DSConfig,
+  DebugDumpIRLogger,
+  LogLevel,
+  Logger,
+  MemoryRegionsMode,
+  PerformanceTimer,
+  StaticAnalysisConfig,
+  MemoryEncodingRepresentation
+}
 
 import java.io.File
 import scala.collection.immutable.ListMap
@@ -191,6 +200,7 @@ trait SystemTests extends AnyFunSuite, CaptureOutput, BASILTest, TestCustomisati
       conf.summariseProcedures,
       dsa = conf.dsa,
       memoryTransform = conf.memoryTransform,
+      memoryEncoding = conf.memoryEncoding,
       useOfflineLifterForGtirbFrontend = conf.useOfflineLifterForGtirbFrontend
     )
     val translateTime = timer.checkPoint("translate-boogie")
@@ -695,6 +705,33 @@ class MemoryTransformSystemTests extends SystemTests {
       simplify = true,
       dsa = Some(DSConfig()),
       memoryTransform = true
+    )
+  )
+}
+
+@test_util.tags.StandardSystemTest
+class MemoryEncodingSystemTests extends SystemTests {
+  private val timeout = 240
+
+  runTests(
+    "memory_encoding/correct",
+    TestConfig(
+      useBAPFrontend = false,
+      expectVerify = true,
+      memoryEncoding = Some(MemoryEncodingRepresentation.Flat),
+      simplify = true,
+      timeout = timeout
+    )
+  )
+
+  runTests(
+    "memory_encoding/incorrect",
+    TestConfig(
+      useBAPFrontend = false,
+      expectVerify = false,
+      memoryEncoding = Some(MemoryEncodingRepresentation.Flat),
+      simplify = true,
+      timeout = timeout
     )
   )
 }

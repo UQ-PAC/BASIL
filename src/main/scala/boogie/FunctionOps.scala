@@ -1,12 +1,13 @@
 package boogie
 import ir.*
 import util.BoogieMemoryAccessMode
+import util.MemoryEncodingRepresentation
 
 val externAttr = BAttribute("extern")
 val inlineAttr = BAttribute("inline")
 
 type BasilIRFunctionOp = BoolToBV1Op | BVFunctionOp | MemoryLoadOp | MemoryStoreOp | ByteExtract | InBounds |
-  BUninterpreted
+  BUninterpreted | SplitMemoryLoadOp | SplitMemoryStoreOp
 
 def genFunctionOpDefinition(
   f: BasilIRFunctionOp,
@@ -24,6 +25,8 @@ def genFunctionOpDefinition(
       memory match
         case BoogieMemoryAccessMode.SuccessiveStoreSelect => genStoreFunction(m)
         case BoogieMemoryAccessMode.LambdaStoreSelect => genStoreLambdaFunction(m)
+    case m: SplitMemoryStoreOp => genStoreFunctionSplit(m)
+    case m: SplitMemoryLoadOp => genLoadFunctionSplit(m)
     case b: ByteExtract =>
       val valueVar = BParam("value", BitVecBType(b.valueSize))
       val offsetVar = BParam("offset", BitVecBType(b.offsetSize))
@@ -66,6 +69,48 @@ def genLoadFunction(m: MemoryLoadOp) = {
     case h :: Nil => h
     case h :: tail =>
       tail.foldLeft(h) { (concat: BExpr, next: MapAccess) =>
+        BinaryBExpr(BVCONCAT, next, concat)
+      }
+    case Nil => throw Exception(s"Zero byte access: $m")
+  }
+
+  BFunction(m.fnName, in, out, Some(body), List(externAttr))
+}
+
+def genLoadFunctionSplit(m: SplitMemoryLoadOp) = {
+  def bAddrBase(addr: BExpr): BExpr =
+    BFunctionCall("me_addr_base", List(addr), BitVecBType(64))
+  def bAddrOffset(addr: BExpr): BExpr =
+    BFunctionCall("me_addr_offset", List(addr), BitVecBType(64))
+
+  val memVar = BMapVar(
+    "memory",
+    MapBType(BitVecBType(m.addressSize), MapBType(BitVecBType(m.addressSize), BitVecBType(m.valueSize))),
+    Scope.Parameter
+  )
+  val indexVar = BParam("index", BitVecBType(m.addressSize))
+  val in = List(memVar, indexVar)
+  val out = BParam(BitVecBType(m.bits))
+  val accesses: Seq[ExprMapAccess] = for (i <- 0 until m.accesses) yield {
+    if (i == 0) {
+      ExprMapAccess(MapAccess(memVar, bAddrBase(indexVar)), bAddrOffset(indexVar), BitVecBType(m.valueSize))
+    } else {
+      ExprMapAccess(
+        MapAccess(memVar, bAddrBase(indexVar)),
+        bAddrOffset(BinaryBExpr(BVADD, indexVar, BitVecBLiteral(i, m.addressSize))),
+        BitVecBType(m.valueSize)
+      )
+    }
+  }
+  val accessesEndian = m.endian match {
+    case Endian.BigEndian => accesses.reverse
+    case Endian.LittleEndian => accesses
+  }
+
+  val body: BExpr = accessesEndian.toList match {
+    case h :: Nil => h
+    case h :: tail =>
+      tail.foldLeft(h) { (concat: BExpr, next: ExprMapAccess) =>
         BinaryBExpr(BVCONCAT, next, concat)
       }
     case Nil => throw Exception(s"Zero byte access: $m")
@@ -126,6 +171,61 @@ def genStoreFunction(m: MemoryStoreOp) = {
 
   val body = indiceValues.tail.foldLeft(MapUpdate(memVar, indices.head, valuesEndian.head)) {
     (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next(0), next(1))
+  }
+
+  BFunction(m.fnName, in, out, Some(body), List(externAttr))
+}
+
+def genStoreFunctionSplit(m: SplitMemoryStoreOp) = {
+  def bAddrBase(addr: BExpr): BExpr =
+    BFunctionCall("me_addr_base", List(addr), BitVecBType(64))
+  def bAddrOffset(addr: BExpr): BExpr =
+    BFunctionCall("me_addr_offset", List(addr), BitVecBType(64))
+
+  val memVar = BMapVar(
+    "memory",
+    MapBType(BitVecBType(m.addressSize), MapBType(BitVecBType(m.addressSize), BitVecBType(m.valueSize))),
+    Scope.Parameter
+  )
+  val indexVar = BParam("index", BitVecBType(m.addressSize))
+  val memType = MapBType(BitVecBType(m.addressSize), MapBType(BitVecBType(m.addressSize), BitVecBType(m.valueSize)))
+  val valueVar = BParam("value", BitVecBType(m.bits))
+  val in = List(memVar, indexVar, valueVar)
+  val out = BParam(memType)
+  val indices: Seq[BExpr] = for (i <- 0 until m.accesses) yield {
+    if (i == 0) {
+      indexVar
+    } else {
+      BinaryBExpr(BVADD, indexVar, BitVecBLiteral(i, m.addressSize))
+    }
+  }
+  val values: Seq[BExpr] = for (i <- 0 until m.accesses) yield {
+    BVExtract((i + 1) * m.valueSize, i * m.valueSize, valueVar)
+  }
+  val valuesEndian = m.endian match {
+    case Endian.BigEndian => values.reverse
+    case Endian.LittleEndian => values
+  }
+  val indiceValues = for (i <- 0 until m.accesses) yield {
+    (indices(i), valuesEndian(i))
+  }
+
+  val body = indiceValues.tail.foldLeft(
+    MapUpdate(
+      memVar,
+      bAddrBase(indices.head),
+      MapUpdate(MapAccess(memVar, bAddrBase(indices.head)), bAddrOffset(indices.head), valuesEndian.head)
+    )
+  ) { (update: MapUpdate, next: (BExpr, BExpr)) =>
+    MapUpdate(
+      update,
+      bAddrBase(next(0)),
+      MapUpdate(
+        ExprMapAccess(update, bAddrBase(next(0)), MapBType(BitVecBType(64), BitVecBType(8))),
+        bAddrOffset(next(0)),
+        next(1)
+      )
+    )
   }
 
   BFunction(m.fnName, in, out, Some(body), List(externAttr))

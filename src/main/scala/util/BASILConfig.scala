@@ -15,7 +15,8 @@ case class BoogieGeneratorConfig(
   coalesceConstantMemory: Boolean = true,
   procedureRely: Option[ProcRelyVersion] = None,
   threadSplit: Boolean = false,
-  directTranslation: Boolean = false
+  directTranslation: Boolean = false,
+  memoryEncoding: Option[MemoryEncodingRepresentation] = None
 )
 
 case class ILLoadingConfig(
@@ -72,6 +73,11 @@ enum MemoryRegionsMode {
   case DSA, MRA, Disabled
 }
 
+enum MemoryEncodingRepresentation {
+  case Flat
+  case Split(baseFirst: Boolean = true, splitMem: Boolean = true)
+}
+
 case class BASILConfig(
   context: Option[IRContext] = None,
   loading: ILLoadingConfig,
@@ -88,5 +94,6 @@ case class BASILConfig(
   assertCalleeSaved: Boolean = false,
   staticAnalysis: Option[StaticAnalysisConfig] = None,
   boogieTranslation: BoogieGeneratorConfig = BoogieGeneratorConfig(),
+  memoryEncoding: Option[MemoryEncodingRepresentation] = None,
   outputPrefix: String
 )

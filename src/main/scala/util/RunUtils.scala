@@ -198,6 +198,16 @@ object RunUtils {
         memTransferTimer.checkPoint("Performed Memory Transform")
     }
 
+    conf.memoryEncoding match {
+      case Some(MemoryEncodingRepresentation.Flat) => {
+        visit_prog(transforms.memoryEncoding.flat.FlatTransform(ctx, conf.simplify), ctx.program)
+      }
+      case Some(s: MemoryEncodingRepresentation.Split) => {
+        visit_prog(transforms.memoryEncoding.split.SplitTransform(ctx, conf.simplify, s), ctx.program)
+      }
+      case _ => {}
+    }
+
     if (conf.transformIrreducibleLoops) {
       StaticAnalysisLogger.info("[!] Transforming Irreducible Loops")
       IrreducibleLoops.transform_all_and_update(ctx.program)

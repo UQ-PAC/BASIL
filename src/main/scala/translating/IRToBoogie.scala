@@ -3,7 +3,7 @@ import analysis.RegionInjector
 import boogie.*
 import ir.*
 import specification.*
-import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
+import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion, MemoryEncodingRepresentation}
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -257,7 +257,7 @@ class IRToBoogie(
     val functionsUsed = (functionsUsed2 ++ functionsUsed3 ++ functionsUsed4 ++ functionsUsed5).toList.sorted
 
     val globalVars = procedures.flatMap(_.globals) ++ rgProcs.flatMap(_.globals)
-    val globalDecls = globalVars.map(b => BVarDecl(b, List(externAttr))).distinct.sorted.toList
+    val globalDecls = globalVars.distinctBy(b => b.name).map(b => BVarDecl(b, List(externAttr))).distinct.sorted.toList
 
     val globalConsts: List[BConstAxiomPair] = globals
       .map { g =>
@@ -266,8 +266,16 @@ class IRToBoogie(
       .toList
       .sorted
 
+    val memEncodingDecls = config.memoryEncoding match {
+      case Some(MemoryEncodingRepresentation.Flat) => transforms.memoryEncoding.flat.memoryEncodingDecls()
+      case Some(s: MemoryEncodingRepresentation.Split) => transforms.memoryEncoding.split.memoryEncodingDecls(s)
+      case _ => List()
+    }
+
     val declarations =
-      globalDecls ++ globalConsts ++ functionsUsed ++ rgLib ++ pushUpModifiesFixedPoint(rgProcs ++ procedures)
+      globalDecls ++ globalConsts ++ functionsUsed ++ memEncodingDecls ++ rgLib ++ pushUpModifiesFixedPoint(
+        rgProcs ++ procedures
+      )
     BProgram(declarations, filename)
   }
 
@@ -446,6 +454,10 @@ class IRToBoogie(
   }
 
   def functionOpToDefinition(f: FunctionOp): BFunction = {
+    def bAddrBase(addr: BExpr): BExpr =
+      BFunctionCall("me_addr_base", List(addr), BitVecBType(64))
+    def bAddrOffset(addr: BExpr): BExpr =
+      BFunctionCall("me_addr_offset", List(addr), BitVecBType(64))
     f match {
       case b: BasilIRFunctionOp => genFunctionOpDefinition(b, config.memoryFunctionType)
       case g: GammaLoadOp =>
@@ -462,6 +474,32 @@ class IRToBoogie(
         }
 
         val body: BExpr = accesses.tail.foldLeft(accesses.head) { (and: BExpr, next: MapAccess) =>
+          BinaryBExpr(BoolAND, next, and)
+        }
+
+        BFunction(g.fnName, in, out, Some(body), List(externAttr))
+      case g: SplitGammaLoadOp =>
+        val gammaMapVar = BMapVar(
+          "gammaMap",
+          MapBType(BitVecBType(g.addressSize), MapBType(BitVecBType(g.addressSize), BoolBType)),
+          Scope.Parameter
+        )
+        val indexVar = BParam("index", BitVecBType(g.addressSize))
+        val in = List(gammaMapVar, indexVar)
+        val out = BParam(BoolBType)
+        val accesses: Seq[ExprMapAccess] = for (i <- 0 until g.accesses) yield {
+          if (i == 0) {
+            ExprMapAccess(MapAccess(gammaMapVar, bAddrBase(indexVar)), bAddrOffset(indexVar), BoolBType)
+          } else {
+            ExprMapAccess(
+              MapAccess(gammaMapVar, bAddrBase(indexVar)),
+              bAddrOffset(BinaryBExpr(BVADD, indexVar, BitVecBLiteral(i, g.addressSize))),
+              BoolBType
+            )
+          }
+        }
+
+        val body: BExpr = accesses.tail.foldLeft(accesses.head) { (and: BExpr, next: ExprMapAccess) =>
           BinaryBExpr(BoolAND, next, and)
         }
 
@@ -505,6 +543,63 @@ class IRToBoogie(
             }
             indiceValues.tail.foldLeft(MapUpdate(gammaMapVar, indices.head, values.head)) {
               (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next(0), next(1))
+            }
+        }
+
+        BFunction(g.fnName, in, out, Some(body), List(externAttr))
+      case g: SplitGammaStoreOp =>
+        val gammaMapType = MapBType(BitVecBType(g.addressSize), MapBType(BitVecBType(g.addressSize), BoolBType))
+        val gammaMapVar = BMapVar("gammaMap", gammaMapType, Scope.Parameter)
+        val indexVar = BParam("index", BitVecBType(g.addressSize))
+        val valueVar = BParam("value", BoolBType)
+        val in = List(gammaMapVar, indexVar, valueVar)
+        val out = BParam(gammaMapType)
+
+        val body: BExpr = config.memoryFunctionType match {
+          case BoogieMemoryAccessMode.LambdaStoreSelect =>
+            if (g.accesses == 1) {
+              MapUpdate(gammaMapVar, indexVar, valueVar)
+            } else {
+              val i = BVariable("i", BitVecBType(g.addressSize), Scope.Local)
+              Lambda(
+                List(i),
+                IfThenElse(
+                  BInBounds(indexVar, BitVecBLiteral(g.accesses, g.addressSize), Endian.LittleEndian, i),
+                  valueVar,
+                  MapAccess(gammaMapVar, i)
+                )
+              )
+            }
+          case BoogieMemoryAccessMode.SuccessiveStoreSelect =>
+            val indices: Seq[BExpr] = for (i <- 0 until g.accesses) yield {
+              if (i == 0) {
+                indexVar
+              } else {
+                BinaryBExpr(BVADD, indexVar, BitVecBLiteral(i, g.addressSize))
+              }
+            }
+            val values: Seq[BExpr] = for (i <- 0 until g.accesses) yield {
+              valueVar
+            }
+            val indiceValues = for (i <- 0 until g.accesses) yield {
+              (indices(i), values(i))
+            }
+            indiceValues.tail.foldLeft(
+              MapUpdate(
+                gammaMapVar,
+                bAddrBase(indices.head),
+                MapUpdate(MapAccess(gammaMapVar, bAddrBase(indices.head)), bAddrOffset(indices.head), values.head)
+              )
+            ) { (update: MapUpdate, next: (BExpr, BExpr)) =>
+              MapUpdate(
+                update,
+                bAddrBase(next(0)),
+                MapUpdate(
+                  ExprMapAccess(update, bAddrBase(next(0)), MapBType(BitVecBType(g.addressSize), BoolBType)),
+                  bAddrOffset(next(0)),
+                  next(1)
+                )
+              )
             }
         }
 
@@ -863,10 +958,12 @@ class IRToBoogie(
     case d: Call => translate(d)
     case n: NOP => throw Exception(s"NOP $n should not be in output translated to Boogie")
     case m: MemoryStore =>
+      val isSplit = m.mem.isInstanceOf[SharedMemorySplit]
       val lhs = m.mem.toBoogie
-      val rhs = BMemoryStore(m.mem.toBoogie, m.index.toBoogie, m.value.toBoogie, m.endian, m.size)
+      val rhs = BMemoryStore(m.mem.toBoogie, m.index.toBoogie, m.value.toBoogie, m.endian, m.size, isSplit)
       val lhsGamma = m.mem.toGamma
-      val rhsGamma = GammaStore(m.mem.toGamma, m.index.toBoogie, exprToGamma(m.value), m.size, m.size / m.mem.valueSize)
+      val rhsGamma =
+        GammaStore(m.mem.toGamma, m.index.toBoogie, exprToGamma(m.value), m.size, m.size / m.mem.valueSize, isSplit)
       val store = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
       val stateSplit = s match {
         case MemoryStore(_, _, _, _, _, Some(label)) => List(captureStateStatement(s"$label"))
@@ -877,6 +974,17 @@ class IRToBoogie(
         case _: StackMemory =>
           List(store) ++ stateSplit
         case memory: SharedMemory =>
+          val gammaValueCheck = BAssert(BinaryBExpr(BoolIMPLIES, L(LArgs, rhs.index), exprToGamma(m.value)))
+          val secureUpdate = translateSecureUpdate(List(m))
+          if (!atomic) {
+            val rely = BProcedureCall("rely")
+            val oldAssigns = translateOldAssigns(Set(memory))
+            val guaranteeChecks = translateGuaranteeChecks(List(m))
+            List(rely) ++ oldAssigns ++ List(gammaValueCheck, store) ++ secureUpdate ++ guaranteeChecks ++ stateSplit
+          } else {
+            List(gammaValueCheck, store) ++ secureUpdate ++ stateSplit
+          }
+        case memory: SharedMemorySplit =>
           val gammaValueCheck = BAssert(BinaryBExpr(BoolIMPLIES, L(LArgs, rhs.index), exprToGamma(m.value)))
           val secureUpdate = translateSecureUpdate(List(m))
           if (!atomic) {
@@ -916,15 +1024,23 @@ class IRToBoogie(
       val rhsGamma = exprToGamma(m.rhs)
       List(AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma)))
     case m: MemoryLoad =>
+      val isSplit = m.mem.isInstanceOf[SharedMemorySplit]
       val lhs = m.lhs.toBoogie
       val lhsGamma = m.lhs.toGamma
-      val rhs = BMemoryLoad(m.mem.toBoogie, m.index.toBoogie, m.endian, m.size)
+      val rhs = BMemoryLoad(m.mem.toBoogie, m.index.toBoogie, m.endian, m.size, isSplit)
       val rhsGamma = m.mem match {
         case s: StackMemory =>
           GammaLoad(s.toGamma, m.index.toBoogie, m.size, m.size / s.valueSize)
         case s: SharedMemory =>
           val boogieIndex = m.index.toBoogie
           BinaryBExpr(BoolOR, GammaLoad(s.toGamma, boogieIndex, m.size, m.size / s.valueSize), L(LArgs, boogieIndex))
+        case s: SharedMemorySplit =>
+          val boogieIndex = m.index.toBoogie
+          BinaryBExpr(
+            BoolOR,
+            GammaLoad(s.toGamma, boogieIndex, m.size, m.size / s.valueSize, true),
+            L(LArgs, boogieIndex)
+          )
       }
       val assign = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
       // add rely call if is a non-stack load

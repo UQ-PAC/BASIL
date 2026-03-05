@@ -10,6 +10,7 @@ import util.{
   BoogieGeneratorConfig,
   BoogieMemoryAccessMode,
   DSAPhase,
+  MemoryEncodingRepresentation,
   DSConfig,
   DebugDumpIRLogger,
   ILLoadingConfig,
@@ -264,7 +265,14 @@ object Main {
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
     noif: Flag,
     @arg(name = "nodebug", doc = "Disable runtime debug assertions")
-    noDebug: Flag
+    noDebug: Flag,
+    @arg(
+      name = "memory-encoding",
+      doc = """Enable memory encoding. options: flat | split(,reverseOrder)(,splitMem).
+      | flat: maps pointers to abstract metadata leveraging quantifiers + triggers for regions.
+      | split: embeds base + offset into pointers, reducing maximum allocations/allocation size but eliminating quantifiers and most pointer metadata. reverseOrder changes mapping to (offset -> base) and splitMem splits heap load/stores."""
+    )
+    memoryEncoding: Option[String]
   )
 
   def configOfArgs(args: Array[String]): (Config, BASILConfig) = {
@@ -379,13 +387,33 @@ object Main {
         throw new IllegalArgumentException("Illegal argument for --assert-callee-saved. allowed: (auto|always|never)")
     }
 
+    val memoryEncodingRepresentation = conf.memoryEncoding match
+      case None => None
+      case Some("flat") | Some("") => Some(MemoryEncodingRepresentation.Flat)
+      case Some(s) if s.slice(0, 5) == "split" => {
+        val parts = s.split(',')
+        Some(MemoryEncodingRepresentation.Split(
+          splitMem = parts.contains("splitMem"),
+          baseFirst = !parts.contains("reverseOrder")
+        ))
+      }
+      case Some(_) =>
+        throw new IllegalArgumentException("Illegal option to memory-encoding, allowed are: flat | split(,reverseOrder)(,splitMem)")
+
     val boogieMemoryAccessMode = if (conf.lambdaStores.value) {
       BoogieMemoryAccessMode.LambdaStoreSelect
     } else {
       BoogieMemoryAccessMode.SuccessiveStoreSelect
     }
     val boogieGeneratorConfig =
-      BoogieGeneratorConfig(boogieMemoryAccessMode, true, rely, conf.threadSplit.value, conf.noif.value)
+      BoogieGeneratorConfig(
+        boogieMemoryAccessMode,
+        true,
+        rely,
+        conf.threadSplit.value,
+        conf.noif.value,
+        memoryEncoding = memoryEncodingRepresentation
+      )
 
     var loadingInputs = if (conf.bapInputDirName.isDefined) then {
       loadDirectory(ChooseInput.Bap, conf.bapInputDirName.get)
@@ -487,7 +515,8 @@ object Main {
       outputPrefix = conf.outFileName,
       dsaConfig = dsa,
       memoryTransform = conf.memoryTransform.value,
-      assertCalleeSaved = calleeSaved
+      assertCalleeSaved = calleeSaved,
+      memoryEncoding = memoryEncodingRepresentation
     )
     (conf, q)
   }
