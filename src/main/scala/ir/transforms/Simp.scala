@@ -1285,18 +1285,6 @@ object OffsetProp {
       }
     }
 
-    def joinState(lhs: Variable, rhs: Expr) = {
-      specJoinState(lhs, rhs) match {
-        case Some((l, r)) => {
-          if (st.contains(l) && st(l) != r) {
-            stSequenceNo += 1
-          }
-          st(l) = r
-        }
-        case _ => ()
-      }
-    }
-
     def specJoinState(lhs: Variable, rhs: Expr): Option[(Variable, Value)] = {
       rhs match {
         case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if !st.contains(lhs) =>
