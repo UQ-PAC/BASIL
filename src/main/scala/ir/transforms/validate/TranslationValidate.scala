@@ -1251,6 +1251,7 @@ object TranslationValidator {
       TransitionSystem.removeUnreachableBlocks(p)
 
       SSADAG.convertToMonadicSideEffect(params, p)
+      transforms.reversePostOrder(p)
 
       ProcInfo(p.name, p, liveVars, cuts, params(p.name), (_, _) => ???, Map())
     }
@@ -1277,7 +1278,12 @@ object TranslationValidator {
       tvLogger.debug(runNamePrefix)
 
       config.outputPath.foreach(path => {
+        val graphSrc = ir.dotBlockGraph(source.transition, Map())
+        val graphTgt = ir.dotBlockGraph(target.transition, Map())
+
         tvLogger.writeToFile(File(s"${path}/${runNamePrefix}.il"), translating.PrettyPrinter.pp_proc(proc))
+        tvLogger.writeToFile(File(s"${path}/${runNamePrefix}-source.dot"), graphSrc)
+        tvLogger.writeToFile(File(s"${path}/${runNamePrefix}-target.dot"), graphTgt)
       })
 
       val concreteInvariant = inferInvariant(interproc, invariant, source, target)
@@ -1346,7 +1352,7 @@ object TranslationValidator {
       var search: Block = b
 
       while (!thecuts.contains(search.label)) {
-        assert(search.nextBlocks.size == 1)
+        assert(search.nextBlocks.size == 1, search.label + "not in: " + thecuts)
 
         search = search.nextBlocks.head
 
