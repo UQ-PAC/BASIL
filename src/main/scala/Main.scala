@@ -19,6 +19,7 @@ import util.{
   PCTrackingOption,
   ProcRelyVersion,
   RunUtils,
+  SimplifyMode,
   StaticAnalysisConfig,
   writeToFile
 }
@@ -213,6 +214,12 @@ object Main {
     generateRelyGuarantees: Flag,
     @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (implies --transform-parameters)")
     simplify: Flag,
+    @arg(name = "simplify-tv", doc = "Simplify pass with translation validation, takes smt file output directory")
+    tvSimp: Option[String],
+    @arg(name = "simplify-tv-verify", doc = "Simplify with translation validation immediately call z3")
+    tvSimpVerify: Flag,
+    @arg(name = "simplify-tv-dryrun", doc = "Skip all tv work after invariant generation")
+    tvDryRun: Flag,
     @arg(
       name = "pc",
       doc = "Program counter mode, supports GTIRB only. (options: none | keep | assert) (default: none)"
@@ -464,6 +471,14 @@ object Main {
       util.assertion.disableAssertions = true
     }
 
+    val simplifyMode = (conf.simplify.value, conf.tvSimp, conf.tvSimpVerify.value) match {
+      case (_, d, true) => SimplifyMode.ValidatedSimplify(Some(util.SMT.Solver.Z3), d, dryRun = conf.tvDryRun.value)
+      case (_, Some(d), _) => SimplifyMode.ValidatedSimplify(None, Some(d), dryRun = conf.tvDryRun.value)
+      case (true, None, _) => SimplifyMode.Simplify
+      case _ if dsa.isDefined => SimplifyMode.Simplify
+      case _ => SimplifyMode.Disabled
+    }
+
     val q = BASILConfig(
       loading = loadingInputs.copy(
         dumpIL = conf.dumpIL,
@@ -474,8 +489,8 @@ object Main {
         pcTracking = PCTrackingOption.valueOf(conf.pcTracking.getOrElse("none").capitalize),
         gtirbLiftOffline = conf.liftOffline.value || loadingInputs.inputFile.endsWith(".gtirb")
       ),
+      simplify = simplifyMode,
       runInterpret = conf.interpret.value,
-      simplify = conf.simplify.value || dsa.isDefined,
       validateSimp = conf.validateSimplify.value,
       transformIrreducibleLoops =
         conf.transformIrreducibleLoops.value || conf.summariseProcedures.value || conf.generateLoopInvariants.value,

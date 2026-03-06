@@ -59,7 +59,7 @@ object ApiServer extends IOApp {
     val basilConfig = BASILConfig(
       context = None,
       loading = ilConfig,
-      simplify = true,
+      simplify = util.SimplifyMode.Simplify,
       dsaConfig = None,
       memoryTransform = true,
       summariseProcedures = true,

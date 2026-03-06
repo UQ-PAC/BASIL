@@ -545,6 +545,7 @@ class BasilIRPrettyPrinter(
 
   override def vindirect(target: PPProg[Variable]): PPProg[IndirectCall] = BST(s"indirect call ${target} ")
   override def vassert(body: Assert): PPProg[Assert] = {
+
     BST(s"assert ${vexpr(body.body)}")
   }
 
@@ -595,7 +596,7 @@ class BasilIRPrettyPrinter(
     val opn = e.getClass.getSimpleName.toLowerCase.stripSuffix("$")
     BST(s"$opn($l, $r)")
   }
-  override def vbool_expr(e: BoolBinOp, l: List[PPProg[Expr]]): PPProg[Expr] = {
+  override def vassoc_expr(e: BoolBinOp, l: List[PPProg[Expr]]): PPProg[Expr] = {
     val opn = e.getClass.getSimpleName.toLowerCase.stripSuffix("$")
     BST(s"$opn(${l.mkString(",")})")
   }

@@ -259,11 +259,11 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
           and(b, expectPredicate(a.body)).simplify
         }
       case a: Assert => or(b, not(expectPredicate(a.body))).simplify
+      case i: IndirectCall => top
       case h: Havoc =>
         h.vars.foldLeft(b) { (p, v) =>
           p.remove(BVTerm.Var(v), top).remove(GammaTerm.Var(v), top).simplify
         }
-      case i: IndirectCall => top
       case c: DirectCall =>
         not(c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>
           p.replace(BVTerm.Var(v), exprToBVTerm(e).get).replace(GammaTerm.Var(v), exprToGammaTerm(e).get).simplify

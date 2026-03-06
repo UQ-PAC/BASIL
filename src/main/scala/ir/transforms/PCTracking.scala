@@ -40,6 +40,10 @@ object PCTracking {
 
           val pcRequires = BinaryExpr(ir.EQ, pcVar, addrVar)
           val pcEnsures = BinaryExpr(ir.EQ, pcVar, OldExpr(r30Var))
+          proc.entryBlock.foreach(b => {
+            b.statements.prepend(LocalAssign(pcVar, addrVar))
+            b.statements.prepend(Assert(BinaryExpr(EQ, pcVar, addrVar)))
+          })
 
           proc.requiresExpr = pcRequires +: proc.requiresExpr
           proc.ensuresExpr = pcEnsures +: proc.ensuresExpr

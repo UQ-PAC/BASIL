@@ -56,6 +56,7 @@ def doSimplify(
 
   logTransform(collectedSnapshots)("SSA-DSA", c => transforms.OnePassDSA().applyTransform(c.program))(ctx)
 
+  assert(ir.invariant.readUninitialised(ctx.program))
   logTransform(collectedSnapshots)("inline PLT", c => transforms.inlinePLTLaunchpad(ctx, AnalysisManager(ctx.program)))(
     ctx
   )
@@ -92,7 +93,11 @@ def doSimplify(
   Logger.info("Copyprop Start")
   logTransform(collectedSnapshots)(
     "linear expr prop",
-    c => { transforms.copyPropParamFixedPoint(c.program, c.globalOffsets); c }
+    c => {
+      transforms.copyPropParamFixedPoint(c.program);
+      assert(ir.invariant.readUninitialised(ctx.program))
+      c
+    }
   )(ctx)
 
   logTransform(collectedSnapshots)(
