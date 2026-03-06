@@ -93,10 +93,10 @@ def doSimplify(
   Logger.info("Copyprop Start")
   logTransform(collectedSnapshots)(
     "linear expr prop",
-    c => { 
+    c => {
       transforms.copyPropParamFixedPoint(c.program);
       assert(ir.invariant.readUninitialised(ctx.program))
-      c 
+      c
     }
   )(ctx)
 

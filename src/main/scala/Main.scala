@@ -489,6 +489,7 @@ object Main {
         pcTracking = PCTrackingOption.valueOf(conf.pcTracking.getOrElse("none").capitalize),
         gtirbLiftOffline = conf.liftOffline.value || loadingInputs.inputFile.endsWith(".gtirb")
       ),
+      simplify = simplifyMode,
       runInterpret = conf.interpret.value,
       validateSimp = conf.validateSimplify.value,
       transformIrreducibleLoops =

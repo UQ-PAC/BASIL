@@ -120,12 +120,12 @@ object RunUtils {
         )
       assert(ir.invariant.readUninitialised(ctx.program))
 
-      //if (conf.assertCalleeSaved) {
+      // if (conf.assertCalleeSaved) {
       //  logTransform(collectedSnapshots)(
       //    "callee preserved params",
       //    ctx => transforms.CalleePreservedParam.transform(ctx.program)
       //  )(ctx)
-      //}
+      // }
     } else {
       logTransform(collectedSnapshots)("clear params b", c => ir.transforms.clearParams(c.program))(ctx)
 
@@ -155,8 +155,6 @@ object RunUtils {
 
     conf.simplify match {
       case c: SimplifyMode.ValidatedSimplify => {
-        ir.transforms.clearParams(ctx.program)
-        ir.transforms.liftIndirectCall(ctx.program)
         DebugDumpIRLogger.writeToFile(File("il-beforetvsimp.il"), pp_prog(ctx.program))
         logTransform(collectedSnapshots)("clear params", ctx => ir.transforms.clearParams(ctx.program))(ctx)
         logTransform(collectedSnapshots)(
@@ -168,16 +166,16 @@ object RunUtils {
 
         DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
 
-        ctx =
-          logTransform(collectedSnapshots)("liftprocedurecallabstraction", ir.transforms.liftProcedureCallAbstraction)(
-            ctx
-          )
+        // ctx =
+        //  logTransform(collectedSnapshots)("liftprocedurecallabstraction", ir.transforms.liftProcedureCallAbstraction)(
+        //    ctx
+        //  )
 
-        DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
+        // DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
 
-        if (conf.assertCalleeSaved) {
-          transforms.CalleePreservedParam.transform(ctx.program)
-        }
+        // if (conf.assertCalleeSaved) {
+        //  transforms.CalleePreservedParam.transform(ctx.program)
+        // }
         val (tvres, nctx) = transforms.validate.validatedSimplifyPipeline(ctx, conf.simplify)
         ctx = nctx
       }
@@ -238,7 +236,10 @@ object RunUtils {
     }
 
     if q.summariseProcedures then
-      getGenerateProcedureSummariesTransform(q.loading.parameterForm || (q.simplify != util.SimplifyMode.Disabled))(ctx, analysisManager)
+      getGenerateProcedureSummariesTransform(q.loading.parameterForm || (q.simplify != util.SimplifyMode.Disabled))(
+        ctx,
+        analysisManager
+      )
 
     if (conf.generateLoopInvariants) {
       StaticAnalysisLogger.info("[!] Generating Loop Invariants")
