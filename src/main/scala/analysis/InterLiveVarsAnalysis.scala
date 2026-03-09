@@ -144,12 +144,30 @@ class InterLiveVarsAnalysis(program: Program, ignoreExternals: Boolean = false, 
 
 def interLiveVarsAnalysis(
   program: Program,
-  ignoreExternals: Boolean = false
+  ignoreExternals: Boolean = false,
+  extraEntries: List[Procedure]
 ): Map[CFGPosition, Map[Variable, TwoElement]] = {
 
   var procs = ListSet.from(program.procedures)
-  var starts = List[Procedure](program.mainProcedure)
+  val entries = program.mainProcedure :: extraEntries
 
-  InterLiveVarsAnalysis(program, ignoreExternals, Some(program.mainProcedure)).analyze()
+  // run the analysis for all entry procedures that don't reach the existing set of reachable
+  // procedures.
+  var reachable = Set[Procedure]()
+  var starts = entries.filter(x => {
+    val reached = x.reachableFrom
+    if (reached.exists(reachable.contains)) {
+      false
+    } else {
+      reachable = reachable ++ reached
+      true
+    }
+  })
+
+  var r = Map[CFGPosition, Map[Variable, TwoElement]]()
+  for (p <- starts) {
+    r = r ++ InterLiveVarsAnalysis(program, ignoreExternals, Some(p)).analyze()
+  }
+  r
 
 }

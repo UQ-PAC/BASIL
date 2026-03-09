@@ -112,8 +112,6 @@ object RunUtils {
 
     if (q.loading.parameterForm && !(q.simplify != SimplifyMode.Disabled)) {
 
-      logTransform(collectedSnapshots)("clear params a", c => ir.transforms.clearParams(c.program))(ctx)
-
       ctx =
         logTransform(collectedSnapshots)("liftProcedureCallAbstraction", ir.transforms.liftProcedureCallAbstraction)(
           ctx
@@ -182,13 +180,13 @@ object RunUtils {
       }
       case SimplifyMode.Simplify => {
         assert(ir.invariant.readUninitialised(ctx.program))
-        logTransform(collectedSnapshots)("clear params", ctx => ir.transforms.clearParams(ctx.program))(ctx)
         logTransform(collectedSnapshots)(
           "lift indir call",
           ctx =>
             ir.transforms.liftIndirectCall(ctx.program)
             transforms.liftSVCompNonDetEarlyIR(ctx.program)
         )(ctx)
+
         getStripUnreachableFunctionsTransform(q.loading.procedureTrimDepth)(ctx, analysisManager)
 
         DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))

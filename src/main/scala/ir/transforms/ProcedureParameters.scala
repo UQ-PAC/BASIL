@@ -120,7 +120,9 @@ def liftProcedureCallAbstraction(program: Program, spec: Option[Specification]):
 
   transforms.clearParams(program)
 
-  val liveVars = analysis.interLiveVarsAnalysis(program)
+  val specdep: List[Procedure] =
+    spec.toList.flatMap(_.funcs.toList.map(b => program.procedures.find(_.procName == b.name).get)).toList
+  val liveVars = analysis.interLiveVarsAnalysis(program, false, specdep)
   transforms.applyRPO(program)
 
   val liveLab = () =>

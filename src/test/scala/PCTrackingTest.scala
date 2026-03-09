@@ -40,7 +40,7 @@ class PCTrackingTest extends AnyFunSuite with CaptureOutput {
   test("mode: assert") {
     val loaded = load("ifbranches", "clang", PCTrackingOption.Assert)
     val p = loaded.ir.program
-    assertResult(5) {
+    assertResult(6) {
       val asserts = p.collect {
         case x: Assert if allVarsPos(x).map(_.name).contains("_PC") =>
           x
