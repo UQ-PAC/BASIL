@@ -182,7 +182,11 @@ class SMTProver(
           try {
             Thread.sleep(m)
             shutdownManager.requestShutdown("Timeout")
-          } catch { e => { println(s"$e") } }
+          } catch { 
+            case e : java.lang.InterruptedException => {
+              // expected: sleep intereppted by success
+            }
+          }
         }
       })
     })

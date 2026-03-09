@@ -300,13 +300,8 @@ class SystemTestsGTIRBSimplifyTV extends SystemTests {
 
   override def customiseTestsByName(name: String) = super.customiseTestsByName(name).orElse {
     name match {
-      case x if (!x.endsWith("gcc_O2:GTIRB") || x.endsWith("clang_O2:GTIRB")) =>
-        // "correct/functionpointer/clang:GTIRB" | "correct/functionpointer/clang_pic:GTIRB" |
-        // "correct/malloc_with_local/clang:GTIRB" | "correct/malloc_with_local2/clang:GTIRB" |
-        // "correct/malloc_with_local2/gcc:GTIRB" | "correct/malloc_with_local3/clang:GTIRB" |
-        // "correct/malloc_with_local3/gcc:GTIRB" | "correct/functionpointer/gcc_pic:GTIRB" |
-        // "correct/functionpointer/gcc:GTIRB" =>
-        Mode.Disabled("disable unoptimised examples for performance")
+      case x if (!(x.endsWith("gcc_O2:GTIRB") || x.endsWith("clang_O2:GTIRB"))) =>
+        Mode.Disabled("disable unoptimised examples: too slow")
       case _ => Mode.Normal
     }
   }
@@ -319,7 +314,7 @@ class SystemTestsGTIRBSimplifyTV extends SystemTests {
       useBAPFrontend = false,
       expectVerify = true,
       checkExpected = false,
-      logResults = true,
+      logResults = false,
       simplify = simplify
     )
   )
@@ -331,7 +326,7 @@ class SystemTestsGTIRBSimplifyTV extends SystemTests {
       useBAPFrontend = false,
       expectVerify = false,
       checkExpected = false,
-      logResults = true,
+      logResults = false,
       simplify = simplify
     )
   )

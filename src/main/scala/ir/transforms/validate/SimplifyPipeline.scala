@@ -271,11 +271,13 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   val _ = visit_prog(counter, p)
   counter.reportToLog("before")
 
+  assert(ir.invariant.readUninitialised(ctx.program))
   transforms.applyRPO(p)
   // nop(config, p)
   // Logger.writeToFile(File("beforeParams.il"), translating.PrettyPrinter.pp_prog(ctx.program))
   val (res, nctx) = parameters(config, ctx)
   config = res
+  assert(ir.invariant.readUninitialised(ctx.program))
   config = assumePreservedParams(config, p)
   assert(ir.invariant.readUninitialised(ctx.program))
   transforms.applyRPO(p)
