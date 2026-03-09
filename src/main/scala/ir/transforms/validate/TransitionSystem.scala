@@ -212,8 +212,8 @@ object TransitionSystem {
   /**
   * Convert asserts in program to a jump to exit with a specific PC set.
   *
-  * @param [[introdAsserts]] specifies which assertions set the pc to the [[assumptionFailLabel]]
-  * rather than the [[assertionFailLabel]].
+  * @param [[introdAsserts]] specifies which assertions set the pc to the assumptionFailLabel
+  * rather than the assertionFailLabel.
   *
   */
   def totaliseAsserts(proc: Procedure, introdAsserts: Set[String] = Set()) = {

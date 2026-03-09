@@ -473,7 +473,7 @@ object TranslationValidator {
 
   /**
   * We re-infer the function signature of all target program procedures based on the transform
-  * described by [[renaming]], and the [[Frame]] of the source.
+  * described by renaming, and the [[Frame]] of the source.
   *
   *   **this describes all the observable effects of a procedure and forms invariant we validate**
   *
