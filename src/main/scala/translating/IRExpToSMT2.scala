@@ -2,7 +2,6 @@ package translating
 
 import ir.*
 import ir.cilvisitor.*
-import util.Logger
 
 import java.io.{BufferedWriter, File, FileWriter, Writer}
 
@@ -406,6 +405,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     cases match {
       case Seq(cond, casev) :: Nil => casev
       case Seq(cond, casev) :: tl => list(sym("ite"), (cond), (casev), mkIte(tl))
+      case _ => throw Exception("malformed ite cases")
     }
   }
 
@@ -463,9 +463,6 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
           )
         )
       }
-      case _ =>
-        Logger.warn(s"Undeclared uninterp emitted : ${x.name}")
-        None
     }
   }
 
