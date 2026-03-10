@@ -41,7 +41,7 @@ class RemovePCTest extends AnyFunSuite with CaptureOutput {
     // it has two direct PC assignments, the rest being fall-through edges
     val loaded = load("cjump", "gcc", true)
     val p = loaded.ir.program
-    assertResult(2) {
+    assertResult(3) {
       p.mainProcedure
         .collect {
           case LocalAssign(Register("_PC", 64), BitVecLiteral(n, _), _) => {

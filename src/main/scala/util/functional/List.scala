@@ -14,11 +14,12 @@ import collection.{IterableOps, Factory}
  */
 object Snoc {
 
-  def unapply[A, CC[_], C](x: IterableOps[A, CC, C]): Option[(C, A)] = {
+  def unapply[A, CC[_], C <: Iterable[A]](x: IterableOps[A, CC, C]): Option[(C, A)] = {
     if (x.isEmpty) then {
       None
     } else {
-      Some((x.init, x.last))
+      val (init, last) = x.splitAt(x.size - 1)
+      Some((init, last.head))
     }
   }
 

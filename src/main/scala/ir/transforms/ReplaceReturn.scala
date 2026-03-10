@@ -13,6 +13,19 @@ class ReplaceReturns(insertR30InvariantAssertion: Procedure => Boolean = _ => tr
 
   private val R30procedures: mutable.Set[Procedure] = mutable.Set()
 
+  var tailCalls = Map[Procedure, Block]()
+
+  def tailCallBlock(p: Procedure) = {
+    tailCalls.get(p) match {
+      case Some(b) => b
+      case None => {
+        val b = p.entryBlock.get.createBlockAfter("tailcallheader")
+        tailCalls = tailCalls + (p -> b)
+        b
+      }
+    }
+  }
+
   /** Assumes IR with 1 call per block which appears as the last statement.
     */
   override def vstmt(j: Statement): VisitAction[List[Statement]] = {
@@ -55,8 +68,8 @@ class ReplaceReturns(insertR30InvariantAssertion: Procedure => Boolean = _ => tr
           // If we can't find one
           case _: Unreachable =>
             if (d.target == procedure) {
-              // recursive tail call
-              d.parent.replaceJump(GoTo(procedure.entryBlock.get))
+              // recursive tail call (entryBlock not allowed to have predecessors)
+              d.parent.replaceJump(GoTo(tailCallBlock(procedure)))
             } else {
               // non-recursive tail call
               d.parent.replaceJump(Return())

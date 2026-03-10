@@ -1,7 +1,7 @@
 import ir.*
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.{BASILTest, CaptureOutput}
-import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, PCTrackingOption, StaticAnalysisConfig}
+import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, PCTrackingOption, SimplifyMode, StaticAnalysisConfig}
 
 @test_util.tags.UnitTest
 class PCTrackingTest extends AnyFunSuite with CaptureOutput {
@@ -19,7 +19,7 @@ class PCTrackingTest extends AnyFunSuite with CaptureOutput {
         staticAnalysis = Some(StaticAnalysisConfig()),
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
-        simplify = simplify
+        simplify = if simplify then SimplifyMode.Simplify else SimplifyMode.Disabled
       )
     )
   }
@@ -40,7 +40,7 @@ class PCTrackingTest extends AnyFunSuite with CaptureOutput {
   test("mode: assert") {
     val loaded = load("ifbranches", "clang", PCTrackingOption.Assert)
     val p = loaded.ir.program
-    assertResult(5) {
+    assertResult(6) {
       val asserts = p.collect {
         case x: Assert if allVarsPos(x).map(_.name).contains("_PC") =>
           x

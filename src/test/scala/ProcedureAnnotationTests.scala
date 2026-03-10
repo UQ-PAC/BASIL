@@ -89,7 +89,7 @@ class ProcedureAnnotationTests extends AnyFunSuite, CaptureOutput {
       BASILConfig(
         context = Some(context),
         loading = ILLoadingConfig(inputFile = "", relfFile = None),
-        simplify = true,
+        simplify = util.SimplifyMode.Simplify,
         generateLoopInvariants = true,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),

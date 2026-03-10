@@ -34,4 +34,20 @@ sudo sysctl kernel.perf_event_paranoid=1
 sudo sysctl kernel.kptr_restrict=0
 ```
 
+## Identifying memory leaks
+
+Memory leaks can be identified using async profiler.
+
+E.g. build an assembly `./mill assembly` to get `out/assembly.dest/out.jar`
+
+Then use asprof with flags `-e alloc --total --live`.
+
+```
+./async-profiler-4.0-linux-x64/bin/asprof -e alloc -o flamegraph --live -f alloc.html --total -d 60 out.jar
+```
+
+This will show the total allocation count only for references that are still live, allocations wiht a reference still retained 
+somewhere.
+
+[related blog article](https://web.archive.org/web/20240228031308/https://krzysztofslusarski.github.io/2022/11/27/async-live.html).
 

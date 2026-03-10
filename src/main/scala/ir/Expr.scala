@@ -187,6 +187,22 @@ sealed trait BVUnOp(op: String) extends UnOp {
 case object BVNOT extends BVUnOp("not")
 case object BVNEG extends BVUnOp("neg")
 
+def boolAnd(exps: Iterable[Expr]) =
+  val l = exps.toList
+  l.size match {
+    case 0 => TrueLiteral
+    case 1 => l.head
+    case _ => AssocExpr(BoolAND, l)
+  }
+
+def boolOr(exps: Iterable[Expr]) =
+  val l = exps.toList
+  l.size match {
+    case 0 => FalseLiteral
+    case 1 => l.head
+    case _ => AssocExpr(BoolOR, l)
+  }
+
 case class AssocExpr(op: BoolBinOp, args: List[Expr]) extends Expr with CachedHashCode {
   require(args.size >= 2, "AssocExpr requires at least two operands")
   override def getType: IRType = BoolType
@@ -381,6 +397,7 @@ sealed trait Variable extends Expr {
 
 object Variable {
   implicit def ordering[V <: Variable]: Ordering[V] = Ordering.by(_.name)
+  implicit def catsOrdering[V <: Variable]: cats.kernel.Order[V] = cats.kernel.Order.by(_.name)
 }
 
 object Register {
