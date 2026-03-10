@@ -148,8 +148,9 @@ def interLiveVarsAnalysis(
   extraEntries: List[Procedure]
 ): Map[CFGPosition, Map[Variable, TwoElement]] = {
 
+  val extra = extraEntries ++ program.procedures.toList.filter(_.incomingCalls().size == 0)
   var procs = ListSet.from(program.procedures)
-  val entries = program.mainProcedure :: extraEntries
+  val entries = program.mainProcedure :: extra
 
   // run the analysis for all entry procedures that don't reach the existing set of reachable
   // procedures.

@@ -161,7 +161,7 @@ object RunUtils {
             ir.transforms.liftIndirectCall(ctx.program)
             transforms.liftSVCompNonDetEarlyIR(ctx.program)
         )(ctx)
-        getStripUnreachableFunctionsTransform(q.loading.procedureTrimDepth)(ctx, analysisManager)
+        //getStripUnreachableFunctionsTransform(q.loading.procedureTrimDepth)(ctx, analysisManager)
 
         DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
 
@@ -187,7 +187,7 @@ object RunUtils {
             transforms.liftSVCompNonDetEarlyIR(ctx.program)
         )(ctx)
 
-        getStripUnreachableFunctionsTransform(q.loading.procedureTrimDepth)(ctx, analysisManager)
+        //getStripUnreachableFunctionsTransform(q.loading.procedureTrimDepth)(ctx, analysisManager)
 
         DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
 
