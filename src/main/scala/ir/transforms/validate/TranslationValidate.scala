@@ -189,9 +189,6 @@ enum Inv {
 
   /* a constraint on the variables defined at a specific cut-point, not guarded by the PC value for that cut */
   case GlobalConstraint(cutPointPCGuard: String, pred: List[InvTerm], comment: Option[String] = None)
-
-  /* a constraint conditional on a predicate in the source program */
-
 }
 
 object TranslationValidator {

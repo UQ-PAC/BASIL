@@ -165,16 +165,6 @@ object RunUtils {
 
         DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
 
-        // ctx =
-        //  logTransform(collectedSnapshots)("liftprocedurecallabstraction", ir.transforms.liftProcedureCallAbstraction)(
-        //    ctx
-        //  )
-
-        // DebugDumpIRLogger.writeToFile(File("il-after-proccalls.il"), pp_prog(ctx.program))
-
-        // if (conf.assertCalleeSaved) {
-        //  transforms.CalleePreservedParam.transform(ctx.program)
-        // }
         val (tvres, nctx) = transforms.validate.validatedSimplifyPipeline(ctx, conf.simplify)
         ctx = nctx
       }
