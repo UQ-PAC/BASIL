@@ -13,40 +13,7 @@ import java.io.File
 /**
  * Result of a translation validation task for a single procedure and transform step.
  */
-case class TVResult(
-  runName: String,
-  proc: String,
-  verified: Option[SatResult],
-  smtFile: Option[String],
-  verifyTime: Map[String, Long]
-) {
-  def toCSV = {
-    val veri = verified match {
-      case Some(SatResult.UNSAT) => "unsat"
-      case Some(s: SatResult.SAT) => "sat"
-      case Some(_) => "unknown"
-      case None => "disabled"
-    }
-    val times = verifyTime.toList
-      .sortBy(_._1)
-      .map { case (n, t) =>
-        t.toString
-      }
-      .mkString(",")
-
-    val timesHeader = verifyTime.toList
-      .sortBy(_._1)
-      .map { case (n, t) =>
-        n
-      }
-      .mkString(",")
-
-    val header = "pass,procedure,outcome," + timesHeader
-    val row = s"$runName,$proc,$veri,$times"
-
-    (header, row)
-  }
-}
+case class TVResult(runName: String, proc: String, verified: Option[SatResult], smtFile: Option[String])
 
 /**
  * Configuration and result list for a transltion validation task of a program (possibly including multiple separate passes).
@@ -1194,7 +1161,7 @@ object TranslationValidator {
     source.clearBlocks()
     target.clearBlocks()
 
-    TVResult(runName, proc.name, verified.map(_._2), smtPath, timer.checkPoints().toMap)
+    TVResult(runName, proc.name, verified.map(_._2), smtPath)
   }
 
   /**

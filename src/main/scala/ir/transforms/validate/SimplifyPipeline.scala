@@ -3,7 +3,7 @@ import ir.*
 import util.SMT.SatResult
 import util.{Logger, SimplifyMode, tvEvalLogger}
 
-import java.io.{BufferedWriter, File, FileWriter}
+import java.io.{BufferedWriter, FileWriter}
 
 import cilvisitor.{visit_proc, visit_prog}
 
@@ -313,17 +313,6 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   } else if (config.verify.isDefined) {
     Logger.info("[!] Translation validation passed")
   }
-
-  config.outputPath.foreach(p => {
-    val csv = (config.results.map(_.toCSV).groupBy(_._1).toList match {
-      case (h, vs) :: Nil => h :: vs.map(_._2)
-      case _ => {
-        Logger.error("Broken header structure for csv metrics file")
-        List()
-      }
-    }).mkString("\n")
-    Logger.writeToFile(File(p + "/stats.csv"), csv)
-  })
 
   Logger.info("[!] Simplify :: Writing simplification validation")
   val w = BufferedWriter(FileWriter("rewrites.smt2"))

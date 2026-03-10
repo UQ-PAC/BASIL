@@ -292,10 +292,6 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     */
   def insertAfter(intrusiveListElement: T, newElem: T): T = {
     debugAssert(size >= 1)
-    // debugAssert(
-    //  containsRef(intrusiveListElement),
-    //  "element is not a member of this list, insertAfter could mangle start and end tracking"
-    // )
     debugAssert(newElem.unitary)
     numElems += 1
     if (intrusiveListElement == lastElem.get) {

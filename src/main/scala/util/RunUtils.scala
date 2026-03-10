@@ -116,14 +116,14 @@ object RunUtils {
         logTransform(collectedSnapshots)("liftProcedureCallAbstraction", ir.transforms.liftProcedureCallAbstraction)(
           ctx
         )
-      assert(ir.invariant.readUninitialised(ctx.program))
 
-      // if (conf.assertCalleeSaved) {
-      //  logTransform(collectedSnapshots)(
-      //    "callee preserved params",
-      //    ctx => transforms.CalleePreservedParam.transform(ctx.program)
-      //  )(ctx)
-      // }
+      if (conf.assertCalleeSaved) {
+        logTransform(collectedSnapshots)(
+          "callee preserved params",
+          ctx => transforms.CalleePreservedParam.transform(ctx.program)
+        )(ctx)
+      }
+      assert(ir.invariant.readUninitialised(ctx.program))
     } else {
       logTransform(collectedSnapshots)("clear params b", c => ir.transforms.clearParams(c.program))(ctx)
 
