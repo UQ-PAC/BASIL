@@ -489,4 +489,69 @@ class IRTest extends AnyFunSuite with CaptureOutput {
     }
   }
 
+  test("dsl phi blocks") {
+    val p = prog(
+      proc("hi", returnBlockLabel = Some("retblock"))(
+        block("entry", goto("b1", "b2")),
+        block(
+          "b1",
+          LocalAssign(LocalVar("x1", BitVecType(64)), BitVecLiteral(150, 64)),
+          LocalAssign(LocalVar("y1", BitVecType(64)), BitVecLiteral(151, 64)),
+          goto("retblock")
+        ),
+        block(
+          "b2",
+          LocalAssign(LocalVar("x2", BitVecType(64)), BitVecLiteral(150, 64)),
+          LocalAssign(LocalVar("y2", BitVecType(64)), BitVecLiteral(151, 64)),
+          goto("retblock")
+        ),
+        block("retblock")(
+          LocalVar("merge_x", BitVecType(64)) -> List(
+            "b2" -> LocalVar("x2", BitVecType(64)),
+            "b1" -> LocalVar("x1", BitVecType(64))
+          ),
+          LocalVar("merge_y", BitVecType(64)) -> List(
+            "b2" -> LocalVar("y2", BitVecType(64)),
+            "b1" -> LocalVar("y1", BitVecType(64))
+          )
+        )(ret)
+      )
+    )
+
+    import ir.dsl.given_ToScalaLines_Program
+    assertResult("""prog(
+  proc("hi", returnBlockLabel = Some("retblock"))(
+    block("entry", goto("b1", "b2")),
+    block("b1",
+      LocalAssign(LocalVar("x1", BitVecType(64), 0), BitVecLiteral(BigInt("150"), 64), None),
+      LocalAssign(LocalVar("y1", BitVecType(64), 0), BitVecLiteral(BigInt("151"), 64), None),
+      SimulAssign(
+        Seq(
+          LocalVar("merge_x", BitVecType(64), 0) -> LocalVar("x1", BitVecType(64), 0),
+          LocalVar("merge_y", BitVecType(64), 0) -> LocalVar("y1", BitVecType(64), 0)
+        ),
+        Some("phi")
+      ),
+      goto("retblock")
+    ),
+    block("b2",
+      LocalAssign(LocalVar("x2", BitVecType(64), 0), BitVecLiteral(BigInt("150"), 64), None),
+      LocalAssign(LocalVar("y2", BitVecType(64), 0), BitVecLiteral(BigInt("151"), 64), None),
+      SimulAssign(
+        Seq(
+          LocalVar("merge_x", BitVecType(64), 0) -> LocalVar("x2", BitVecType(64), 0),
+          LocalVar("merge_y", BitVecType(64), 0) -> LocalVar("y2", BitVecType(64), 0)
+        ),
+        Some("phi")
+      ),
+      goto("retblock")
+    ),
+    block("retblock", ret)
+  )
+)""".replace("\\r", "")) {
+      p.toScala
+    }
+
+  }
+
 }
