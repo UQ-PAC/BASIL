@@ -54,6 +54,7 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
   val cats_collections = mvn"org.typelevel::cats-collections-core:0.9.10"
   val cats_core = mvn"org.typelevel::cats-core:2.13.0"
   val cats_kernel = mvn"org.typelevel::cats-kernel:2.13.0"
+  val native_utils = mvn"com.github.ramanrajarathinam:native-utils:1.0.0"
 
   val catsEffect = mvn"org.typelevel::cats-effect:3.5.4"
   val http4sVersion = "1.0.0-M40"
@@ -66,7 +67,7 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
   val log4cats = mvn"org.typelevel::log4cats-slf4j:2.6.0"
   val declineEffect = mvn"com.monovore::decline-effect:2.2.0"
 
-  override def mvnDeps = Seq(scalactic, sourceCode, mainArgs, upickle, aslpOffline, javaSmt, javaSmtZ3, catsEffect, http4Dsl,
+  override def mvnDeps = Seq(scalactic, sourceCode, mainArgs, upickle, aslpOffline, javaSmt, javaSmtZ3, native_utils, catsEffect, http4Dsl,
     http4Circe, circleGeneric, slf4j, scalaXml, emberServer, log4cats, declineEffect, javaSmtCVC5, cats_kernel, cats_core, cats_collections)
 
   override def repositoriesTask = Task.Anon {
@@ -87,12 +88,9 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
 
   override def sources = Task.Sources("main/scala")
 
-  override def forkArgs = Task {
-    super.forkArgs() ++ z3.forkArgs()
-  }
-  override def forkEnv = Task {
-    super.forkEnv() ++ z3.forkEnv()
-  }
+  override def resources = Task {
+    super.resources() :+ z3.nativeLibraryPath()
+ }
 
   override def scalafixConfig = Task {
     Some(BuildCtx.workspaceRoot / ".scalafix.conf")
@@ -294,7 +292,7 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
   def runProfile(profileDest: String, args: String*) = Task.Command {
     println(s"Profiling: you may want to set\n  sudo sysctl kernel.perf_event_paranoid=1\n  sudo sysctl kernel.kptr_restrict=0\n")
     val prof = asyncProf.path()
-    val oargs : Seq[String] = forkArgs() 
+    val oargs : Seq[String] = forkArgs()
     val realArgs : Seq[String] = oargs ++ Seq(s"-agentpath:${prof}=start,event=cpu,file=${profileDest}")
     os.call(Seq("java") ++ realArgs ++ Seq( "-jar", assembly().path.toString) ++ args, stdout = os.Inherit, cwd = BuildCtx.workspaceRoot)
   }
