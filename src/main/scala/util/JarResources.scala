@@ -2,6 +2,7 @@ package util
 import java.nio.file.{Files, StandardCopyOption}
 
 object JarResources {
+
   /**
    * Loads the given library name from the Java resources classpath,
    * extracting it from the JAR if needed.
