@@ -54,7 +54,7 @@ trait NativeDepsModule extends JavaModule {
 
   def offlinePlatforms =
     import Platform.*
-    Set(Platform(X86_64, Linux), Platform(Aarch64, Mac))
+    Set(Platform(X86_64, Linux), Platform(Aarch64, Mac), Platform(X86_64, Windows))
 
   override def prepareOffline(all: mainargs.Flag) = Task.Command[Seq[PathRef]] {
     val resolver = millResolver()
