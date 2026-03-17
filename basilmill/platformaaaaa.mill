@@ -1,15 +1,3 @@
 package build.basilmill
 
-import millbuild.Platform
-import upickle.default.ReadWriter
 
-extension (os: Platform.Os) {
-  def coursierType = coursier.core.Type(os.libExtension)
-}
-
-
-// these are `implicit val` rather than given so they get imported by
-// plain imports, without needing `import x.given`.
-implicit val osReadWriter: ReadWriter[Platform.Os] = ReadWriter.derived[Platform.Os]
-implicit val archReadWriter: ReadWriter[Platform.Arch] = ReadWriter.derived[Platform.Arch]
-implicit val platformReadWriter: ReadWriter[Platform] = ReadWriter.derived[Platform]
