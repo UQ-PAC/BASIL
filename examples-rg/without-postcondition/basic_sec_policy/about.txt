@@ -1,0 +1,3 @@
+Created by James T.
+
+A rather contrived, but very simple test of rely-guarantee generation for security verification, inspired by seqlock. read relies on L(x) remaining broken once it has been broken once by the other thread. This means if the security policy was broken before the assignment r := x, it will be caught by the if statement and r will be reset to 0. This rely works because L(x) ==> Gamma_x is assumed to be an invariant over both threads, thus the precondition L(x) produced by read can be simplified to true.

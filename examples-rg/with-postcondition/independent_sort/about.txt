@@ -1,0 +1,5 @@
+Created by James T.
+
+A basic test of multi-threaded sorting, where each thread performs insertion sort over one half of
+the global array.
+The completion of both threads should guarantee that arr is sorted.

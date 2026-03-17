@@ -1,0 +1,3 @@
+Sourced from Nick C.
+
+A basic implementation of a lock. Verification of read depends on knowing that x is not changed after z is assigned 0.

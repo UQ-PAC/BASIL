@@ -1,0 +1,3 @@
+Inspired by the producer-consumer algorithm in the hornICE paper.
+
+producer continuously increments product (up to a fixed value to ensure termination) while consumer simultaneously decrements product. Security verification depends on knowing that r == 0 when consumer's loop is terminated. As it turns out, this can be achieved by relying on producer always increasing product, as we want to avoid the case where r is assigned product before producer decrements product to 0, causing a potential loop exit with r == 1.

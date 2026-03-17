@@ -1,0 +1,5 @@
+Created by James T.
+
+This test ensures the analysis considers a variable's gamma as opposed to relying on its security
+policy. The use of x in the conditional requires that L(x) || Gamma_x holds beforehand. write_z
+cannot guarantee stability of L(x), but can guarantee stability of Gamma_x.
