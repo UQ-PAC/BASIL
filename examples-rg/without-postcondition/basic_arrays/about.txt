@@ -1,3 +1,0 @@
-Created by James T.
-
-A simple test of non-interfering concurrent access to the same array.

@@ -1,3 +1,0 @@
-Created by James T.
-
-For the two threads to meet their postconditions, their rely-guarantee conditions need to essentially cover the entire concurrent behaviour.

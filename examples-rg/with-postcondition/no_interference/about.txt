@@ -1,3 +1,0 @@
-Created by James T.
-
-A basic baseline test to check whether trivial rely-guarantee conditions can be produced for threads which contain no interference.
