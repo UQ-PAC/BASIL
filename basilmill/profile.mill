@@ -8,8 +8,6 @@ import os.Path
 import scalalib._
 import scala.util.{Try}
 
-import millbuild.Platform
-
 trait ProfileModule extends ScalaModule with DownloadModule {
 
 }

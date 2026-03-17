@@ -6,7 +6,6 @@ import javalib._
 import mainargs._
 import os.Path
 
-import millbuild.Platform
 
 trait Z3Module extends NativeDepsModule {
 }
