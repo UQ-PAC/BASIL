@@ -11,9 +11,15 @@ package build
 import mill._
 import scalalib._
 import mill.api.BuildCtx
+import coursier.core.Authentication
+import coursier.maven.MavenRepository
+
 
 
 import os.Path
+
+import contrib.scalapblib._
+import com.goyeau.mill.scalafix.ScalafixModule
 
 object `package` extends ScalaModule {
   // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
@@ -27,8 +33,9 @@ object `package` extends ScalaModule {
   override def moduleDir = BuildCtx.workspaceRoot / "src"
 
   private def mainSources = Task.Sources("main/scala")
+  private def millBuildSources = Task.Sources(BuildCtx.workspaceRoot / "mill-build/src")
   override def sources = Task {
-    super.sources()
+    super.sources() ++ mainSources() ++ millBuildSources()
   }
 
   def rootObject = this
