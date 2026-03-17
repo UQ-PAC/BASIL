@@ -1,4 +1,0 @@
-[submodule "src/frontend"]
-	path = src/frontend
-	url = https://github.com/UQ-PAC/basil-gui-frontend.git
-	branch = static

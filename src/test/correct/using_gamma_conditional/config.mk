@@ -1,1 +1,0 @@
-ENABLED_COMPILERS = clang clang_O2 clang_pic gcc gcc_pic
