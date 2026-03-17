@@ -4,6 +4,5 @@ import mill._
 import api._
 import javalib._
 
-
 trait NativeDepsModule extends JavaModule {
 }
