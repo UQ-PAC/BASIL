@@ -40,13 +40,13 @@ trait mdbookBinary extends DownloadModule {
 
   def run(args: String*) = Task.Command {
     val res = os.call(path() +: args, stdout = os.Inherit, check = false)
-    Task.ctx().systemExit(res.exitCode)
+    Task.ctx().systemExitWithReason("mdbook exited non-zero", res.exitCode)
     ()
   }
 
   def serve(args: String*) = Task.Command {
     val res = os.call(Seq(path().toString, "serve",  mdbookSources().path.toString) ++ args, stdout = os.Inherit, check = false)
-    Task.ctx().systemExit(res.exitCode)
+    Task.ctx().systemExitWithReason("mdbook exited non-zero", res.exitCode)
     ()
   }
 

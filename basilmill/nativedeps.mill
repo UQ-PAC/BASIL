@@ -4,6 +4,8 @@ import mill._
 import api._
 import javalib._
 
+import millbuild.Platform
+
 trait NativeDepsModule extends JavaModule {
   /**
    * This should be implemented by downstream modules.

@@ -1,7 +1,6 @@
-package build.basilmill
+package millbuild
 
 import upickle.default.ReadWriter
-
 
 case class Platform(val arch: Platform.Arch, val os: Platform.Os) derives ReadWriter
 
