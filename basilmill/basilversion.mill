@@ -6,7 +6,5 @@ import mill.api.BuildCtx
 
 import scala.util.Try
 
-import mill.contrib.buildinfo.BuildInfo
-
-trait BasilVersion extends BuildInfo {
+trait BasilVersion {
 }

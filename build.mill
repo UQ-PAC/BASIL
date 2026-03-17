@@ -1,10 +1,5 @@
 //| mill-version: 1.1.2-jvm
 //| mill-jvm-version: system
-//| mvnDeps:
-//| - org.antlr:antlr4:4.9.3
-//| - com.goyeau::mill-scalafix::0.6.0
-//| - com.lihaoyi::mill-contrib-buildinfo:$MILL_VERSION
-//| - com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION
 
 package build
 
