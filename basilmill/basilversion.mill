@@ -28,11 +28,4 @@ trait BasilVersion extends BuildInfo {
       Task.env.get("COMMIT")
     }
   }
-
-  override def buildInfoPackageName = "buildinfo"
-  override def buildInfoMembers = Seq(
-    BuildInfo.Value("scalaVersion", scalaVersion()),
-    BuildInfo.Value("gitVersion", gitVersion().getOrElse("(unknown version)")),
-    BuildInfo.Value("gitCommit", gitCommit().getOrElse("(unknown commit)")),
-  )
 }
