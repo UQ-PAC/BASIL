@@ -6,5 +6,6 @@ object Platform {
   enum Arch {
     case Aarch64
   }
+
 }
 
