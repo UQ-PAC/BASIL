@@ -86,9 +86,8 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
 
   override def moduleDir = BuildCtx.workspaceRoot / "src"
 
-
   private def mainSources = Task.Sources("main/scala")
-  private def millBuildSources = Task.Sources("mill-build/src")
+  private def millBuildSources = Task.Sources(BuildCtx.workspaceRoot / "mill-build/src")
   override def sources = Task {
     super.sources() ++ mainSources() ++ millBuildSources()
   }

@@ -79,7 +79,7 @@ class SMTSolver(var defaultTimeoutMillis: Option[Int] = None, solver: Solver = S
         case Solver.Z3 => SolverContextFactory.Solvers.Z3
         case Solver.CVC5 => SolverContextFactory.Solvers.CVC5
       },
-      util.JarResources.loadLibraryFromJar
+      util.JarResources.loadNativeLibraryFromJar
     )
   }
 

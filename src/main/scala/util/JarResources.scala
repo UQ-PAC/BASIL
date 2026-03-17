@@ -11,10 +11,19 @@ object JarResources {
    * [[org.sosy_lab.java_smt.SolverContextFactory]]'s constructor to
    * allow it to load libraries from the JAR.
    */
-  def loadLibraryFromJar(libraryName: String) = {
+  def loadNativeLibraryFromJar(libraryName: String) = {
     val fileName = System.mapLibraryName(libraryName)
+
+    val platformFolder = millbuild.Platform.detectExn().toPlatformString
+    val resourcePath = "/" + platformFolder + "/" + fileName
+
     val tempFile = Files.createTempFile("jar-resource", "-" + fileName)
-    val stream = getClass.getResourceAsStream("/" + fileName)
+    val stream = getClass.getResourceAsStream(resourcePath)
+
+    if (stream == null) {
+      throw new Exception("cannot load resource from jar: " + resourcePath)
+    }
+
     Files.copy(stream, tempFile, StandardCopyOption.REPLACE_EXISTING)
     System.load(tempFile.toString)
   }

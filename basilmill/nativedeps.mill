@@ -29,8 +29,6 @@ trait NativeDepsModule extends JavaModule {
 
     // always download all platforms because they will be bundled
     // into the jar.
-    // TODO: extensions are per-OS, but an OS might have different
-    // architectures and these will clash
     offlinePlatforms.foreach(plat => {
 
       // deduplicate only if name and dep are both identical
@@ -46,7 +44,10 @@ trait NativeDepsModule extends JavaModule {
       )
 
       (names `zip` libs).map((name, lib) => {
-        val newPath = Task.dest / s"$name.${plat.os.libExtension}"
+        val folder = Task.dest / plat.toPlatformString
+        os.makeDir.all(folder)
+
+        val newPath = folder / s"$name.${plat.os.libExtension}"
         os.copy(lib.path, newPath)
       })
     })
