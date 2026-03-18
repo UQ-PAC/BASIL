@@ -19,6 +19,7 @@ import basilmill.AntlrModule
 import basilmill.BasilDocs
 import basilmill.BasilVersion
 import basilmill.ProfileModule
+import basilmill.JlinkModule2
 import basilmill.Z3Module
 //import basilmill.CVC5Module
 
@@ -263,6 +264,16 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
   object z3 extends Z3Module
 //  object cvc5 extends CVC5Module
 
+  object javaBuild extends JavaModule with JlinkModule2 {
+    def jlinkModuleName = "basil"
+    def jlinkCompressLevel = "2"
+    def runClasspath = Task {
+      super.runClasspath() ++ build.runClasspath()
+    }
+    def sources = Task.Sources(BuildCtx.workspaceRoot / "src/main/java")
+    def mainClass = build.mainClass
+  }
+
   def ctagsConfig = Task.Source {
     BuildCtx.workspaceRoot / "basilmill" / "scala.ctags"
   }
@@ -294,7 +305,7 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
   def runProfile(profileDest: String, args: String*) = Task.Command {
     println(s"Profiling: you may want to set\n  sudo sysctl kernel.perf_event_paranoid=1\n  sudo sysctl kernel.kptr_restrict=0\n")
     val prof = asyncProf.path()
-    val oargs : Seq[String] = forkArgs() 
+    val oargs : Seq[String] = forkArgs()
     val realArgs : Seq[String] = oargs ++ Seq(s"-agentpath:${prof}=start,event=cpu,file=${profileDest}")
     os.call(Seq("java") ++ realArgs ++ Seq( "-jar", assembly().path.toString) ++ args, stdout = os.Inherit, cwd = BuildCtx.workspaceRoot)
   }
