@@ -1,4 +1,5 @@
-//| mill-version: 1.0.3-jvm
+//| mill-version: 1.1.2-jvm
+//| mill-jvm-version: system
 //| mvnDeps:
 //| - org.antlr:antlr4:4.9.3
 //| - com.goyeau::mill-scalafix::0.6.0
@@ -294,9 +295,8 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
   def runProfile(profileDest: String, args: String*) = Task.Command {
     println(s"Profiling: you may want to set\n  sudo sysctl kernel.perf_event_paranoid=1\n  sudo sysctl kernel.kptr_restrict=0\n")
     val prof = asyncProf.path()
-    val oargs : Seq[String] = forkArgs() 
+    val oargs : Seq[String] = forkArgs()
     val realArgs : Seq[String] = oargs ++ Seq(s"-agentpath:${prof}=start,event=cpu,file=${profileDest}")
     os.call(Seq("java") ++ realArgs ++ Seq( "-jar", assembly().path.toString) ++ args, stdout = os.Inherit, cwd = BuildCtx.workspaceRoot)
   }
-
 }
