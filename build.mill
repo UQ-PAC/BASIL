@@ -28,7 +28,7 @@ import os.Path
 import contrib.scalapblib._
 import com.goyeau.mill.scalafix.ScalafixModule
 
-object `package` extends ScalaModule with BasilDocs with BasilVersion with ScalafixModule {
+object `package` extends ScalaModule with BasilDocs with BasilVersion with ScalafixModule with JlinkModule2 {
   // ammoniteVersion should be updated whenever scalaVersion is changed. see, for example,
   // https://mvnrepository.com/artifact/com.lihaoyi/ammonite_3.4.3 to list valid versions.
   override def scalaVersion = "3.3.7"
@@ -38,6 +38,8 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
   override def moduleDeps = Seq(basilAntlr, basilProto, bnfc)
 
   override def scalacOptions: T[Seq[String]] = Seq("-deprecation", "-Wunused:imports", "-feature")
+
+  override def jlinkCompressLevel = "2"
 
   val javaTests = mvn"com.novocode:junit-interface:0.11"
   val scalaTests = mvn"org.scalatest::scalatest:3.2.19"
@@ -263,16 +265,6 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
 
   object z3 extends Z3Module
 //  object cvc5 extends CVC5Module
-
-  object javaBuild extends JavaModule with JlinkModule2 {
-    def jlinkModuleName = "basil"
-    def jlinkCompressLevel = "2"
-    def runClasspath = Task {
-      super.runClasspath() ++ build.runClasspath()
-    }
-    def sources = Task.Sources(BuildCtx.workspaceRoot / "src/main/java")
-    def mainClass = build.mainClass
-  }
 
   def ctagsConfig = Task.Source {
     BuildCtx.workspaceRoot / "basilmill" / "scala.ctags"
