@@ -7,6 +7,8 @@ import ir.*
 import ir.dsl.given
 import ir.eval.*
 import ir.transforms.*
+import ir.transforms.memoryEncoding
+import ir.transforms.memoryEncoding
 import translating.*
 import translating.PrettyPrinter.*
 import util.LogLevel.INFO
@@ -148,15 +150,27 @@ object RunUtils {
         memTransferTimer.checkPoint("Performed Memory Transform")
     }
 
-    conf.memoryEncoding match {
-      case Some(MemoryEncodingRepresentation.Flat) => {
-        visit_prog(transforms.memoryEncoding.flat.FlatTransform(ctx, conf.simplify), ctx.program)
+    val memEncoding: Option[memoryEncoding.MemoryEncoding] =
+      conf.memoryEncoding match {
+        case Some(r) =>
+          Some(memoryEncoding.split.SplitMemoryEncoding(r, conf.simplify, ctx))
+        case _ => None
       }
-      case Some(s: MemoryEncodingRepresentation.Split) => {
-        visit_prog(transforms.memoryEncoding.split.SplitTransform(ctx, conf.simplify, s), ctx.program)
-      }
-      case _ => {}
-    }
+    memEncoding.map(me =>
+      visit_prog(memoryEncoding.MemoryEncodingTransform(me, memoryEncoding.MemorySpecification()), ctx.program)
+    )
+
+    // memoryEncoding.transform(ctx.program)
+
+    // conf.memoryEncoding match {
+    //   case Some(MemoryEncodingRepresentation.Flat) => {
+    //     visit_prog(transforms.memoryEncoding.flat.FlatTransform(ctx, conf.simplify), ctx.program)
+    //   }
+    //   case Some(s: MemoryEncodingRepresentation.Split) => {
+    //     visit_prog(transforms.memoryEncoding.split.SplitTransform(ctx, conf.simplify, s), ctx.program)
+    //   }
+    //   case _ => {}
+    // }
 
     if (conf.transformIrreducibleLoops) {
       StaticAnalysisLogger.info("[!] Transforming Irreducible Loops")
@@ -231,13 +245,29 @@ object RunUtils {
       for (thread <- ctx.program.threads) {
         val fileName = q.outputPrefix.stripSuffix(".bpl") + "_" + thread.entry.name + ".bpl"
         val boogieTranslator =
-          IRToBoogie(ctx.program, ctx.specification, Some(thread), fileName, regionInjector, q.boogieTranslation)
+          IRToBoogie(
+            ctx.program,
+            ctx.specification,
+            Some(thread),
+            fileName,
+            regionInjector,
+            q.boogieTranslation,
+            memEncoding
+          )
         outPrograms.addOne(boogieTranslator.translate)
       }
       outPrograms
     } else {
       val boogieTranslator =
-        IRToBoogie(ctx.program, ctx.specification, None, q.outputPrefix, regionInjector, q.boogieTranslation)
+        IRToBoogie(
+          ctx.program,
+          ctx.specification,
+          None,
+          q.outputPrefix,
+          regionInjector,
+          q.boogieTranslation,
+          memEncoding
+        )
       ArrayBuffer(boogieTranslator.translate)
     }
     assert(invariant.singleCallBlockEnd(ctx.program))

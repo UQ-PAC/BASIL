@@ -4,6 +4,7 @@ import boogie.*
 import ir.*
 import specification.*
 import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion, MemoryEncodingRepresentation}
+import ir.transforms.memoryEncoding.MemoryEncoding
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -115,7 +116,8 @@ class IRToBoogie(
   var thread: Option[ProgramThread],
   val filename: String,
   val regionInjector: Option[RegionInjector],
-  val config: BoogieGeneratorConfig
+  val config: BoogieGeneratorConfig,
+  val memEncoding: Option[MemoryEncoding] = None
 ) {
   private val externAttr = BAttribute("extern")
   private val inlineAttr = BAttribute("inline")
@@ -266,11 +268,13 @@ class IRToBoogie(
       .toList
       .sorted
 
-    val memEncodingDecls = config.memoryEncoding match {
-      case Some(MemoryEncodingRepresentation.Flat) => transforms.memoryEncoding.flat.memoryEncodingDecls()
-      case Some(s: MemoryEncodingRepresentation.Split) => transforms.memoryEncoding.split.memoryEncodingDecls(s)
-      case _ => List()
-    }
+    // val memEncodingDecls = memEncoding match {
+    //   // case Some(MemoryEncodingRepresentation.Flat) => transforms.memoryEncoding.flat.memoryEncodingDecls()
+    //   // case Some(s: MemoryEncodingRepresentation.Split) => transforms.memoryEncoding.split.memoryEncodingDecls(s)
+    //   case Some(r) => transforms.memoryEncoding.EmptyEncoding(r, config.simplify)
+    //   case _ => List()
+    // }
+    val memEncodingDecls = memEncoding.map(m => m.bDeclarations).toList.flatten
 
     val declarations =
       globalDecls ++ globalConsts ++ functionsUsed ++ memEncodingDecls ++ rgLib ++ pushUpModifiesFixedPoint(

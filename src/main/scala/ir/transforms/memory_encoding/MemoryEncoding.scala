@@ -4,13 +4,15 @@ import util.MemoryEncodingRepresentation
 import boogie.*
 import ir.*
 
-trait MemoryEncoding {
-  val repr: MemoryEncodingRepresentation
-  val simplify: Boolean
+trait MemoryEncoding(val repr: MemoryEncodingRepresentation, val simplify: Boolean) {
+  def splitMem: Boolean = repr match {
+    case MemoryEncodingRepresentation.Split(_, true) => true
+    case _ => false
+  }
 
   // Type used to represent abstract allocation ids
-  val allocationType: IRType
-  val allocationBType: BType
+  def allocationType: IRType
+  def allocationBType: BType
   def allocationLiteral(n: Int): Expr
 
   val addressSize: Int = 64
@@ -21,17 +23,17 @@ trait MemoryEncoding {
   val liveType: IRType = BitVecType(2)
   val liveBType: BType = BitVecBType(2)
   val deadLiteral: Expr = BitVecLiteral(0, 2)
-  val liveBLiteral: Expr = BitVecLiteral(1, 2)
+  val liveLiteral: Expr = BitVecLiteral(1, 2)
   val freshLiteral: Expr = BitVecLiteral(2, 2)
 
   val memEncodingType: IRType = CustomSort("MemEncoding")
   val memEncodingBType: BType = CustomBType("MemEncoding")
+
+  def memEncodingBDataTypeBody: List[BDataTypeConstructor] = List()
   val memEncodingBDataTypeDecl: BDataTypeDecl = BDataTypeDecl(
     "MemEncoding",
     memEncodingBDataTypeBody
-    // List(BDataTypeConstructor("MemEncoding", List(alloc_live_param, alloc_size_param, addr_is_heap_param)))
   )
-  val memEncodingBDataTypeBody: List[BDataTypeConstructor] = List()
 
   // Necessary boogie declarations for the memory encoding
   def bDeclarations: List[BDeclaration] = {
@@ -47,7 +49,8 @@ trait MemoryEncoding {
       allocLiveUpdateFunc,
       canAllocateFunc,
       allocateFunc,
-      initHeapFunc
+      initHeapFunc,
+      validAccessFunc,
     )
   }
 
@@ -159,12 +162,12 @@ trait MemoryEncoding {
     BFunctionCall("me_allocate", List(me, addr, size), memEncodingBType)
 
   // me_init_heap makes all assertions to initialize the heap within the given lb and ub addresses
-  def initHeapFunc: BFunction = BFunction("me_init_heap", List(pMemEncoding, pLb, pUb), rBool, initHeapBody)
+  def initHeapFunc: BFunction = BFunction("me_init_heap", List(pMemEncoding), rBool, initHeapBody)
   def initHeapBody: Option[BExpr] = None
-  def initHeapCall(lb: Expr, ub: Expr, me: Expr = gMemEncoding): Expr =
-    FApplyExpr("me_init_heap", Seq(me, lb, ub), BoolType)
-  def initHeapBCall(lb: BExpr, ub: BExpr, me: BExpr = gMemEncoding.toBoogie): BExpr =
-    BFunctionCall("me_init_heap", List(me, lb, ub), BoolBType)
+  def initHeapCall(me: Expr = gMemEncoding): Expr =
+    FApplyExpr("me_init_heap", Seq(me), BoolType)
+  def initHeapBCall(me: BExpr = gMemEncoding.toBoogie): BExpr =
+    BFunctionCall("me_init_heap", List(me), BoolBType)
 
   // me_valid_access ensures accessing an address + size is memory safe:
   // - An allocation exists at the address (or teh address is not on the heap)
@@ -178,5 +181,3 @@ trait MemoryEncoding {
   def validAccessBCall(addr: BExpr, size: BExpr, me: BExpr = gMemEncoding.toBoogie): BExpr =
     BFunctionCall("me_valid_access", List(me, addr, size), BoolBType)
 }
-
-// class SplitEncoding(override val repr: MemoryEncodingRepresentation, override val simplify: Boolean) {}

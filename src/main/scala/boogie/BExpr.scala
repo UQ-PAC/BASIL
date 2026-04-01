@@ -903,3 +903,13 @@ case class BFieldAccessExpr(record: BVar, field: BVar, rType: BType) extends BEx
   override def toString(): String = s"$record->$field"
   override def getType: BType = field.getType
 }
+
+case class BFieldUpdateExpr(record: BExpr, field: BVar, value: BExpr) extends BExpr {
+  override def toString = s"$record->($field := $value)"
+  override val getType: BType = record.getType
+  // override def functionOps: Set[FunctionOp] = record.functionOps ++ field.functionOps ++ value.functionOps
+  // override def locals: Set[BVar] = record.locals ++ field.locals ++ value.locals
+  // override def globals: Set[BVar] = field.globals ++ record.globals ++ value.globals
+  // override def params: Set[BVar] = field.params ++ record.params ++ value.params
+  // override def loads: Set[BExpr] = field.loads ++ value.loads ++ record.loads
+}
