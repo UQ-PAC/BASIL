@@ -31,7 +31,7 @@ case class BProgram(declarations: List[BDeclaration], filename: String) {
     }
 
     val timer = PerformanceTimer("Verify", LogLevel.INFO)
-    val cmd = Seq("boogie", "/useArrayAxioms", temp.toString)
+    val cmd = Seq("boogie", "/useArrayAxioms", "/warnVacuousProofs", temp.toString)
     Logger.info(s"Running: ${cmd.mkString(" ")}")
 
     val output = cmd.!!
