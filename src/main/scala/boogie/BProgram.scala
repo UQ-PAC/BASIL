@@ -186,3 +186,17 @@ case class BConstAxiomPair(const: BVarDecl, axiom: BAxiom) extends BDeclaration 
   override def compare(that: BConstAxiomPair): Int = const.compare(that.const)
   override def toString: String = const.toString + "\n" + axiom.toString
 }
+
+case class BDataTypeConstructor(name: String, fields: List[BVar]) {
+  val fieldsString = fields.map(_.withType).mkString(", ")
+  val declString = s"$name($fieldsString)"
+
+  override def toString: String = declString
+}
+
+case class BDataTypeDecl(name: String, constructors: List[BDataTypeConstructor]) extends BDeclaration {
+  val constructorsString = constructors.mkString(", ");
+  val declString = s"datatype $name {$constructorsString}";
+  override def toString: String = declString
+  override def toBoogie: List[String] = List(toString)
+}

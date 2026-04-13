@@ -56,6 +56,22 @@ class StackSubstituter extends CILVisitor {
       node.mem = stackMemory
       SkipChildren()
     }
+    case node @ Assert(FApplyExpr("valid", se, _, _), _, _) => {
+      // Memory Encoding validity checks shouldn't occur on stack memory
+      if se(5).variables.exists(isStackPtr) then {
+        ChangeTo(List())
+      } else {
+        SkipChildren()
+      }
+    }
+    case node @ Assert(FApplyExpr("me_valid_access", se, _, _), _, _) => {
+      // Memory Encoding validity checks shouldn't occur on stack memory
+      if se(1).variables.exists(isStackPtr) then {
+        ChangeTo(List())
+      } else {
+        SkipChildren()
+      }
+    }
     case _ => SkipChildren()
   }
 }

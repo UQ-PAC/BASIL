@@ -220,6 +220,16 @@ object RunUtils {
         invariant.readUninitialised(ctx.program)
     }
 
+    conf.memoryEncoding match {
+      case Some(MemoryEncodingRepresentation.Flat) => {
+        visit_prog(transforms.memoryEncoding.flat.FlatTransform(ctx, conf.simplify != util.SimplifyMode.Disabled), ctx.program)
+      }
+      case Some(MemoryEncodingRepresentation.BOO) => {
+        visit_prog(transforms.memoryEncoding.split.SplitTransform(ctx, conf.simplify!= util.SimplifyMode.Disabled ), ctx.program)
+      }
+      case _ => {}
+    }
+
     if (conf.transformIrreducibleLoops) {
       StaticAnalysisLogger.info("[!] Transforming Irreducible Loops")
       IrreducibleLoops.transform_all_and_update(ctx.program)

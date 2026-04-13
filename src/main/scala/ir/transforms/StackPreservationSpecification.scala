@@ -122,7 +122,7 @@ def genStackAllocationSpec(p: Program) = {
             BinaryBExpr(BVSGT, i, SP),
             BinaryBExpr(EQ, MapAccess(stack.toBoogie, i), Old(MapAccess(stack.toBoogie, i)))
           ),
-          List(MapAccess(stack.toBoogie, i))
+          List(List(MapAccess(stack.toBoogie, i)))
         )
       }
 

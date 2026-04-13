@@ -397,7 +397,7 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
     while (traversalQueue.nonEmpty) {
       val next = traversalQueue.pop()
 
-      def infix(b: BinaryBExpr): Unit = traversalQueue.pushAll(Seq("(", b.arg1, s" ${b.op} ", b.arg2, ")").reverse)
+      def infix(b: BinaryBExpr): Unit = traversalQueue.pushAll(Seq("(", b.arg1, s" ${b.op} ", b.arg2, s"): ${b.getType}").reverse)
       def prefix(b: BinaryBExpr): Unit =
         traversalQueue.pushAll(Seq(s"bv${b.op}${b.inSize}(", b.arg1, ",", b.arg2, ")").reverse)
 
@@ -426,7 +426,7 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
     case bOp: BVBinOp =>
       bOp match {
         case BVCONCAT =>
-          s"($arg1 $bOp $arg2)"
+          s"(($arg1 $bOp $arg2): $getType)"
         case _ =>
           s"bv$bOp$inSize($arg1, $arg2)"
       }
@@ -486,9 +486,12 @@ case class IfThenElse(guard: BExpr, thenExpr: BExpr, elseExpr: BExpr) extends BE
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitIfThenElse(this)
 }
 
-trait BQuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr, triggers: List[BExpr] = List()) extends BExpr {
+trait BQuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr, triggers: List[List[BExpr]] = List())
+    extends BExpr {
   override def toString: String = {
-    val trstr = if triggers.nonEmpty then "{" + triggers.mkString(",") + "} " else ""
+    val trstr = if triggers.nonEmpty then {
+      triggers.filter(t => t.nonEmpty).map(t => "{" + t.mkString(",") + "}").mkString(" ")
+    } else ""
     val boundString = bound.map(_.withType).mkString(", ")
     s"($sort $boundString::  $trstr($body))"
   }
@@ -510,10 +513,10 @@ enum Quantifier {
   case lambda
 }
 
-case class ForAll(bound: List[BVar], body: BExpr, triggers: List[BExpr] = List())
+case class ForAll(bound: List[BVar], body: BExpr, triggers: List[List[BExpr]] = List())
     extends BQuantifierExpr(Quantifier.forall, bound, body, triggers)
 
-case class Exists(bound: List[BVar], body: BExpr, triggers: List[BExpr] = List())
+case class Exists(bound: List[BVar], body: BExpr, triggers: List[List[BExpr]] = List())
     extends BQuantifierExpr(Quantifier.exists, bound, body, triggers)
 
 case class Lambda(bound: List[BVar], body: BExpr) extends BQuantifierExpr(Quantifier.lambda, bound, body)
@@ -816,4 +819,9 @@ case class ArrayAccess(global: SpecGlobal, index: Int) extends SpecGlobalOrAcces
   override val toOldGamma: BVar = BVariable(s"Gamma_${global.name}$$${index}_old", BoolBType, Scope.Local)
   override def specGlobals: Set[SpecGlobalOrAccess] = Set(this)
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitArrayAccess(this)
+}
+
+case class BFieldAccessExpr(record: BVar, field: BVar) extends BExpr {
+  override def toString(): String = s"$record->$field"
+  override def getType: BType = field.getType
 }

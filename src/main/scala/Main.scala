@@ -10,6 +10,7 @@ import util.{
   BoogieGeneratorConfig,
   BoogieMemoryAccessMode,
   DSAPhase,
+  MemoryEncodingRepresentation,
   DSConfig,
   DebugDumpIRLogger,
   ILLoadingConfig,
@@ -271,7 +272,12 @@ object Main {
     @arg(name = "noif", doc = "Disable information flow security transform in Boogie output")
     noif: Flag,
     @arg(name = "nodebug", doc = "Disable runtime debug assertions")
-    noDebug: Flag
+    noDebug: Flag,
+    @arg(
+      name = "memory-encoding",
+      doc = "Enable memory encoding. (options: flat|boo|obo). flat addressing maps pointers directly to offset. boo/obo split pointers into base and offset: boo = base -> offset -> object, obo = offset -> base -> object."
+    )
+    memoryEncoding: Option[String]
   )
 
   def configOfArgs(args: Array[String]): (Config, BASILConfig) = {
@@ -386,13 +392,29 @@ object Main {
         throw new IllegalArgumentException("Illegal argument for --assert-callee-saved. allowed: (auto|always|never)")
     }
 
+    val memoryEncodingRepresentation = conf.memoryEncoding match
+      case Some("flat") => Some(MemoryEncodingRepresentation.Flat)
+      case Some("") => Some(MemoryEncodingRepresentation.Flat)
+      case Some("boo") => Some(MemoryEncodingRepresentation.BOO)
+      case Some("obo") => Some(MemoryEncodingRepresentation.OBO)
+      case None => None
+      case Some(_) =>
+        throw new IllegalArgumentException("Illegal option to memory-encoding, allowed are: (flat|obo|boo)")
+
     val boogieMemoryAccessMode = if (conf.lambdaStores.value) {
       BoogieMemoryAccessMode.LambdaStoreSelect
     } else {
       BoogieMemoryAccessMode.SuccessiveStoreSelect
     }
     val boogieGeneratorConfig =
-      BoogieGeneratorConfig(boogieMemoryAccessMode, true, rely, conf.threadSplit.value, conf.noif.value)
+      BoogieGeneratorConfig(
+        boogieMemoryAccessMode,
+        true,
+        rely,
+        conf.threadSplit.value,
+        conf.noif.value,
+        memoryEncoding = memoryEncodingRepresentation
+      )
 
     var loadingInputs = if (conf.bapInputDirName.isDefined) then {
       loadDirectory(ChooseInput.Bap, conf.bapInputDirName.get)
@@ -502,7 +524,8 @@ object Main {
       outputPrefix = conf.outFileName,
       dsaConfig = dsa,
       memoryTransform = conf.memoryTransform.value,
-      assertCalleeSaved = calleeSaved
+      assertCalleeSaved = calleeSaved,
+      memoryEncoding = memoryEncodingRepresentation
     )
     (conf, q)
   }
