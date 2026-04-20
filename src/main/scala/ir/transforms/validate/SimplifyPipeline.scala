@@ -254,8 +254,8 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   // maybe it should; in ackermann phase and observable variables...
   val p = ctx.program
   var config = mode match {
-    case SimplifyMode.ValidatedSimplify(verifyMode, filePrefix, dryRun) =>
-      TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = true, dryRun = dryRun)
+    case SimplifyMode.ValidatedSimplify(verifyMode, filePrefix, dryRun, effectMode) =>
+      TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = true, dryRun = dryRun, effects = effectMode)
     case _ => TVJob(None, None)
   }
 
@@ -295,6 +295,8 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   counter = ir.transforms.CountGuardStatements()
   val _ = visit_prog(counter, p)
   counter.reportToLog("after")
+
+  config = simplifyCFGValidated(config, p)
 
   tvEvalLogger.debug {
     val counter = ir.transforms.CountStatements()

@@ -213,7 +213,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   def vstore(mem: Memory, index: Sexp[Expr], value: Sexp[Expr], endian: Endian, size: Int): Sexp[MemoryStore] = ???
   def vhavoc(variables: List[Sexp[Variable]]) = ???
   def vold(e: Expr) = ???
-  def vquantifier(e: QuantifierExpr) = ???
+
   def vlambda(e: LambdaExpr) = ???
   def vprog(mainProc: String, procedures: List[Sexp[Procedure]]): Sexp[Program] = ???
   def vrepeat(reps: Int, value: Sexp[Expr]): Sexp[Expr] = ???
@@ -222,6 +222,15 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
   def vboollit(b: Boolean): Sexp[BoolLit] = ???
   def vbvlit(b: BitVecLiteral): Sexp[BitVecLiteral] = ???
   def vintlit(b: BigInt): Sexp[IntLiteral] = ???
+
+  def vquantifier(e: QuantifierExpr) = {
+    val n = e.kind match
+      case QuantifierSort.exists => "exists"
+      case QuantifierSort.forall => "forall"
+    val param = e.body.binds.map(v => list(sym(fixVname(v.name)), basilTypeToSMTType(v.getType)))
+    val body = vexpr(e.body.body)
+    list(sym(n), list(param: _*), body)
+  }
 
   class SMTBuilder() {
 
@@ -472,6 +481,8 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       var decled = Set[Sexp[Expr]]()
       var typeDecled = Set[Sexp[Expr]]()
 
+      var bound = Set[Variable]()
+
       override def vexpr(e: Expr) =
         e.getType match {
           case CustomSort(b) => {
@@ -489,7 +500,18 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
             decled = decled + booltoBVDef
             DoChildren()
           }
-          case v: Variable => {
+          case LambdaExpr(binds, _) => {
+            val oldbound = bound
+            bound = bound ++ binds
+            ChangeDoChildrenPost(
+              e,
+              e => {
+                bound = oldbound
+                e
+              }
+            )
+          }
+          case v: Variable if !(bound.contains(v)) => {
             val decl = list(sym("declare-const"), sym(fixVname(v.name)), basilTypeToSMTType(v.getType))
             decled = decled + decl
             SkipChildren()

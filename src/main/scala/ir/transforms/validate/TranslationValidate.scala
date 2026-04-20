@@ -3,12 +3,18 @@ package ir.transforms.validate
 import analysis.ProcFrames.*
 import cats.collections.DisjointSets
 import ir.*
-import ir.cilvisitor.*
 import translating.PrettyPrinter.*
 import util.SMT.*
 import util.{LogLevel, PerformanceTimer, tvLogger}
 
 import java.io.File
+
+import cilvisitor.*
+
+enum EffectMode:
+  case Ackermann
+  case UF
+  case Axiom
 
 /**
  * Result of a translation validation task for a single procedure and transform step.
@@ -25,6 +31,7 @@ case class TVJob(
   debugDumpAlways: Boolean = false,
   /* minimum number of statements in source and target combined to trigger case analysis */
   splitLargeProceduresThreshold: Option[Int] = Some(60),
+  effects: EffectMode = EffectMode.Ackermann,
   dryRun: Boolean = false
 ) {
 
@@ -152,6 +159,7 @@ def combineProcs(p1: Procedure, p2: Procedure): Program = {
 class NamespaceState(val namespace: String) extends CILVisitor {
 
   def stripNamespace(n: String) = n.stripPrefix(namespace + "__")
+  def addNamespace(n: String) = namespace + "__" + n
 
   override def vblock(b: Block) = {
     b.label = namespace + "__" + b.label
@@ -946,14 +954,18 @@ object TranslationValidator {
 
     // val preInv = invariant
 
-    val ackInv =
-      Ackermann.instantiateAxioms(
-        sourceInfo.transition.entryBlock.get,
-        targetInfo.transition.entryBlock.get,
-        exprInSource,
-        exprInTarget,
-        invariant.renamingSrcTgt
-      )
+    val ackInv = config.effects match {
+      case EffectMode.Ackermann => {
+        Ackermann.instantiateAxioms(
+          sourceInfo.transition.entryBlock.get,
+          targetInfo.transition.entryBlock.get,
+          exprInSource,
+          exprInTarget,
+          invariant.renamingSrcTgt
+        )
+      }
+      case _ => List()
+    }
 
     val preInv = (concreteInvariant.map(
       invToPredicateInState(
@@ -979,6 +991,12 @@ object TranslationValidator {
         )
       )
       .map(_.body)
+
+    val effect_axioms = config.effects match {
+      case EffectMode.UF => AxiomEncoding.ufEncoding(source, target)
+      case EffectMode.Axiom => AxiomEncoding.axiomEncoding(source, target, afterRenamer, beforeRenamer)
+      case _ => List()
+    }
 
     visit_proc(afterRenamer, source)
     visit_proc(beforeRenamer, target)
@@ -1007,6 +1025,11 @@ object TranslationValidator {
     })
 
     count = 0
+    for (e <- effect_axioms) {
+      count += 1
+      b.addAssert(e, Some(f"ackaxiom$count"))
+    }
+    count = 0
     for (e <- preInv) {
       count += 1
       val l = e.comment match {
@@ -1029,14 +1052,14 @@ object TranslationValidator {
     count = 0
     for (i <- extractProg(source)) {
       count += 1
-      b.addAssert(i, Some(s"source$count"))
+      b.addAssert(i, Some(s"psrc$count"))
       prover.map(_.addConstraint(i))
     }
     count = 0
     for (i <- extractProg(target)) {
       count += 1
       prover.map(_.addConstraint(i))
-      b.addAssert(i, Some(s"tgt$count"))
+      b.addAssert(i, Some(s"ptgt$count"))
     }
 
     val sourceAssumeFail =
@@ -1389,5 +1412,4 @@ object TranslationValidator {
       getValidationSMT(p, tvconf, transformName, before, after, inv)
     }
   }
-
 }

@@ -6,6 +6,8 @@ import util.tvLogger
 
 import scala.collection.mutable
 
+import cilvisitor.*
+
 case class Field(name: String)
 type EffCallFormalParam = Variable | Memory | Field
 
@@ -401,4 +403,65 @@ object Ackermann {
 
     invs.toList
   }
+}
+
+object AxiomEncoding {
+
+  class AxiomEncoding(renaming: Option[NamespaceState] = None) extends CILVisitor {
+
+    var seenAckermann = Set[FApplyExpr]()
+
+    def lformal_name(n: EffCallFormalParam) = {
+      n match {
+        case v: Variable => v.name
+        case Field(name) => name
+        case m: Memory => m.name
+      }
+    }
+
+    override def vstmt(s: Statement) = s match {
+      case l @ SideEffectStatement(s, n, lhs, rhs) => {
+        val calls = lhs.map((lformal, lactual) =>
+          val name = lformal_name(lformal)
+          val call_i = FApplyExpr(n + "_" + name, rhs.map(_._2).toSeq, lactual.getType, true)
+          seenAckermann = seenAckermann + call_i
+          val call_n = renaming match {
+            case Some(rn) => call_i.copy(name = rn.addNamespace(call_i.name))
+            case None => call_i
+          }
+          (lactual, call_n)
+        )
+        ChangeTo(List(SimulAssign(Vector.from(calls))))
+      }
+      case _ => SkipChildren()
+    }
+  }
+
+  def toAxiom(s: FApplyExpr, src: NamespaceState, tgt: NamespaceState) = {
+    val srcArgs = s.params.zipWithIndex.map((v, i) => LocalVar(src.namespace + i, v.getType))
+    val tgtArgs = s.params.zipWithIndex.map((v, i) => LocalVar(tgt.namespace + i, v.getType))
+
+    val srcf = FApplyExpr(src.addNamespace(s.name), srcArgs, s.returnType): Expr
+    val tgtf = FApplyExpr(tgt.addNamespace(s.name), tgtArgs, s.returnType): Expr
+
+    QuantifierExpr(QuantifierSort.forall, LambdaExpr(srcArgs.toList ++ tgtArgs, polyEqual(srcf, tgtf)))
+
+  }
+
+  def ufEncoding(src: Procedure, tgt: Procedure) = {
+    val effax = AxiomEncoding(None)
+    visit_proc(effax, src)
+    visit_proc(effax, tgt)
+    List()
+  }
+
+  def axiomEncoding(src: Procedure, tgt: Procedure, srcrename: NamespaceState, tgtrename: NamespaceState) = {
+    val effsrc = AxiomEncoding(Some(srcrename))
+    val efftgt = AxiomEncoding(Some(tgtrename))
+    visit_proc(effsrc, src)
+    visit_proc(efftgt, tgt)
+    val axioms = effsrc.seenAckermann ++ efftgt.seenAckermann
+    axioms.map(a => toAxiom(a, srcrename, tgtrename)).toList
+  }
+
 }

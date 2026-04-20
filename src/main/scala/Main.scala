@@ -220,6 +220,8 @@ object Main {
     tvSimpVerify: Flag,
     @arg(name = "simplify-tv-dryrun", doc = "Skip all tv work after invariant generation")
     tvDryRun: Flag,
+    @arg(name = "simplify-tv-effects", doc = "How to encode effects for TV: ackermann|uf|axiom (default=ackermann)")
+    tvEffects: String = "ackermann",
     @arg(
       name = "pc",
       doc = "Program counter mode, supports GTIRB only. (options: none | keep | assert) (default: none)"
@@ -471,9 +473,23 @@ object Main {
       util.assertion.disableAssertions = true
     }
 
+    def effmodeOfString(n: String) = {
+      n match
+        case "uf" => ir.transforms.validate.EffectMode.UF
+        case "ackermann" => ir.transforms.validate.EffectMode.Ackermann
+        case "axiom" => ir.transforms.validate.EffectMode.Axiom
+    }
+
     val simplifyMode = (conf.simplify.value, conf.tvSimp, conf.tvSimpVerify.value) match {
-      case (_, d, true) => SimplifyMode.ValidatedSimplify(Some(util.SMT.Solver.Z3), d, dryRun = conf.tvDryRun.value)
-      case (_, Some(d), _) => SimplifyMode.ValidatedSimplify(None, Some(d), dryRun = conf.tvDryRun.value)
+      case (_, d, true) =>
+        SimplifyMode.ValidatedSimplify(
+          Some(util.SMT.Solver.Z3),
+          d,
+          dryRun = conf.tvDryRun.value,
+          effmodeOfString(conf.tvEffects)
+        )
+      case (_, Some(d), _) =>
+        SimplifyMode.ValidatedSimplify(None, Some(d), dryRun = conf.tvDryRun.value, effmodeOfString(conf.tvEffects))
       case (true, None, _) => SimplifyMode.Simplify
       case _ if dsa.isDefined => SimplifyMode.Simplify
       case _ => SimplifyMode.Disabled
