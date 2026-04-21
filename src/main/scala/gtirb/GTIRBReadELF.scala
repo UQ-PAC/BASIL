@@ -7,9 +7,9 @@ import translating.{ELFBind, ELFNDX, ELFSymType, ELFSymbol, ELFVis, ReadELFData}
 import util.Logger
 
 import java.io.ByteArrayInputStream
+import scala.collection.mutable
 import scala.util.DynamicVariable
 import scala.util.chaining.scalaUtilChainingOps
-import scala.collection.mutable
 
 /**
  * Responsible for interpreting the GTIRB's symbol information
