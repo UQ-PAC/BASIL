@@ -242,7 +242,10 @@ def assumePreservedParams(config: TVJob, p: Program) = {
   // validator.getValidationSMT(config, , introducedAsserts = asserts.toSet)
   TranslationValidator.forTransform(
     "AssumeCallPreserved",
-    transforms.CalleePreservedParam.transform,
+    p => {
+      simplifyCFG(p)
+      transforms.CalleePreservedParam.transform(p)
+    },
     asserts => InvariantDescription(introducedAsserts = asserts.toSet)
   )(p, config)
 
@@ -279,7 +282,6 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   config = assumePreservedParams(config, p)
   assert(ir.invariant.readUninitialised(ctx.program))
   transforms.applyRPO(p)
-  config = simplifyCFGValidated(config, p)
   assert(ir.invariant.readUninitialised(ctx.program))
   transforms.applyRPO(p)
   config = dynamicSingleAssignment(config, p)
@@ -296,7 +298,6 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   val _ = visit_prog(counter, p)
   counter.reportToLog("after")
 
-  config = simplifyCFGValidated(config, p)
 
   tvEvalLogger.debug {
     val counter = ir.transforms.CountStatements()

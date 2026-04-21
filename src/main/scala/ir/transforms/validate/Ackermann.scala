@@ -444,7 +444,9 @@ object AxiomEncoding {
     val srcf = FApplyExpr(src.addNamespace(s.name), srcArgs, s.returnType): Expr
     val tgtf = FApplyExpr(tgt.addNamespace(s.name), tgtArgs, s.returnType): Expr
 
-    QuantifierExpr(QuantifierSort.forall, LambdaExpr(srcArgs.toList ++ tgtArgs, polyEqual(srcf, tgtf)))
+    QuantifierExpr(QuantifierSort.forall, LambdaExpr(srcArgs.toList ++ tgtArgs, 
+      BinaryExpr(BoolIMPLIES, boolAnd(srcArgs.zip(tgtArgs).map(polyEqual)),
+        polyEqual(srcf, tgtf))))
 
   }
 
