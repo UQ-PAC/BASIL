@@ -290,6 +290,14 @@ object Ackermann {
     } yield (AckInv(name, lhs, args))
   }
 
+  def loc_pos(v: Block | Procedure | Command ) = v match {
+    case b: Block => "BLOC___" + b.label
+    case b: Procedure => "PROC___" + b.name
+    case cmd: Jump => "JUMP___" + cmd.parent.label
+    case stmt: Statement => "STMT___" + stmt.parent.label + "___OFF___" +  stmt.parent.statements.toList.indexOf(stmt) 
+    case _ : Command => ???
+  } 
+
   def instantiateAxioms(
     sourceEntry: Block,
     targetEntry: Block,
@@ -382,7 +390,7 @@ object Ackermann {
 
           instantiateAxiomInstance(paramMapping)(src, tgt) match {
             case Right(inv) => {
-              invariant = invariant + ((inv.toPredicate(renameSourceExpr, renameTargetExpr)) -> inv.name)
+              invariant = invariant + ((inv.toPredicate(renameSourceExpr, renameTargetExpr)) -> (inv.name + "___src" + loc_pos(srcPos) + "___tgt" + loc_pos(tgtPos) + "___end___"))
               advanceBoth()
             }
             case Left(InstFailureReason.ParamMismatch(err)) =>
