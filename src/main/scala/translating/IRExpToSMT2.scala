@@ -270,6 +270,11 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       }
     }
 
+    def addAssertOnly(e: Expr, name: Option[String] = None) = {
+      exprs = Cmd.AssertExp(e, name) :: exprs
+    }
+
+
     def addAssert(e: Expr, name: Option[String] = None) = {
       before = false
       val (t, d) = BasilIRToSMT2.extractDecls(e)

@@ -239,6 +239,40 @@ object SimplifyValidation {
   var validate: Boolean = false
   var debugTrace = mutable.ArrayBuffer[(Expr, Expr, sourcecode.Line, sourcecode.FileName, sourcecode.Name)]()
 
+  def clear() = {
+    traceLog = mutable.LinkedHashSet()
+  }
+
+
+  def nonTrivial() = {
+    traceLog.filter((e,b,_) => e.variables.nonEmpty || b.variables.nonEmpty)
+  }
+
+  def makeAxioms(b: translating.BasilIRToSMT2.SMTBuilder) = {
+
+    def makeEQ(a: Expr, b: Expr) = {
+      require(a.getType == b.getType)
+      BinaryExpr(EQ, a, b)
+    }
+
+    var ind = 0
+
+    for ((o, n, sname) <- nonTrivial()) {
+      ind += 1
+      if (ir.transforms.ExprComplexity()(n) > 5000) {
+        Logger.warn(s"Skipping simplification proof $ind because too large (> 5000)!")
+      } else {
+        val equal = makeEQ(o, n)
+        val vars = equal.variables.collect(v => v match 
+          case v : LocalVar => v).toList
+        val e = QuantifierExpr(QuantifierSort.forall, LambdaExpr(vars, equal))
+        b.addAssertOnly(e, Some(s"groundrewrite$ind"))
+      }
+    }
+  }
+
+
+
   def makeValidation(writer: BufferedWriter) = {
 
     def makeEQ(a: Expr, b: Expr) = {
@@ -248,14 +282,14 @@ object SimplifyValidation {
 
     var ind = 0
 
-    for ((o, n, sname) <- traceLog) {
+    for ((o, n, sname) <- nonTrivial()) {
       ind += 1
       if (ir.transforms.ExprComplexity()(n) > 5000) {
         Logger.warn(s"Skipping simplification proof $ind because too large (> 5000)!")
       } else {
         if (ind % 100 == 0) Logger.info(s"Wrote simplification proof $ind / ${traceLog.size}")
         val equal = UnaryExpr(BoolNOT, makeEQ(o, n))
-        val expr = translating.BasilIRToSMT2.exprUnsat(equal, Some(s"simp.$ind$sname"))
+        val expr = translating.BasilIRToSMT2.exprUnsat(equal, Some(s"simp.$ind$sname"), getModel=false)
         writer.write(expr)
         writer.write("\n\n")
       }
@@ -1038,20 +1072,20 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
     //  )
 
     // Collapses big concats of single bits (probably produced from 32 bit arithmetic right shifts).
-    case BinaryExpr(BVCONCAT, a, b) if a == b => logSimp(e, Repeat(2, a))
-    case BinaryExpr(BVCONCAT, Repeat(n, a), b) if a == b => logSimp(e, Repeat(n + 1, a))
-    case BinaryExpr(BVCONCAT, a, Repeat(n, b)) if a == b => logSimp(e, Repeat(n + 1, a))
-    case BinaryExpr(BVCONCAT, SignExtend(n, a), b) if a == b && size(b).get == 1 => logSimp(e, SignExtend(n + 1, a))
-    case BinaryExpr(BVCONCAT, a, SignExtend(n, b)) if a == b && size(b).get == 1 => logSimp(e, SignExtend(n + 1, a))
-    case Repeat(n, body) if size(body).get == 1 => logSimp(e, SignExtend(n - 1, body))
-    case SignExtend(n, Extract(1, 0, BinaryExpr(BVLSHR, a, BitVecLiteral(m, _)))) if n >= m =>
-      logSimp(
-        e,
-        SignExtend((n - m).toInt, BinaryExpr(BVASHR, Extract((m + 1).toInt, 0, a), BitVecLiteral(m, (m + 1).toInt)))
-      )
+    //case BinaryExpr(BVCONCAT, a, b) if a == b => logSimp(e, Repeat(2, a))
+    //case BinaryExpr(BVCONCAT, Repeat(n, a), b) if a == b => logSimp(e, Repeat(n + 1, a))
+    //case BinaryExpr(BVCONCAT, a, Repeat(n, b)) if a == b => logSimp(e, Repeat(n + 1, a))
+    //case BinaryExpr(BVCONCAT, SignExtend(n, a), b) if a == b && size(b).get == 1 => logSimp(e, SignExtend(n + 1, a))
+    //case BinaryExpr(BVCONCAT, a, SignExtend(n, b)) if a == b && size(b).get == 1 => logSimp(e, SignExtend(n + 1, a))
+    //case Repeat(n, body) if size(body).get == 1 => logSimp(e, SignExtend(n - 1, body))
+    //case SignExtend(n, Extract(1, 0, BinaryExpr(BVLSHR, a, BitVecLiteral(m, _)))) if n >= m =>
+    //  logSimp(
+    //    e,
+    //    SignExtend((n - m).toInt, BinaryExpr(BVASHR, Extract((m + 1).toInt, 0, a), BitVecLiteral(m, (m + 1).toInt)))
+    //  )
 
-    case BinaryExpr(BVSHL, body, BitVecLiteral(n, _)) if size(body).get <= n =>
-      logSimp(e, BitVecLiteral(0, size(body).get))
+    //case BinaryExpr(BVSHL, body, BitVecLiteral(n, _)) if size(body).get <= n =>
+    //  logSimp(e, BitVecLiteral(0, size(body).get))
 
     // simplify convoluted bit test
     case BinaryExpr(EQ, BinaryExpr(BVSHL, ZeroExtend(n1, body), BitVecLiteral(n, _)), BitVecLiteral(0, _))

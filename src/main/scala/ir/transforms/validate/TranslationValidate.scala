@@ -1,4 +1,5 @@
 package ir.transforms.validate
+import java.io.{BufferedWriter, File, FileWriter}
 
 import analysis.ProcFrames.*
 import cats.collections.DisjointSets
@@ -1025,6 +1026,9 @@ object TranslationValidator {
     })
 
     count = 0
+
+    ir.eval.SimplifyValidation.makeAxioms(b)
+
     for (e <- effect_axioms) {
       count += 1
       b.addAssert(e, Some(f"ackaxiom$count"))
@@ -1409,7 +1413,21 @@ object TranslationValidator {
       val r = transform(p)
       val inv = invariant(r)
       val after = ir.dsl.IRToDSL.convertProgram(p).resolve
-      getValidationSMT(p, tvconf, transformName, before, after, inv)
+      val res = getValidationSMT(p, tvconf, transformName, before, after, inv)
+
+
+      tvconf.outputPath.foreach (path => 
+        val smtPath = s"$path/${transformName}-rewrites.smt2"
+
+        if (ir.eval.SimplifyValidation.traceLog.nonEmpty) {
+          val w = BufferedWriter(FileWriter(smtPath))
+          ir.eval.SimplifyValidation.makeValidation(w)
+          w.close()
+          ir.eval.SimplifyValidation.clear()
+        }
+      )
+
+      res
     }
   }
 }
