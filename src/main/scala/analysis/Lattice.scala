@@ -821,3 +821,25 @@ class ConstantPropagationLatticeWithSSA extends PowersetLattice[BitVecLiteral] {
 
   def concat(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_concat, a, b)
 }
+
+class StronglyLiveBitsLattice extends MapLattice[Int, TwoElement, TwoElementLattice](TwoElementLattice()) {
+
+  override def top: Map[Int, TwoElement] = Map().withDefaultValue(sublattice.top)
+  def shift(value: Int, originalMap: Map[Int, TwoElement]): Map[Int, TwoElement] = originalMap.map({
+    case (x, d) =>
+      x + value -> d
+  }).withDefaultValue(sublattice.bottom)
+
+  def shiftMap(values: Set[Int], originalMap: Map[Int, TwoElement]): Map[Int, TwoElement] = {
+    values.foldLeft(Map(): Map[Int, TwoElement]){
+      (x, y) => x ++ originalMap.map({
+        case (m, n) =>
+          m + y -> n
+      })
+    }.withDefaultValue(sublattice.bottom)
+  }
+
+  def cartesianAdd(as: Set[Int], bs: Set[Int]): Set[Int] =
+    for {a <- as; b <- bs} yield a + b
+
+}
