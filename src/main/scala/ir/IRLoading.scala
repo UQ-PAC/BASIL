@@ -72,6 +72,9 @@ object IRLoading {
 
         val ReadELFData(symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) = relfData
 
+        // ensure globals have unique names
+        assert(globals.map(_.name).size == globals.size)
+
         def continuation(ctx: IRContext) =
           val specification = IRLoading.loadSpecification(q.specFile, ctx.program, globals)
           IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, ctx.program)
