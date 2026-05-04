@@ -17,7 +17,8 @@ enum SimplifyMode {
     verify: Option[util.SMT.Solver] = Some(util.SMT.Solver.Z3),
     dumpSMT: Option[String] = None,
     dryRun: Boolean = false,
-    effectMode: ir.transforms.validate.EffectMode = ir.transforms.validate.EffectMode.Ackermann
+    effectMode: ir.transforms.validate.EffectMode = ir.transforms.validate.EffectMode.Ackermann,
+    smokeTest: Boolean = false
   )
 }
 

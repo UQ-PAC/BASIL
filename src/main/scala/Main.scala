@@ -220,6 +220,8 @@ object Main {
     tvSimpVerify: Flag,
     @arg(name = "simplify-tv-dryrun", doc = "Skip all tv work after invariant generation")
     tvDryRun: Flag,
+    @arg(name = "simplify-tv-smoke", doc = "Validate perturbation transform to expect failure")
+    tvSmoke: Flag,
     @arg(name = "simplify-tv-effects", doc = "How to encode effects for TV: ackermann|uf|axiom (default=ackermann)")
     tvEffects: String = "ackermann",
     @arg(
@@ -486,10 +488,11 @@ object Main {
           Some(util.SMT.Solver.Z3),
           d,
           dryRun = conf.tvDryRun.value,
-          effmodeOfString(conf.tvEffects)
+          effmodeOfString(conf.tvEffects),
+          conf.tvSmoke.value
         )
       case (_, Some(d), _) =>
-        SimplifyMode.ValidatedSimplify(None, Some(d), dryRun = conf.tvDryRun.value, effmodeOfString(conf.tvEffects))
+        SimplifyMode.ValidatedSimplify(None, Some(d), dryRun = conf.tvDryRun.value, effmodeOfString(conf.tvEffects), conf.tvSmoke.value)
       case (true, None, _) => SimplifyMode.Simplify
       case _ if dsa.isDefined => SimplifyMode.Simplify
       case _ => SimplifyMode.Disabled

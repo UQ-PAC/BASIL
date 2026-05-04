@@ -1403,12 +1403,23 @@ object TranslationValidator {
 
       val beforeprocs = before.nameToProcedure
       for (p <- p.procedures) {
+
+        tvconf.outputPath.foreach (path =>
+          tvLogger.writeToFile(File(s"${path}/${transformName}-${p.name}-target.il"), translating.PrettyPrinter.pp_proc(p))
+        )
+
         assert(p.blocks.map(_.label).corresponds(beforeprocs(p.procName).blocks.map(_.label).toList)(_.equals(_)))
       }
 
       val r = transform(p)
       val inv = invariant(r)
       val after = ir.dsl.IRToDSL.convertProgram(p).resolve
+
+      tvconf.outputPath.foreach (path =>
+        for (p <- p.procedures) {
+          tvLogger.writeToFile(File(s"${path}/${transformName}-${p.name}-source.il"), translating.PrettyPrinter.pp_proc(p))
+        })
+
       getValidationSMT(p, tvconf, transformName, before, after, inv)
     }
   }

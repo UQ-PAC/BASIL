@@ -5,7 +5,84 @@ import util.{Logger, SimplifyMode, tvEvalLogger}
 
 import java.io.{BufferedWriter, FileWriter}
 
-import cilvisitor.{visit_proc, visit_prog}
+import cilvisitor.*
+
+
+class BogoTransform(
+  /** probality to delete any given edge */
+  prob_edge : Float = 0.1,
+  /** probality to change any given op */
+  prob_op : Float = 0.1,
+  /** probality to delete any given statement */
+  prob_stmt : Float = 0.1,
+  ) extends ir.cilvisitor.CILVisitor {
+
+
+  val rand = scala.util.Random
+
+  var edge_count = 0
+  var op_count = 0
+  var stmt_count = 0
+
+  def changed() = edge_count + op_count + stmt_count
+
+
+  def op() : Boolean = {
+    val r = rand.nextFloat() <= prob_op
+    if r then op_count += 1
+    r
+  }
+
+  def stmt() : Boolean = {
+    val r = rand.nextFloat() <= prob_stmt
+    if r then stmt_count += 1
+    r
+  }
+
+  def edge() : Boolean = {
+    val r = rand.nextFloat() <= prob_edge
+    if r then edge_count += 1
+    r
+  }
+
+
+  override def vblock(b: Block) = {
+    b.jump match {
+      case g : GoTo => {
+        g.targets.filter(_ => edge()).toList.foreach(g.removeTarget)
+        DoChildren()
+      }
+      case o => DoChildren()
+    }
+  }
+
+  override def vstmt(e: Statement) = {
+    e match {
+      case _ : Assert => SkipChildren()
+      case _ if stmt() => {
+        ChangeTo(List())
+      }
+      case _ => DoChildren()
+    }
+  }
+
+  override def vexpr(e: Expr) = 
+    if (! op()) then DoChildren() else ChangeTo(
+      e match {
+        case BinaryExpr(BVADD, l, r) => BinaryExpr(BVSUB, l, r)
+        case BinaryExpr(BVSUB, l, r) => BinaryExpr(BVSUB, r, l)
+        case BinaryExpr(BVXOR, l, r) => BinaryExpr(BVAND, l, r)
+        case BinaryExpr(BVAND, l, r) => BinaryExpr(BVOR, l, r)
+        case BinaryExpr(BVMUL, l, r) => BinaryExpr(BVADD, l, r)
+        case BitVecLiteral(v, sz) => {
+          val i = (BigInt(sz, rand))
+          BitVecLiteral((i), sz)
+        }
+        case o => o
+    })
+
+}
+
 
 /**
  * Translation-validated simplification pipeline.
@@ -233,8 +310,31 @@ def guardCleanup(config: TVJob, p: Program) = {
   TranslationValidator.forTransform("GuardCleanup", guardCleanupTransforms, copypropInvariant)(p, config)
 }
 
-def nop(config: TVJob, p: Program) = {
-  TranslationValidator.forTransform("NOP", p => p)(p, config)
+
+def perturbation(
+  name: String ="Perturbation",
+  prob_edge : Float = -1,
+  /** probality to change any given op */
+  prob_op : Float = -1,
+  /** probality to delete any given statement */
+  prob_stmt : Float = -1, 
+
+  )(config: TVJob, p: Program) = {
+
+  def perturb(p: Program) = {
+    val t = BogoTransform(prob_edge, prob_op, prob_stmt)
+    visit_prog(t, p)
+    println(s"ops: ${t.op_count}")
+    val m: Map[String, Map[ir.Variable, ir.Expr]] = Map()
+    m
+  }
+
+  TranslationValidator.forTransform(name, perturb, copypropInvariant)(p, config)
+}
+
+
+def nop(name: String="NOP", config: TVJob, p: Program) = {
+  TranslationValidator.forTransform(name, p => p)(p, config)
 }
 
 def assumePreservedParams(config: TVJob, p: Program) = {
@@ -256,11 +356,16 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   // also the translation validation doesn't really consider spec at all
   // maybe it should; in ackermann phase and observable variables...
   val p = ctx.program
+  var smoketest = false
   var config = mode match {
-    case SimplifyMode.ValidatedSimplify(verifyMode, filePrefix, dryRun, effectMode) =>
+    case SimplifyMode.ValidatedSimplify(verifyMode, filePrefix, dryRun, effectMode, smoke) =>
+      smoketest = smoke
       TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = true, dryRun = dryRun, effects = effectMode)
     case _ => TVJob(None, None)
   }
+
+
+  if (smoketest) then nop("nop-init", config, p)
 
   tvEvalLogger.debug {
     val counter = ir.transforms.CountStatements()
@@ -278,6 +383,9 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   // Logger.writeToFile(File("beforeParams.il"), translating.PrettyPrinter.pp_prog(ctx.program))
   val (res, nctx) = parameters(config, ctx)
   config = res
+  if (smoketest) then 
+    config = nop("nop-params", config, p)
+
   assert(ir.invariant.readUninitialised(ctx.program))
   config = assumePreservedParams(config, p)
   assert(ir.invariant.readUninitialised(ctx.program))
@@ -285,9 +393,14 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   assert(ir.invariant.readUninitialised(ctx.program))
   transforms.applyRPO(p)
   config = dynamicSingleAssignment(config, p)
+  if (smoketest) then 
+    config = nop("nop-dsa", config, p)
+
   assert(ir.invariant.readUninitialised(ctx.program))
   transforms.applyRPO(p)
   config = copyProp(config, p)
+  if (smoketest) then 
+    config = nop("nop-copyprop", config, p)
 
   assert(ir.invariant.readUninitialised(ctx.program))
   transforms.applyRPO(p)
@@ -304,6 +417,18 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
     val _ = visit_prog(counter, p)
     "tv-eval-marker: after-stmt-count=" + counter.count
   }
+
+  if (smoketest) then 
+    config = nop("nop-guardcleanup", config, p)
+  if (smoketest) {
+    config = perturbation(name="PerturbStmt", prob_stmt = 0.01)(config, p)
+    config = perturbation(name="PerturbExpr", prob_op=0.01)(config, p)
+    //config = perturbation(name="PerturbControl", prob_edge=0.01)(config, p)
+  }
+
+
+
+  /** DONE */
 
   val failed = config.results.filter(_.verified.exists(_.isInstanceOf[SatResult.SAT]))
 
