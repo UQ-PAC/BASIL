@@ -1,6 +1,7 @@
 package ir.transforms.validate
 import ir.*
 import util.SMT.SatResult
+import server.IREpoch
 import util.{Logger, SimplifyMode, tvEvalLogger}
 
 import java.io.{BufferedWriter, FileWriter}
@@ -251,14 +252,16 @@ def assumePreservedParams(config: TVJob, p: Program) = {
 
 }
 
-def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, IRContext) = {
+  
+def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode,
+  collectedSnapshots: Option[scala.collection.mutable.ArrayBuffer[IREpoch]] = None): (TVJob, IRContext) = {
   // passing through ircontext like this just for spec transform is horrible
   // also the translation validation doesn't really consider spec at all
   // maybe it should; in ackermann phase and observable variables...
   val p = ctx.program
   var config = mode match {
     case SimplifyMode.ValidatedSimplify(verifyMode, filePrefix, dryRun, effectMode) =>
-      TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = true, dryRun = dryRun, effects = effectMode)
+      TVJob(outputPath = filePrefix, verify = verifyMode, debugDumpAlways = true, dryRun = dryRun, effects = effectMode, logSnapshot=collectedSnapshots)
     case _ => TVJob(None, None)
   }
 

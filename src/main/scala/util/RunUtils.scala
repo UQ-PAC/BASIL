@@ -33,7 +33,26 @@ case class BASILResult(
   boogie: ArrayBuffer[BProgram]
 )
 
+val debugDisable = false
+
 object RunUtils {
+
+  def logProgTransform[T](
+    collectedSnapshots: Option[ArrayBuffer[IREpoch]]
+  )(name: String, f: Program => T)(ctx: Program): T = {
+    val before = collectedSnapshots.map(_ => IRToDSL.convertProgram(ctx).resolve)
+    val res: T = f(ctx)
+    val after = collectedSnapshots.map(_ => IRToDSL.convertProgram(ctx).resolve)
+    for {
+      Snapshots <- collectedSnapshots
+      b <- before
+      a <- after
+    } yield {
+      Snapshots += IREpoch(name, b, a)
+    }
+    res
+  }
+
 
   def logTransform[T](
     collectedSnapshots: Option[ArrayBuffer[IREpoch]]
@@ -165,7 +184,7 @@ object RunUtils {
 
         DebugDumpIRLogger.writeToFile(File("il-after-indirectcalllift.il"), pp_prog(ctx.program))
 
-        val (tvres, nctx) = transforms.validate.validatedSimplifyPipeline(ctx, conf.simplify)
+        val (tvres, nctx) = transforms.validate.validatedSimplifyPipeline(ctx, conf.simplify, collectedSnapshots)
         ctx = nctx
       }
       case SimplifyMode.Simplify => {
