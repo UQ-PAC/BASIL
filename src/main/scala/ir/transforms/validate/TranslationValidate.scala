@@ -3,10 +3,11 @@ package ir.transforms.validate
 import analysis.ProcFrames.*
 import cats.collections.DisjointSets
 import ir.*
+import server.IREpoch
 import translating.PrettyPrinter.*
 import util.SMT.*
 import util.{LogLevel, PerformanceTimer, tvLogger}
-import server.IREpoch
+
 import java.io.File
 
 import cilvisitor.*
@@ -33,7 +34,7 @@ case class TVJob(
   splitLargeProceduresThreshold: Option[Int] = Some(60),
   effects: EffectMode = EffectMode.Ackermann,
   dryRun: Boolean = false,
-  logSnapshot: Option[scala.collection.mutable.ArrayBuffer[IREpoch]] = None,
+  logSnapshot: Option[scala.collection.mutable.ArrayBuffer[IREpoch]] = None
 ) {
 
   lazy val noneFailed = {
@@ -1397,7 +1398,7 @@ object TranslationValidator {
   def forTransform[T](
     transformName: String,
     transform: Program => T,
-    invariant: T => InvariantDescription = (_: T) => InvariantDescription(),
+    invariant: T => InvariantDescription = (_: T) => InvariantDescription()
   ): ((Program, TVJob) => TVJob) = { (p: Program, tvconf: TVJob) =>
     {
 
@@ -1408,7 +1409,7 @@ object TranslationValidator {
         assert(p.blocks.map(_.label).corresponds(beforeprocs(p.procName).blocks.map(_.label).toList)(_.equals(_)))
       }
 
-      val r =  util.RunUtils.logProgTransform(tvconf.logSnapshot)(transformName, transform)(p)
+      val r = util.RunUtils.logProgTransform(tvconf.logSnapshot)(transformName, transform)(p)
       val inv = invariant(r)
       val after = ir.dsl.IRToDSL.convertProgram(p).resolve
       getValidationSMT(p, tvconf, transformName, before, after, inv)

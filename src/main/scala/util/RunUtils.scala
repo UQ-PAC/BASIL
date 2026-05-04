@@ -53,7 +53,6 @@ object RunUtils {
     res
   }
 
-
   def logTransform[T](
     collectedSnapshots: Option[ArrayBuffer[IREpoch]]
   )(name: String, f: IRContext => T)(ctx: IRContext): T = {
@@ -230,11 +229,22 @@ object RunUtils {
     if (conf.dsaConfig.isDefined) {
       updateWithCallSCC(ctx.program)
       val dsaResults = IntervalDSA(ctx, conf.dsaConfig.get).dsa()
+
+      for ((p,v) <- dsaResults.topDown) {
+        writeToFile( v.toDot, "dsa-" + p.name + ".dot")
+        
+      }
       dsaContext = Some(dsaResults)
 
       if q.memoryTransform && conf.dsaConfig.get.phase == DSAPhase.TD then // need more than prereq
         val memTransferTimer = PerformanceTimer("Mem Transfer Timer", INFO)
-        visit_prog(MemoryTransform(dsaResults.topDown, dsaResults.globals), ctx.program)
+
+        logTransform(collectedSnapshots)("MemoryTransform", ctx => {
+          visit_prog(MemoryTransform(dsaResults.topDown, dsaResults.globals), ctx.program)
+        })(
+          ctx
+        )
+
         memTransferTimer.checkPoint("Performed Memory Transform")
         invariant.readUninitialised(ctx.program)
     }

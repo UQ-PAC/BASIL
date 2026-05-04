@@ -8,7 +8,6 @@ import translating.PrettyPrinter.*
 import util.RunUtils.logTransform
 import util.{DebugDumpIRLogger, Logger, PerformanceTimer}
 
-import server.IREpoch
 import java.io.{BufferedWriter, File, FileWriter}
 import scala.collection.mutable.ArrayBuffer
 
