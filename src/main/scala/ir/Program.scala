@@ -685,7 +685,7 @@ class Block private (
     _incomingJumps ++= shuffled
   }
 
-  def incomingJumps: immutable.Set[GoTo] = _incomingJumps.to(immutable.ListSet)
+  def incomingJumps: immutable.List[GoTo] = _incomingJumps.to(List)
 
   def addIncomingJump(g: GoTo): Boolean = _incomingJumps.add(g)
 

@@ -112,7 +112,7 @@ trait IntraProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
     pos match {
       case c: Command => Set(IRWalk.prevCommandInBlock(c).getOrElse(c.parent))
       case b: Block if b.isEntry => Set(b.parent)
-      case b: Block => b.incomingJumps.asInstanceOf[Set[CFGPosition]]
+      case b: Block => util.SetWrapper(b.incomingJumps).asInstanceOf[Set[CFGPosition]]
       case proc: Procedure => Set() // intraproc
     }
   }
