@@ -2,3 +2,6 @@
 	path = src/frontend
 	url = https://github.com/UQ-PAC/basil-gui-frontend.git
 	branch = static
+[submodule "bitwuzla"]
+	path = bitwuzla
+	url = https://github.com/ncough/bitwuzla.git

@@ -25,10 +25,18 @@ class BogoTransform(
   var stmt_count = 0
 
   def changed() = edge_count + op_count + stmt_count
+  
+  var required = 5
+  
 
+  def req() = {
+    required -= 1
+    required > 0
+  }
 
   def op() : Boolean = {
-    val r = rand.nextFloat() <= prob_op
+
+    val r = req() || (rand.nextFloat() <= prob_op)
     if r then op_count += 1
     r
   }
@@ -45,6 +53,10 @@ class BogoTransform(
     r
   }
 
+
+  def visit_proc_random(p: Procedure) = {
+    rand.shuffle(Array.from(p.blocks)).foreach(b => visit_block(this, b))
+  }
 
   override def vblock(b: Block) = {
     b.jump match {
@@ -323,7 +335,9 @@ def perturbation(
 
   def perturb(p: Program) = {
     val t = BogoTransform(prob_edge, prob_op, prob_stmt)
-    visit_prog(t, p)
+    for (p <- p.procedures) {
+      t.visit_proc_random(p)
+    }
     println(s"ops: ${t.op_count}")
     val m: Map[String, Map[ir.Variable, ir.Expr]] = Map()
     m
@@ -365,7 +379,7 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   }
 
 
-  if (smoketest) then nop("nop-init", config, p)
+  //if (smoketest) then nop("nop-init", config, p)
 
   tvEvalLogger.debug {
     val counter = ir.transforms.CountStatements()
@@ -383,8 +397,8 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   // Logger.writeToFile(File("beforeParams.il"), translating.PrettyPrinter.pp_prog(ctx.program))
   val (res, nctx) = parameters(config, ctx)
   config = res
-  if (smoketest) then 
-    config = nop("nop-params", config, p)
+  //if (smoketest) then 
+  //  config = nop("nop-params", config, p)
 
   assert(ir.invariant.readUninitialised(ctx.program))
   config = assumePreservedParams(config, p)
@@ -393,14 +407,14 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
   assert(ir.invariant.readUninitialised(ctx.program))
   transforms.applyRPO(p)
   config = dynamicSingleAssignment(config, p)
-  if (smoketest) then 
-    config = nop("nop-dsa", config, p)
+  //if (smoketest) then 
+  //  config = nop("nop-dsa", config, p)
 
   assert(ir.invariant.readUninitialised(ctx.program))
   transforms.applyRPO(p)
   config = copyProp(config, p)
-  if (smoketest) then 
-    config = nop("nop-copyprop", config, p)
+  //if (smoketest) then 
+  //  config = nop("nop-copyprop", config, p)
 
   assert(ir.invariant.readUninitialised(ctx.program))
   transforms.applyRPO(p)
@@ -418,8 +432,8 @@ def validatedSimplifyPipeline(ctx: IRContext, mode: util.SimplifyMode): (TVJob, 
     "tv-eval-marker: after-stmt-count=" + counter.count
   }
 
-  if (smoketest) then 
-    config = nop("nop-guardcleanup", config, p)
+  //if (smoketest) then 
+  //  config = nop("nop-guardcleanup", config, p)
   if (smoketest) {
     config = perturbation(name="PerturbStmt", prob_stmt = 0.01)(config, p)
     config = perturbation(name="PerturbExpr", prob_op=0.01)(config, p)
