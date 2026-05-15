@@ -31,9 +31,9 @@ proc @main_1812 () -> ()
     ParseBasilIL.loadILString(minimal)
   }
 
-  test("minimal + declare-fun") {
+  test("minimal + uninterp fun") {
     ParseBasilIL.loadILString(minimal + """
-      declare-fun $FPToFixed_bv64_bv1123_bool_bv32_bv1123_bv32 : (bv64, bv1123, bool, bv32, bv1123) -> bv32;
+      val $FPToFixed_bv64_bv1123_bool_bv32_bv1123_bv32 : bv64 -> bv1123 -> bool -> bv32 -> bv1123 -> bv32;
     """)
   }
 }
