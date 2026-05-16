@@ -1,4 +1,5 @@
 import analysis.*
+import analysis.given
 import ir.*
 import ir.dsl.*
 import ir.transforms.{reversePostOrder, worklistSolver}
@@ -42,7 +43,7 @@ class GammaDomainTests extends AnyFunSuite, CaptureOutput {
     val gammaResults = getMustGammaDomainResults(f, initialState)
     val reachability = getReachabilityConditions(f)
 
-    assert(latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0, LatticeSetLattice()) == LatticeSet.Bottom())
+    assert(latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0) == LatticeSet.Bottom())
     assert(reachability(f.labelToBlock("returnBlock")) == Predicate.True)
   }
 
@@ -64,7 +65,7 @@ class GammaDomainTests extends AnyFunSuite, CaptureOutput {
     val reachability = getReachabilityConditions(f)
 
     assert(
-      latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0, LatticeSetLattice()) == LatticeSet
+      latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0) == LatticeSet
         .FiniteSet(Set(R0))
     )
     // TODO is this right?!
@@ -94,7 +95,7 @@ class GammaDomainTests extends AnyFunSuite, CaptureOutput {
     val gammaResults = getMustGammaDomainResults(f, initialState)
 
     assert(
-      latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0, LatticeSetLattice()) == LatticeSet
+      latticeMapApply(gammaResults(f.labelToBlock("returnBlock")), R0) == LatticeSet
         .FiniteSet(Set(R2))
     )
     assert(
