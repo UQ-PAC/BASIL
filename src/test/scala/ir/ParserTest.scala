@@ -46,7 +46,7 @@ proc @main_1812 () -> ()
   block %main_basil_return_1 [
     return ();
   ]
-];"""
+];""".replaceAll("\\r\\n?", "\n")
     } {
       p.program.pprint.trim
     }
