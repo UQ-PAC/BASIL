@@ -46,9 +46,9 @@ Decl_SharedMem . Decl ::= "memory" "shared" GlobalIdent ":" Type ;
 Decl_UnsharedMem . Decl ::= "memory" GlobalIdent ":" Type ;
 Decl_Var . Decl ::= "var" GlobalIdent ":" Type  ;
 
-separator Type "->";
+terminator Type "->";
 
-Decl_UninterpFun . Decl ::= "val" AttribSet GlobalIdent ":" "(" [Type] ")" "->" Type ;
+Decl_UninterpFun . Decl ::= "val" AttribSet GlobalIdent ":" [Type] Type ;
 Decl_Fun . Decl ::= "define-fun" AttribSet GlobalIdent"(" [Params] ")" "->" Type "=" Expr;
 Decl_ProgEmpty . Decl ::= "prog" "entry" ProcIdent AttribSet ;
 Decl_ProgWithSpec . Decl ::= "prog" "entry" ProcIdent AttribSet BeginList [ ProgSpec ] EndList ;
