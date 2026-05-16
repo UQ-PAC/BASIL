@@ -78,6 +78,10 @@ case class TNum(value: BitVecLiteral, mask: BitVecLiteral) {
     TNum(n, 0.bv(n.size))
   }
 
+  def maxUnsignedValue(): BitVecLiteral = value | mask
+
+  def minUnsignedValue(): BitVecLiteral = value & (~mask)
+
   override def toString() = {
     val padwidth = width / 4 + (if width % 4 != 0 then 1 else 0)
     def padded(number: BigInt) = {
