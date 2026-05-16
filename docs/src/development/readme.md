@@ -102,3 +102,18 @@ scalafix can introduce some badly-formatted code which scalafmt will want to fix
 
 See [testing](testing.md).
 
+## Attaching Debugger
+
+A debugger can be attached to the JVM by using the appropriate mill modules.
+
+`./mill debug.run` can be used to attach the debugger to a regular run of BASIL. It is the same as `./mill run` except it will wait for a debugger to be attached.
+
+`./mill testDebug.testOnly` can be used to attach the debugger to a test in the BASIL test suite. It is the same as `./mill test.testOnly` except it will wait for a debugger to be attached.
+
+To attach the IntelliJ debugger, BASIL is set up to use a debugger with the following settings in IntelliJ:
+
+- Debugger mode: Attach to remote JVM
+- Transport: Socket
+- Host: `localhost`
+- Port: `5005`
+- Command line arguments for remote JVM: `-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005`

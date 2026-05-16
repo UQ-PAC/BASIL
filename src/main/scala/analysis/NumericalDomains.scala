@@ -107,14 +107,15 @@ class IntervalDomain(
     c match {
       case c: LocalAssign => b + (c.lhs -> eval(c.rhs, b))
       case c: SimulAssign =>
-        b ++ (c.assignments.map { case (lhs, rhs) =>
-          (lhs -> eval(rhs, b))
-        }).toMap
+        b ++ c.assignments.map { (lhs, rhs) =>
+          lhs -> eval(rhs, b)
+        }.toMap
       case c: MemoryAssign => b + (c.lhs -> eval(c.rhs, b))
       case c: MemoryLoad => b + (c.lhs -> Top)
       case c: MemoryStore => b
       case c: Assume => exprToPredicate(c.body).map(p => b.meet(fromPred(p))).getOrElse(b)
       case c: Assert => exprToPredicate(c.body).map(p => b.meet(fromPred(p))).getOrElse(b)
+      case h: Havoc => b ++ h.vars.map(v => v -> Top).toMap
       case c: IndirectCall => top
       case c: DirectCall => top
       case c: GoTo => b

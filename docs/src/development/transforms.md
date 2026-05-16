@@ -12,7 +12,7 @@ as constraint-based analyses.
 - SPA:  [cs.au.dk/~amoeller/spa/spa.pdf](https://cs.au.dk/~amoeller/spa/spa.pdf)
   - Course textbook for CSSE4630, has a good introduction to lattice theory and dataflow analyses, the later
     chapters (Distributive and later) are less relevant.
-- [Miné AbsInt tutorial](https://www-apr.lip6.fr/~mine/publi/article-mine-FTiPL17.pdf)
+- [Miné AbsInt tutorial](https://hal.sorbonne-universite.fr/hal-01657536/document)
 - [Lecture series on AbsInt (Youtube)](https://www.youtube.com/watch?v=FTcIE7uzehE&list=PLtjm-n_Ts-J-6EU1WfVIWLhl1BUUR-Sqm&index=27)
 
 

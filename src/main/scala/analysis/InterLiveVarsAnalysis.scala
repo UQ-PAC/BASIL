@@ -18,6 +18,8 @@ import ir.{
   Variable
 }
 
+import scala.collection.immutable.ListSet
+
 /** Micro-transfer-functions for LiveVar analysis
  *  This analysis works by inlining function calls - instead of just mapping parameters and returns, all live variables
  *  (registers) are propagated to and from callee functions. The result of which variables are alive at each point in
@@ -136,6 +138,37 @@ trait LiveVarsAnalysisFunctions(inline: Boolean, addExternals: Boolean = true)
   }
 }
 
-class InterLiveVarsAnalysis(program: Program, ignoreExternals: Boolean = false)
-    extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program),
+class InterLiveVarsAnalysis(program: Program, ignoreExternals: Boolean = false, entry: Option[Procedure] = None)
+    extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program, entry),
       LiveVarsAnalysisFunctions(true, !ignoreExternals)
+
+def interLiveVarsAnalysis(
+  program: Program,
+  ignoreExternals: Boolean = false,
+  extraEntries: List[Procedure]
+): Map[CFGPosition, Map[Variable, TwoElement]] = {
+
+  val extra = extraEntries ++ program.procedures.toList.filter(_.incomingCalls().size == 0)
+  var procs = ListSet.from(program.procedures)
+  val entries = program.mainProcedure :: extra
+
+  // run the analysis for all entry procedures that don't reach the existing set of reachable
+  // procedures.
+  var reachable = Set[Procedure]()
+  var starts = entries.filter(x => {
+    val reached = x.reachableFrom
+    if (reached.exists(reachable.contains)) {
+      false
+    } else {
+      reachable = reachable ++ reached
+      true
+    }
+  })
+
+  var r = Map[CFGPosition, Map[Variable, TwoElement]]()
+  for (p <- starts) {
+    r = r ++ InterLiveVarsAnalysis(program, ignoreExternals, Some(p)).analyze()
+  }
+  r
+
+}

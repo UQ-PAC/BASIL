@@ -97,7 +97,7 @@ class InterprocSummaryGenerator(program: Program, parameterForm: Boolean = false
     val wp = procedure.entryBlock
       .flatMap(b => wpDomainResults.get(b))
       .toList
-      .flatMap(p => not(p).simplify.split)
+      .flatMap(p => wpDomain.toPred(p).simplify.split)
       .map(Condition(_, Some("Weakest precondition")))
 
     val requires = (curRequires ++ mustGammasWithConditions ++ wp).filter(_ != TrueBLiteral).distinct

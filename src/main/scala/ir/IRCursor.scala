@@ -176,7 +176,7 @@ object InterProcIRCursor extends InterProcIRCursor
 trait CallGraph extends IRWalk[Procedure, Procedure] {
   final def succ(b: Procedure): Set[Procedure] = b.calls
 
-  final def pred(b: Procedure): Set[Procedure] = b.incomingCalls().map(_.parent.parent).toSet
+  final def pred(b: Procedure): Set[Procedure] = b.callers().toSet
 }
 
 object CallGraph extends CallGraph
@@ -457,9 +457,9 @@ def freeVarsPos(s: CFGPosition): Set[Variable] = s match {
       case _ => Set()
     }.toSet
   case p: Block => p.statements.flatMap(freeVarsPos).toSet
-  case p: DirectCall => p.actualParams.flatMap(_._2.variables).toSet
-  case p: Return => p.outParams.flatMap(_._2.variables).toSet
-  case _: Unreachable | _: GoTo | _: NOP => Set[Variable]()
+  case p: DirectCall => p.actualParams.values.flatMap(_.variables).toSet
+  case p: Return => p.outParams.values.flatMap(_.variables).toSet
+  case _: Unreachable | _: GoTo | _: NOP | _: Havoc => Set[Variable]()
 }
 
 def allVarsPos(s: CFGPosition): Set[Variable] = s match {

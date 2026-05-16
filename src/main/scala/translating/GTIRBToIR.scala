@@ -346,7 +346,7 @@ class GTIRBToIR(
 
     block.address.foreach { addr =>
       val pcCorrectExpr = BinaryExpr(EQ, Register("_PC", 64), BitVecLiteral(addr, 64))
-      val assertPC = Assert(pcCorrectExpr, Some("pc-tracking"), Some("pc-tracking"))
+      val assertPC = Assert(pcCorrectExpr, Some("pc-tracking " + pcCorrectExpr), Some("pc-tracking"))
       block.statements.append(assertPC)
     }
     block
@@ -723,11 +723,18 @@ class GTIRBToIR(
   ): (Option[Call], Jump) = {
     // TODO add assertion that target register is low
     val label = handlePCAssign(block)
+    val targetRegister = getPCTarget(block)
 
     val withinProcedureTargets = targets.collect { case t: Block if procedure.blocks.contains(t) => t }
+    val assertion = boolOr(targets.map(target => BinaryExpr(EQ, targetRegister, BitVecLiteral(target.address.get, 64))))
 
     if (withinProcedureTargets.size == targets.size) {
       // all target blocks are within the calling procedure
+      for (target <- targets) {
+        val assume = Assume(BinaryExpr(EQ, targetRegister, BitVecLiteral(target.address.get, 64)))
+        target.statements.prepend(assume)
+      }
+      block.statements.append(Assert(assertion))
       (None, GoTo(targets, label))
     } else if (withinProcedureTargets.nonEmpty) {
       // TODO - only some target blocks are within the calling procedure - unclear how to handle
@@ -748,7 +755,6 @@ class GTIRBToIR(
     } else {
       // indirect jump targeting multiple blocks outside this procedure
       val newBlocks = ArrayBuffer[Block]()
-      val targetRegister = getPCTarget(block)
 
       for (targetBlock <- targets) {
         if (!targetBlock.isEntry) {
@@ -761,11 +767,13 @@ class GTIRBToIR(
         val resolvedCall = DirectCall(target)
 
         val assume = Assume(BinaryExpr(EQ, targetRegister, BitVecLiteral(target.address.get, 64)))
+
         val label = block.label + "_" + target.name
         // unreachable because R30 is not set and any returns will need to be manually resolved through later analysis
         newBlocks.append(Block(label, None, ArrayBuffer(assume, resolvedCall), Unreachable()))
       }
       handlePCAssign(block)
+      block.statements.append(Assert(assertion))
       procedure.addBlocks(newBlocks)
       (None, GoTo(newBlocks))
     }
@@ -804,6 +812,12 @@ class GTIRBToIR(
     }
     handlePCAssign(block)
     procedure.addBlocks(newBlocks)
+    val assertion = boolOr(
+      indirectCallTargets.map(target =>
+        BinaryExpr(EQ, targetRegister, BitVecLiteral(entranceUUIDtoProcedure(target.targetUuid).address.get, 64))
+      )
+    )
+    block.statements.append(Assert(assertion))
     GoTo(newBlocks)
   }
 

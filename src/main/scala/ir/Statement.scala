@@ -178,7 +178,7 @@ class MemoryLoad(
     case _ => Set()
   }
   override def toString: String = s"$labelStr$lhs := MemoryLoad($mem, $index, $endian, $size)"
-  override def deepEquals(o: Object) = o match {
+  override def deepEquals(o: Object): Boolean = o match {
     case MemoryLoad(l, m, ind, en, sz, lbl) =>
       l == lhs && m == mem && ind == index && en == endian && sz == size && lbl == label
     case _ => false
@@ -191,6 +191,47 @@ object MemoryLoad {
 }
 
 /**
+ * IR semantics: Havoc sets all variables in '_vars' to be undefined
+ */
+class Havoc private (_vars: mutable.LinkedHashSet[Variable], var label: Option[String]) extends Assign with Command {
+
+  def this(vars: Iterable[Variable], label: Option[String] = None) = this(mutable.LinkedHashSet.from(vars), label)
+
+  def this(variable: Variable) = this(mutable.LinkedHashSet(variable), None)
+
+  def vars: Set[Variable] = _vars.to(ListSet)
+
+  override def assignees: Set[Variable] = vars
+
+  override def modifies: Set[Global] = {
+    val mod = _vars.collect { case g: GlobalVar => g }
+    mod.toSet
+  }
+
+  override def deepEquals(o: Object): Boolean = o match {
+    case Havoc(vs, lbl) => vs == vars && lbl == label
+    case _ => false
+  }
+
+  def addVariables(v: Iterable[Variable]): Unit = {
+    v.foreach(addVariable)
+  }
+
+  def addVariable(v: Variable): Unit = {
+    _vars.add(v)
+  }
+
+  def removeVariable(v: Variable): Boolean = {
+    _vars.remove(v)
+  }
+
+}
+
+object Havoc {
+  def unapply(h: Havoc): Some[(Set[Variable], Option[String])] = Some(h.vars, h.label)
+}
+
+/**
  * A no-operation statement. Subclasses of this class are used to mark atomic regions.
  *
  * **Important:** Subclasses are warned against having a constructor parameter whose name
@@ -198,12 +239,16 @@ object MemoryLoad {
  * class's field in all methods of the subclass.
  */
 class NOP(var label: Option[String] = None) extends Statement with Command {
+  def cloneStatement(): NOP = {
+    NOP(label)
+  }
   override def toString: String = s"NOP $labelStr"
   override def deepEquals(o: Object) = o match {
     case NOP(x) => x == label
     case _ => false
   }
 }
+
 object NOP {
   def unapply(x: NOP) = Some(x.label)
 }

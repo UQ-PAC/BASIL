@@ -131,21 +131,22 @@ class TypeChecker extends CILVisitor {
   override def vstmt(s: Statement) =
     val newViolations = s match {
       case n: NOP => Seq()
+      case _: Havoc => Seq()
       case SimulAssign(assignments, _) =>
         assignments.collect {
           case (lhs, rhs) if lhs.getType != rhs.getType =>
             StatementEqualityError(s, Some(lhs), Some(rhs), lhs.getType, rhs.getType)
         }.toSeq
       case LocalAssign(lhs, rhs, _) =>
-        if (lhs.getType != rhs.getType) then
+        if (lhs.getType != rhs.getType) {
           Seq(StatementEqualityError(s, Some(lhs), Some(rhs), lhs.getType, rhs.getType))
-        else Seq()
+        } else Seq()
       case MemoryAssign(lhs, rhs, _) =>
-        if (lhs.getType != rhs.getType) then
+        if (lhs.getType != rhs.getType) {
           Seq(StatementEqualityError(s, Some(lhs), Some(rhs), lhs.getType, rhs.getType))
-        else Seq()
+        } else Seq()
       case MemoryLoad(lhs, mem, index, endian, size, _) =>
-        if (lhs.getType != BitVecType(size)) then {
+        if (lhs.getType != BitVecType(size)) {
           Seq(
             StatementEqualityError(
               s,
@@ -156,7 +157,7 @@ class TypeChecker extends CILVisitor {
               Some("load size doesn't match lhs")
             )
           )
-        } else if (index.getType != BitVecType(mem.addressSize)) then {
+        } else if (index.getType != BitVecType(mem.addressSize)) {
           Seq(
             StatementEqualityError(
               s,
@@ -169,7 +170,7 @@ class TypeChecker extends CILVisitor {
           )
         } else Seq()
       case MemoryStore(mem, index, value, endian, size, _) =>
-        if (value.getType != BitVecType(size)) then {
+        if (value.getType != BitVecType(size)) {
           Seq(
             StatementEqualityError(
               s,
@@ -180,7 +181,7 @@ class TypeChecker extends CILVisitor {
               Some("store size doesn't match value")
             )
           )
-        } else if (index.getType != BitVecType(mem.addressSize)) then {
+        } else if (index.getType != BitVecType(mem.addressSize)) {
           Seq(
             StatementEqualityError(
               s,
@@ -193,14 +194,14 @@ class TypeChecker extends CILVisitor {
           )
         } else Seq()
       case a: Assert =>
-        if (a.body.getType != BoolType) then
+        if (a.body.getType != BoolType) {
           Seq(StatementEqualityError(a, None, Some(a.body), BoolType, a.body.getType))
-        else Seq()
+        } else Seq()
       case a: Assume =>
-        if (a.body.getType != BoolType) then
+        if (a.body.getType != BoolType) {
           Seq(StatementEqualityError(a, None, Some(a.body), BoolType, a.body.getType))
-        else Seq()
-      case d: DirectCall => {
+        } else Seq()
+      case d: DirectCall =>
         d.target.formalInParam.toSeq.collect {
           case p if d.actualParams(p).getType != p.getType =>
             StatementEqualityError(
@@ -224,9 +225,8 @@ class TypeChecker extends CILVisitor {
                   Some(s"Out paramater ${rhs} does not match lvalue ${lhs}")
                 )
             }
-      }
       case i: IndirectCall =>
-        if (i.target.getType != BitVecType(64)) then {
+        if (i.target.getType != BitVecType(64)) {
           Seq(
             StatementEqualityError(
               i,

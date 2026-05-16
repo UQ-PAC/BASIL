@@ -104,11 +104,12 @@ enum Def {
 // map v -> definitions reached here
 class DefUseEntryDomain() extends AbstractDomain[Map[Variable, Set[Def]]] {
 
-  override def transfer(s: Map[Variable, Set[Def]], b: Command) = {
+  override def transfer(s: Map[Variable, Set[Def]], b: Command): Map[Variable, Set[Def]] = {
     b match {
       case a: LocalAssign => s.updated(a.lhs, Set(Def.Def(a)))
       case a: MemoryLoad => s.updated(a.lhs, Set(Def.Def(a)))
-      case d: DirectCall => d.outParams.map(_._2).foldLeft(s)((s, r) => s.updated(r, Set(Def.Def(d))))
+      case h: Havoc => h.vars.foldLeft(s) { (s, r) => s.updated(r, Set(Def.Def(h))) }
+      case d: DirectCall => d.outParams.values.foldLeft(s)((s, r) => s.updated(r, Set(Def.Def(d))))
       case _ => s
     }
   }
@@ -116,12 +117,12 @@ class DefUseEntryDomain() extends AbstractDomain[Map[Variable, Set[Def]]] {
   def bot = Map[Variable, Set[Def]]()
   def init = Map[Variable, Set[Def]]().withDefaultValue(Def.Entry)
 
-  def join(l: Map[Variable, Set[Def]], r: Map[Variable, Set[Def]], pos: Block) = {
+  def join(l: Map[Variable, Set[Def]], r: Map[Variable, Set[Def]], pos: Block): Map[Variable, Set[Def]] = {
     l.keySet
       .union(r.keySet)
-      .map(k => {
-        k -> (l.get(k).getOrElse(Set(Def.Entry)) ++ r.get(k).getOrElse(Set(Def.Entry)))
-      })
+      .map { k =>
+        k -> (l.getOrElse(k, Set(Def.Entry)) ++ r.getOrElse(k, Set(Def.Entry)))
+      }
       .toMap
   }
 }
@@ -138,10 +139,11 @@ class IntraLiveVarsDomain extends PowerSetDomain[Variable] {
       case m: MemoryStore => s ++ m.index.variables ++ m.value.variables
       case a: Assume => s ++ a.body.variables
       case a: Assert => s ++ a.body.variables
+      case h: Havoc => s -- h.vars
       case i: IndirectCall => s + i.target
-      case c: DirectCall => (s -- c.outParams.map(_._2)) ++ c.actualParams.flatMap(_._2.variables)
+      case c: DirectCall => (s -- c.outParams.values) ++ c.actualParams.values.flatMap(_.variables)
       case g: GoTo => s
-      case r: Return => s ++ r.outParams.flatMap(_._2.variables)
+      case r: Return => s ++ r.outParams.values.flatMap(_.variables)
       case r: Unreachable => s
       case n: NOP => s
     }
@@ -334,70 +336,63 @@ def getRedundantAssignments(procedure: Procedure): Set[Variable] = {
 
   for (c <- procedure) {
     c match {
-
-      case a: LocalAssign => {
+      case a: LocalAssign =>
         assignedNotRead(a.lhs) = joinVS(assignedNotRead(a.lhs), VS.Assigned(Set(a)))
-        a.rhs.variables.foreach(v => {
+        a.rhs.variables.foreach { v =>
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(a)))
-        })
-      }
-      case a: MemoryAssign => {
+        }
+      case a: MemoryAssign =>
         assignedNotRead(a.lhs) = joinVS(assignedNotRead(a.lhs), VS.Assigned(Set(a)))
-        a.rhs.variables.foreach(v => {
+        a.rhs.variables.foreach { v =>
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(a)))
-        })
-      }
-      case m: SimulAssign => {
-        m.assignments.foreach { case (lhs, r) =>
+        }
+      case m: SimulAssign =>
+        m.assignments.foreach { (lhs, r) =>
           assignedNotRead(lhs) = joinVS(assignedNotRead(lhs), VS.Assigned(Set(m)))
         }
         m.assignments.toSeq
           .flatMap(_._2.variables)
-          .foreach(v => {
+          .foreach { v =>
             assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(m)))
-          })
-      }
-      case a: MemoryLoad => {
+          }
+      case a: MemoryLoad =>
         assignedNotRead(a.lhs) = joinVS(assignedNotRead(a.lhs), VS.Assigned(Set(a)))
-        a.index.variables.foreach(v => {
+        a.index.variables.foreach { v =>
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(a)))
-        })
-      }
-      case m: MemoryStore => {
-        m.index.variables.foreach(v => {
+        }
+      case m: MemoryStore =>
+        m.index.variables.foreach { v =>
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(m)))
-        })
-        m.value.variables.foreach(v => {
+        }
+        m.value.variables.foreach { v =>
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(m)))
-        })
-      }
-      case m: IndirectCall => {
+        }
+      case m: IndirectCall =>
         assignedNotRead(m.target) = joinVS(assignedNotRead(m.target), VS.Read(Set(), Set(m)))
-      }
-      case m: Assert => {
-        m.body.variables.foreach(v => {
+      case m: Assert =>
+        m.body.variables.foreach { v =>
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(m)))
-        })
-      }
-      case m: Assume => {
+        }
+      case m: Assume =>
         for (v <- m.body.variables) {
           assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(m)))
         }
-      }
-      case c: DirectCall => {
-        c.actualParams
-          .flatMap(_._2.variables)
-          .foreach(v => {
+      case h: Havoc =>
+        h.vars.foreach { v =>
+          assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Assigned(Set(h)))
+        }
+      case c: DirectCall =>
+        c.actualParams.values
+          .flatMap(_.variables)
+          .foreach { v =>
             assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(c)))
-          })
-      }
-      case p: Return => {
-        p.outParams
-          .flatMap(_._2.variables)
-          .foreach(v => {
+          }
+      case p: Return =>
+        p.outParams.values
+          .flatMap(_.variables)
+          .foreach { v =>
             assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(p)))
-          })
-      }
+          }
       case p: GoTo => ()
       case p: NOP => ()
       case p: Unreachable => ()
@@ -406,8 +401,7 @@ def getRedundantAssignments(procedure: Procedure): Set[Variable] = {
     }
   }
 
-  var toRemove = assignedNotRead.filter(_._2.isInstanceOf[VS.Assigned])
-  var removeOld = toRemove
+  val toRemove = assignedNotRead.filter(_._2.isInstanceOf[VS.Assigned])
 
   toRemove.map(_._1).toSet
 }
@@ -505,16 +499,15 @@ def inlineCond(a: Assume): Option[Expr] = boundary {
 
     for (s <- Vector.from(bs).flatMap(_.statements).reverseIterator) {
       s match {
-        case assign: LocalAssign => {
-          st = st.filterNot(_._2.variables.contains(assign.lhs)).updated(assign.lhs, assign.rhs)
-        }
-        case assign: MemoryLoad => {
-          st = st.filterNot(_._2.variables.contains(assign.lhs))
-        }
+        case assign: LocalAssign =>
+          st = st.filterNot { (k, v) => v.variables.contains(assign.lhs) }.updated(assign.lhs, assign.rhs)
+        case assign: MemoryLoad =>
+          st = st.filterNot { (k, v) => v.variables.contains(assign.lhs) }
         case n: MemoryStore => ()
         case n: Assume => ()
-        case n: Assume => ()
         case n: Assert => ()
+        case h: Havoc =>
+          st = st.filterNot { (k, v) => v.variables.intersect(h.vars).nonEmpty }
         case n: NOP => ()
         case _ => break((st, false))
       }
@@ -666,6 +659,8 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
     DoChildren()
   }
 
+  var replaced = Map[Variable, Expr]()
+
   def substitute(pos: Command)(v: Variable): Option[Expr] = {
     if (goodSubst(v)) {
       val res = defs.get(v).getOrElse(Set())
@@ -688,6 +683,7 @@ class GuardVisitor(validate: Boolean = false) extends CILVisitor {
             if (validate) {
               debugAssert(propOK(rhs))
             }
+            replaced = replaced + (v -> rhs)
             Some(rhs)
           }
           case o => {
@@ -722,12 +718,7 @@ def simplifyCFG(p: Procedure) = {
   removeEmptyBlocks(p)
 }
 
-def copypropTransform(
-  p: Procedure,
-  procFrames: Map[Procedure, Set[Memory]],
-  funcEntries: Map[BigInt, Procedure],
-  constRead: (BigInt, Int) => Option[BitVecLiteral]
-) = {
+def copypropTransform(p: Procedure, procFrames: Map[Procedure, Set[Memory]]) = {
   val t = util.PerformanceTimer(s"simplify ${p.name} (${p.blocks.size} blocks)")
   // SimplifyLogger.info(s"${p.name} ExprComplexity ${ExprComplexity()(p)}")
   // val result = solver.solveProc(p, true).withDefaultValue(dom.bot)
@@ -851,7 +842,11 @@ def coalesceBlocks(proc: Procedure): Boolean = {
       val stmts = b.statements.map(b.statements.remove).toList
       nextBlock.statements.prependAll(stmts)
       // leave empty block b and cleanup with removeEmptyBlocks
-    } else if (b.jump.isInstanceOf[Unreachable] && b.statements.isEmpty && b.prevBlocks.size == 1) {
+    } else if (
+      b.jump.isInstanceOf[
+        Unreachable
+      ] && b.statements.isEmpty && b.prevBlocks.size == 1 && b.prevBlocks.head.nextBlocks.size == 1
+    ) {
       b.prevBlocks.head.replaceJump(Unreachable())
       b.parent.removeBlocks(b)
     }
@@ -1053,7 +1048,7 @@ def cleanupBlocks(p: Program) = {
   }
 }
 
-def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
+def doCopyPropTransform(p: Program) = {
 
   applyRPO(p)
 
@@ -1066,8 +1061,6 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
     }
 
   val procFrames = getProcFrame.solveInterproc(p)
-
-  val addrToProc = p.procedures.toSeq.flatMap(p => p.address.map(addr => addr -> p).toSeq).toMap
 
   def read(addr: BigInt, size: Int): Option[BitVecLiteral] = {
     val rodata = p.initialMemory.filter((_, s) => s.readOnly)
@@ -1096,7 +1089,7 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
         {
           SimplifyLogger
             .debug(s"CopyProp Transform ${p.name} (${p.blocks.size} blocks, expr complexity ${ExprComplexity()(p)})")
-          copypropTransform(p, procFrames, addrToProc, read)
+          copypropTransform(p, procFrames)
         }
     )
 
@@ -1124,9 +1117,9 @@ def doCopyPropTransform(p: Program, rela: Map[BigInt, BigInt]) = {
 
 }
 
-def copyPropParamFixedPoint(p: Program, rela: Map[BigInt, BigInt]): Int = {
+def copyPropParamFixedPoint(p: Program): Int = {
   SimplifyLogger.info(s"Simplify:: Copyprop iteration 0")
-  doCopyPropTransform(p, rela)
+  doCopyPropTransform(p)
   var inlinedOutParams: Map[Procedure, Set[Variable]] = removeInvariantOutParameters(p)
   var changed = inlinedOutParams.nonEmpty
   var iterations = 1
@@ -1135,7 +1128,7 @@ def copyPropParamFixedPoint(p: Program, rela: Map[BigInt, BigInt]): Int = {
     changed = false
     SimplifyLogger.info(s"Simplify:: Copyprop iteration $iterations")
     transforms.removeTriviallyDeadBranches(p)
-    doCopyPropTransform(p, rela)
+    doCopyPropTransform(p)
     val extraInlined = removeInvariantOutParameters(p, inlinedOutParams)
     inlinedOutParams = extraInlined.foldLeft(inlinedOutParams)((acc, v) =>
       acc + (v._1 -> (acc.getOrElse(v._1, Set[Variable]()) ++ v._2))
@@ -1249,33 +1242,59 @@ object OffsetProp {
     val lastUpdate = mutable.Map[Block, Int]()
     var stSequenceNo = 1
 
-    def findOff(v: Variable, c: BitVecLiteral): BitVecLiteral | Variable | BinaryExpr = find(v) match {
-      case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
-      case lv: Variable => BinaryExpr(BVADD, lv, c)
-      case BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) =>
-        BinaryExpr(BVADD, l, ir.eval.BitVectorEval.smt_bvadd(r, c))
-      case _ => throw Exception("Unexpected expression structure created by find() at some point")
-    }
+    def eval(c: BitVecLiteral)(v: BitVecLiteral | Variable | BinaryExpr): BitVecLiteral | Variable | BinaryExpr =
+      v match {
+        case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
+        case lv: Variable => BinaryExpr(BVADD, lv, c)
+        case BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) =>
+          BinaryExpr(BVADD, l, ir.eval.BitVectorEval.smt_bvadd(r, c))
+        case _ => throw Exception("Unexpected expression structure created by find() at some point")
+      }
 
-    def find(v: Variable): BitVecLiteral | Variable | BinaryExpr = {
+    def findOff(v: Variable, c: BitVecLiteral, fuel: Int = 10000): BitVecLiteral | Variable | BinaryExpr =
+      find(v, fuel) match {
+        case lc: BitVecLiteral => ir.eval.BitVectorEval.smt_bvadd(lc, c)
+        case lv: Variable => BinaryExpr(BVADD, lv, c)
+        case BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) =>
+          BinaryExpr(BVADD, l, ir.eval.BitVectorEval.smt_bvadd(r, c))
+        case _ => throw Exception("Unexpected expression structure created by find() at some point")
+      }
+
+    def find(v: Variable, fuel: Int = 10000): BitVecLiteral | Variable | BinaryExpr = {
+      if (fuel == 0) {
+        var chain = List(v)
+        for (i <- 0 to 10) {
+          chain = st.get(chain.head) match {
+            case Some((Some(v: Variable), _)) => v :: chain
+            case o =>
+              chain
+          }
+        }
+
+        update(v, (None, None))
+        SimplifyLogger.error(
+          s"Ran out of fuel recursively resolving copyprop (at $v): probable cycle. Next lookups are: $chain"
+        )
+      }
       st.get(v) match {
         case None => v
         case Some((None, None)) => v
         case Some((None, Some(c))) => c
-        case Some((Some(v), None)) => find(v)
-        case Some((Some(v), Some(c))) => findOff(v, c)
+        case Some((Some(v), None)) => find(v, fuel - 1)
+        case Some((Some(v), Some(c))) => findOff(v, c, fuel - 1)
       }
     }
 
     def specJoinState(lhs: Variable, rhs: Expr): Option[(Variable, Value)] = {
       rhs match {
-        case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if (!st.contains(lhs)) =>
+        case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if !st.contains(lhs) =>
           Some(lhs -> (Some(l), Some(r)))
         case e @ BinaryExpr(BVADD, l: Variable, r: BitVecLiteral) if findOff(l, r) == find(lhs) => None
-        case v: Variable if (!st.contains(lhs)) => Some(lhs -> (Some(v), None))
-        case v: BitVecLiteral if (!st.contains(lhs)) => Some(lhs -> (None, Some(v)))
-        case v: Variable if (find(lhs) == find(v)) => None
-        case c: BitVecLiteral if (find(lhs) != c) => Some(lhs -> (None, None))
+        case v: Variable if !st.contains(lhs) => Some(lhs -> (Some(v), None))
+        case v: BitVecLiteral if !st.contains(lhs) => Some(lhs -> (None, Some(v)))
+        case v: Variable if find(lhs) == find(v) => None
+        case c: BitVecLiteral if find(lhs) != c => Some(lhs -> (None, None))
+        case c: BitVecLiteral if find(lhs) == c => Some(lhs -> (None, Some(c)))
         case _ => Some(lhs -> (None, None))
       }
     }
@@ -1313,16 +1332,24 @@ object OffsetProp {
     def analyse(p: Procedure): Map[Variable, Expr] = {
       reversePostOrder(p)
       val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
+      val worklistSet = mutable.HashSet[Block]()
       worklist.addAll(p.entryBlock)
+      worklistSet.addAll(p.entryBlock)
       while (worklist.nonEmpty && !giveUp) {
         val b = worklist.dequeue()
-        val seq = lastUpdate.get(b).getOrElse(0)
+        worklistSet.remove(b)
+        val seq = lastUpdate.getOrElse(b, 0)
 
         b.statements.foreach(transfer)
 
         if (stSequenceNo != seq || seq == 0) {
           lastUpdate(b) = stSequenceNo
-          worklist.addAll(b.nextBlocks)
+          for (block <- b.nextBlocks) {
+            if (!worklistSet.contains(block)) {
+              worklist.enqueue(block)
+              worklistSet.add(block)
+            }
+          }
         }
       }
 
@@ -1346,7 +1373,7 @@ object OffsetProp {
 
     class SubstExprs(subst: Map[Variable, Expr]) extends CILVisitor {
       override def vexpr(e: Expr) = {
-        Substitute(subst.get)(e) match {
+        Substitute(subst.get, false)(e) match {
           case Some(n) => ChangeTo(n)
           case _ => SkipChildren()
         }
@@ -1436,16 +1463,24 @@ object MinCopyProp {
     def analyse(p: Procedure): Map[Variable, Variable | Literal] = {
       reversePostOrder(p)
       val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
+      val worklistSet = mutable.HashSet[Block]()
       worklist.addAll(p.entryBlock)
+      worklistSet.addAll(p.entryBlock)
       while (worklist.nonEmpty && !giveUp) {
         val b = worklist.dequeue()
-        val seq = lastUpdate.get(b).getOrElse(0)
+        worklistSet.remove(b)
+        val seq = lastUpdate.getOrElse(b, 0)
 
         b.statements.foreach(transfer)
 
         if (stSequenceNo != seq || seq == 0) {
           lastUpdate(b) = stSequenceNo
-          worklist.addAll(b.nextBlocks)
+          for (block <- b.nextBlocks) {
+            if (!worklistSet.contains(block)) {
+              worklist.enqueue(block)
+              worklistSet.add(block)
+            }
+          }
         }
       }
 
@@ -1539,9 +1574,12 @@ object CopyProp {
           if transform then x.body = subst(x.body)
           SkipChildren()
         }
+        case h: Havoc =>
+          h.vars.foreach(replaceVar(_, None))
+          SkipChildren()
         case x: DirectCall => {
           if transform then x.actualParams = x.actualParams.map((l, r) => (l, subst(r)))
-          val lhs = x.outParams.map(_._2)
+          val lhs = x.outParams.values
           lhs.foreach(replaceVar(_, None))
           SkipChildren()
         }
@@ -1641,12 +1679,7 @@ object CopyProp {
     c.keys.filter(isMemVar).foreach(v => clobberFull(c, v))
   }
 
-  def DSACopyProp(
-    p: Procedure,
-    procFrames: Map[Procedure, Set[Memory]],
-    funcEntries: Map[BigInt, Procedure],
-    constRead: (BigInt, Int) => Option[BitVecLiteral]
-  ) = {
+  def DSACopyProp(p: Procedure, procFrames: Map[Procedure, Set[Memory]]) = {
     val updated = false
     val state = mutable.HashMap[Variable, PropState]()
     var poisoned = false // we have an indirect call
@@ -1667,6 +1700,10 @@ object CopyProp {
         case l: MemoryAssign => {
           clobberFull(c, l.lhs)
         }
+        case h: Havoc =>
+          h.vars.foreach { v =>
+            clobberFull(c, v)
+          }
         case s: SimulAssign =>
           s.assignments.foreach {
             case (l, r) => {
@@ -1730,27 +1767,6 @@ object CopyProp {
           // need a reaching-defs to get inout args (just assume register name matches?)
           // this reduce we have to clobber with the indirect call this round
           poisoned = true
-          val r = for {
-            (addr, deps) <- canPropTo(c, x.target)
-            addr <- addr match {
-              case b: BitVecLiteral => Some(b.value)
-              case _ => None
-            }
-            proc <- funcEntries.get(addr)
-          } yield (proc, deps)
-
-          r match {
-            case Some(target, deps) => {
-              SimplifyLogger.info("Resolved indirect call")
-            }
-            case None => {
-              for ((i, v) <- c) {
-                v.clobbered = true
-              }
-              poisoned = true
-            }
-          }
-
         }
         case _ => ()
       }
@@ -2010,13 +2026,13 @@ val removeExternalFunctionReferences = Transform(
 def getDoCleanupTransform(doSimplify: Boolean): Transform = TransformBatch(
   "DoCleanup",
   List(
-    makeProcEntriesNonLoops,
     // useful for ReplaceReturns
     // (pushes single block with `Unreachable` into its predecessor)
     coalesceBlocksFixpoint,
     applyRpoTransform,
     replaceJumpsInNonReturningProcs,
     getEstablishProcedureDiamondFormTransform(doSimplify),
+    makeProcEntriesNonLoops,
     removeExternalFunctionReferences
   ),
   notice = "Removing external function calls", // fixme: is this all the cleanup is doing?
@@ -2025,6 +2041,7 @@ def getDoCleanupTransform(doSimplify: Boolean): Transform = TransformBatch(
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
     assert(invariant.procEntryNoIncoming(ctx.program))
+    assert(invariant.programDiamondForm(ctx.program))
   }
 )
 

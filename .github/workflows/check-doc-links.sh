@@ -25,11 +25,12 @@ args=(
   --remap "https://uq-pac\.github\.io/BASIL file://$dir/BASIL"
   --remap "https://github\.com/UQ-PAC/BASIL/blob/main https://github.com/UQ-PAC/BASIL/blob/$commit"
   --remap "https://github\.com/UQ-PAC/BASIL/tree/main https://github.com/UQ-PAC/BASIL/tree/$commit"
-  --remap '(\.[a-z]+(#.*)?)$ $1'
-  --remap '^file:///.* $0/index.html'
+  --index-files index.html
   --exclude '/scala-lang\.org/api/'
   --exclude '#L\d+$'
   --exclude 'https://hdl\.handle\.net/1911/96345'
+  --exclude 'inkuire-big\.svg$'
+  --exclude 'fonts/dejavu\.css$'
   --insecure
   --no-progress
   --max-concurrency 16

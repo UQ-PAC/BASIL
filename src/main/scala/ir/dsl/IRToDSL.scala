@@ -54,6 +54,10 @@ object IRToDSL {
       x.address
     )
 
+  def cloneSingleProcedure(x: Procedure) =
+    val proc = convertProcedure(x)
+    EventuallyProgram(proc, Seq()).resolve
+
   def convertProgram(x: Program) =
     val others = x.procedures.filter(_ != x.mainProcedure).map(convertProcedure)
     EventuallyProgram(convertProcedure(x.mainProcedure), others.to(ArraySeq), x.initialMemory.values)

@@ -37,15 +37,15 @@ jobs:
           ignoreJob: true
           ignoreMatrix: true
 
-      - uses: actions/cache@v4
-        with:
-          path: out
-          key: |
-            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
-          restore-keys: |
-            build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
-            build-${{ runner.os }}-
-            build-
+      #- uses: actions/cache@v4
+      #  with:
+      #    path: out
+      #    key: |
+      #      build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-${{ hashFiles('**/*.scala') }}
+      #    restore-keys: |
+      #      build-${{ runner.os }}-${{ hashFiles('**/*.mill') }}-
+      #      build-${{ runner.os }}-
+      #      build-
 
       - run: ./mill -i fmt
 

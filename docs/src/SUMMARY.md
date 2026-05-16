@@ -20,6 +20,10 @@
 # Analyses
 
 - [Data Structure Analysis](development/dsa.md) Basil Memory Analysis
+- [Translation Validation](development/tv/index.md)
+  - [Public API](development/tv/tv-api.md)
+  - [Implementation](development/tv/implementation.md)
+  - [Assumptions](development/tv/assumptions.md)
 
 # Development
 
@@ -28,8 +32,10 @@
 - [Common Development Tasks](development/readme.md) Explanation of common development tasks
 - [Version numbering](development/versioning.md) Use of the version number system, including how to cut a release.
 - [Profiling](development/profiling.md)
+- [Decompiler User Interface](development/api-information.md) Guide to using the interface 
+to visualise transform passes
 
-# Devleopment Guidelines
+# Development Guidelines
 
 - [Testing](development/testing.md)
   - [Integration (system) tests](development/integration-tests.md)

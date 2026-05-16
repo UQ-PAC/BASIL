@@ -43,12 +43,12 @@ class SimpExpr(simplifier: Simplifier) extends CILVisitor with Simplifier {
   var changedAnything = false
   var count = 0
 
-  def simplify(e: Expr) = {
+  def simplify(e: Expr)(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name) = {
     val (n, changed) = simplifier(e)
 
     changedAnything = changedAnything || changed
 
-    if (changed) logSimp(e, n)
+    if (changed) logSimp(e, n)(line, file, name)
     (n, changed)
   }
 
@@ -704,17 +704,21 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
       logSimp(e, UnaryExpr(BoolNOT, BinaryExpr(BVUGT, x1, UnaryExpr(BVNOT, BinaryExpr(BVADD, y1, z1)))))
     }
 
-    case BinaryExpr(
-          EQ,
-          extended @ ZeroExtend(exts, orig @ BinaryExpr(o1, x1, z1)),
-          BinaryExpr(o2, compar @ ZeroExtend(ext2, BinaryExpr(o4, x2, y2)), z2)
-        )
-        if exts == ext2 && size(x1).get >= 8 && (o1 == o2) && o2 == o4 && o1 == BVADD
-          && simplifyCond(BinaryExpr(o1, ZeroExtend(exts, x1), ZeroExtend(exts, z1)))
-          == simplifyCond(BinaryExpr(BVADD, ZeroExtend(exts, x2), (BinaryExpr(BVADD, ZeroExtend(exts, y2), z2)))) => {
-      // C not Set
-      logSimp(e, UnaryExpr(BoolNOT, BinaryExpr(BVUGT, x1, UnaryExpr(BVNOT, z1))))
-    }
+    // broken
+    // (declare-const Var2 (_ BitVec 64))
+    // (assert (! (not (= (or (not (= (bvnot (bool2bv1 (= (concat (_ bv0 64) (bvadd Var2 (_ bv18446744073705224440 64))) (bvadd (concat (_ bv0 64) (bvadd Var2 (_ bv8 64))) (_ bv18446744073705224432 128))))) (_ bv1 1))) (= (bvadd Var2 (_ bv18446744073705224440 64)) (_ bv0 64))) (bvule Var2 (_ bv4327176 64)))) :named simp.209SimplifyExpr.scala..62))
+    // (check-sat)
+    // case BinaryExpr(
+    //      EQ,
+    //      extended @ ZeroExtend(exts, orig @ BinaryExpr(o1, x1, z1)),
+    //      BinaryExpr(o2, compar @ ZeroExtend(ext2, BinaryExpr(o4, x2, y2)), z2)
+    //    )
+    //    if exts == ext2 && size(x1).get >= 8 && (o1 == o2) && o2 == o4 && o1 == BVADD
+    //      && simplifyCond(BinaryExpr(o1, ZeroExtend(exts, x1), ZeroExtend(exts, z1)))
+    //      == simplifyCond(BinaryExpr(BVADD, ZeroExtend(exts, x2), (BinaryExpr(BVADD, ZeroExtend(exts, y2), z2)))) => {
+    //  // C not Set
+    //  logSimp(e, UnaryExpr(BoolNOT, BinaryExpr(BVUGT, x1, UnaryExpr(BVNOT, z1))))
+    // }
 
     case BinaryExpr(
           EQ,
@@ -732,30 +736,34 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
       logSimp(e, UnaryExpr(BoolNOT, BinaryExpr(BVUGE, x1, y1)))
     }
 
-    case BinaryExpr(
-          EQ,
-          ZeroExtend(exts, orig @ BinaryExpr(BVADD, x1, y1: BitVecLiteral)),
-          BinaryExpr(BVADD, ZeroExtend(ext1, BinaryExpr(BVADD, x2, y3neg: BitVecLiteral)), y4neg: BitVecLiteral)
-        )
-        if size(x1).get >= 8
-          && exts == ext1
-          && simplifyCond(UnaryExpr(BVNEG, y1))
-          == simplifyCond(
-            BinaryExpr(BVADD, UnaryExpr(BVNEG, y3neg), UnaryExpr(BVNEG, Extract(size(y4neg).get - exts, 0, y4neg)))
-          )
-          && simplifyCond(ZeroExtend(exts, Extract(size(y4neg).get - exts, 0, y4neg))) == y4neg
-          && {
-            val l = simplifyCond(BinaryExpr(BVSUB, UnaryExpr(BVNEG, y1), UnaryExpr(BVNEG, (y3neg))))
-            val r = simplifyCond(UnaryExpr(BVNEG, Extract(size(y4neg).get - exts, 0, y4neg)))
-            l == r
-          }
-          && x1 == x2 => {
-      // somehow we get three-way inequality
-      logSimp(
-        e,
-        BinaryExpr(BoolAND, BinaryExpr(BVULT, x1, UnaryExpr(BVNEG, y1)), BinaryExpr(BVUGE, x1, UnaryExpr(BVNEG, y3neg)))
-      )
-    }
+    // fails verification
+    // (assert (! (not (= (= (concat (_ bv0 64) (bvadd Var2 (_ bv18446744073705224440 64))) (bvadd (concat (_ bv0 64) (bvadd Var2 (_ bv8 64))) (_ bv18446744073705224432 128))) (and (bvult Var2 (bvneg (_ bv18446744073705224440 64))) (bvuge Var2 (bvneg (_ bv8 64)))))) :named simp.197SimplifyExpr.scala..762))
+    // (check-sat)
+    // (echo "simp.197SimplifyExpr.scala..762  ::  boolnot(eq(eq(zero_extend(64, bvadd(Var2:bv64, 0xffffffffffbdf8f8:bv64)), bvadd(zero_extend(64, bvadd(Var2:bv64, 0x8:bv64)), 0xffffffffffbdf8f0:bv128)), booland(bvult(Var2:bv64, bvneg(0xffffffffffbdf8f8:bv64)), bvuge(Var2:bv64, bvneg(0x8:bv64)))))")
+    // case BinaryExpr(
+    //      EQ,
+    //      ZeroExtend(exts, orig @ BinaryExpr(BVADD, x1, y1: BitVecLiteral)),
+    //      BinaryExpr(BVADD, ZeroExtend(ext1, BinaryExpr(BVADD, x2, y3neg: BitVecLiteral)), y4neg: BitVecLiteral)
+    //    )
+    //    if size(x1).get >= 8
+    //      && exts == ext1
+    //      && simplifyCond(UnaryExpr(BVNEG, y1))
+    //      == simplifyCond(
+    //        BinaryExpr(BVADD, UnaryExpr(BVNEG, y3neg), UnaryExpr(BVNEG, Extract(size(y4neg).get - exts, 0, y4neg)))
+    //      )
+    //      && simplifyCond(ZeroExtend(exts, Extract(size(y4neg).get - exts, 0, y4neg))) == y4neg
+    //      && {
+    //        val l = simplifyCond(BinaryExpr(BVSUB, UnaryExpr(BVNEG, y1), UnaryExpr(BVNEG, (y3neg))))
+    //        val r = simplifyCond(UnaryExpr(BVNEG, Extract(size(y4neg).get - exts, 0, y4neg)))
+    //        l == r
+    //      }
+    //      && x1 == x2 => {
+    //  // somehow we get three-way inequality
+    //  logSimp(
+    //    e,
+    //    BinaryExpr(BoolAND, BinaryExpr(BVULT, x1, UnaryExpr(BVNEG, y1)), BinaryExpr(BVUGE, x1, UnaryExpr(BVNEG, y3neg)))
+    //  )
+    // }
 
     /* generic comparison simplification */
     // redundant inequality
@@ -1028,6 +1036,19 @@ def cleanupExtends(e: Expr): (Expr, Boolean) = {
     //    e,
     //    BinaryExpr(BVAND, e, BinaryExpr(BVCONCAT, BitVecLiteral(0, ed), BitVecLiteral(BigInt(2).pow(hi) - 1, hi)))
     //  )
+
+    // Collapses big concats of single bits (probably produced from 32 bit arithmetic right shifts).
+    case BinaryExpr(BVCONCAT, a, b) if a == b => logSimp(e, Repeat(2, a))
+    case BinaryExpr(BVCONCAT, Repeat(n, a), b) if a == b => logSimp(e, Repeat(n + 1, a))
+    case BinaryExpr(BVCONCAT, a, Repeat(n, b)) if a == b => logSimp(e, Repeat(n + 1, a))
+    case BinaryExpr(BVCONCAT, SignExtend(n, a), b) if a == b && size(b).get == 1 => logSimp(e, SignExtend(n + 1, a))
+    case BinaryExpr(BVCONCAT, a, SignExtend(n, b)) if a == b && size(b).get == 1 => logSimp(e, SignExtend(n + 1, a))
+    case Repeat(n, body) if size(body).get == 1 => logSimp(e, SignExtend(n - 1, body))
+    case SignExtend(n, Extract(1, 0, BinaryExpr(BVLSHR, a, BitVecLiteral(m, _)))) if n >= m =>
+      logSimp(
+        e,
+        SignExtend((n - m).toInt, BinaryExpr(BVASHR, Extract((m + 1).toInt, 0, a), BitVecLiteral(m, (m + 1).toInt)))
+      )
 
     case BinaryExpr(BVSHL, body, BitVecLiteral(n, _)) if size(body).get <= n =>
       logSimp(e, BitVecLiteral(0, size(body).get))

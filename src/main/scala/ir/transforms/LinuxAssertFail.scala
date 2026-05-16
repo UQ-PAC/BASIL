@@ -39,7 +39,7 @@ def liftLinuxAssertFail(ctx: IRContext) = {
   }
 
   val asserts: Map[DirectCall, Replace] = ctx.program.collect {
-    case d: DirectCall if d.target.procName == "__assert_fail" => {
+    case d: DirectCall if d.target.procName == "__assert_fail" =>
       d -> AssertFail(
         None,
         None,
@@ -50,29 +50,25 @@ def liftLinuxAssertFail(ctx: IRContext) = {
         // getBV(d.actualParams(lineNo)).map(_.value.toInt),
         // getBV(d.actualParams(funNameParam)).flatMap(getString)
       )
-    }
-    case d: DirectCall if d.target.procName == "abort" => {
+
+    case d: DirectCall if d.target.procName == "abort" =>
       d -> Abort()
-    }
   }.toMap
 
   class Replacer extends CILVisitor {
 
-    override def vstmt(s: Statement) = {
+    override def vstmt(s: Statement): VisitAction[List[Statement]] = {
       s match {
-        case d: DirectCall if asserts.contains(d) => {
+        case d: DirectCall if asserts.contains(d) =>
           asserts(d) match {
-            case af: AssertFail => {
+            case af: AssertFail =>
               val msg = af.info.getOrElse("")
               val line = af.filename.map(fn => s" $fn:${af.lineNo.map(_.toString).getOrElse("?")}").getOrElse("")
               val fun = af.function.map(f => s" @ $f").getOrElse("")
               ChangeTo(List(Assert(FalseLiteral, Some(s"call __assert_fail $msg$fun$line"))))
-            }
-            case a: Abort => {
+            case a: Abort =>
               ChangeTo(List(Assert(FalseLiteral, Some("abort"))))
-            }
           }
-        }
         case _ => SkipChildren()
       }
     }
@@ -82,12 +78,6 @@ def liftLinuxAssertFail(ctx: IRContext) = {
 }
 
 def liftSVCompNonDetEarlyIR(p: Program) = {
-
-  /*
-   * Run after parameter form
-   */
-
-  def nonDetFunc(name: String, size: Int) = FApplyExpr(name, Seq(), BitVecType(size))
 
   /*
    * Officially possible:
@@ -100,25 +90,31 @@ def liftSVCompNonDetEarlyIR(p: Program) = {
 
   class ReplaceNondet extends CILVisitor {
 
-    override def vstmt(s: Statement) = s match {
-      case d: DirectCall if d.target.name.startsWith("__VERIFIER_nondet") => {
+    override def vstmt(s: Statement): VisitAction[List[Statement]] = s match {
+      case d: DirectCall if d.target.name.startsWith("__VERIFIER_nondet") =>
         val lhs = Register("R0", 64)
         val oSize = 64
 
         val ndtype = d.target.procName.stripPrefix("__VERIFIER_nondet_")
 
         val size = typeToSize(ndtype)
-        val ns = if (oSize > size) {
-          LocalAssign(lhs, ZeroExtend(oSize - size, nonDetFunc(d.target.procName, size)))
+        val nondetName = s"#nondet_$size"
+        val nondet = LocalVar(nondetName, BitVecType(size))
+        val havoc = Havoc(nondet)
+
+        val assign = if (oSize > size) {
+          LocalAssign(lhs, ZeroExtend(oSize - size, nondet))
         } else if (oSize == size) {
-          LocalAssign(lhs, nonDetFunc(d.target.procName, size))
+          LocalAssign(lhs, nondet)
         } else {
           throw Exception("unreachable")
         }
+        val replacement = List(havoc, assign)
 
-        ChangeTo(List(ns))
-      }
-      case _ => SkipChildren()
+        ChangeTo(replacement)
+
+      case _ =>
+        SkipChildren()
     }
   }
 
@@ -133,18 +129,18 @@ def liftSVComp(p: Program) = {
 
   class ReplaceNondet extends CILVisitor {
 
-    override def vstmt(s: Statement) = s match {
-      case d: DirectCall if d.target.procName == "__VERIFIER_error" => {
+    override def vstmt(s: Statement): VisitAction[List[Statement]] = s match {
+      case d: DirectCall if d.target.procName == "__VERIFIER_error" =>
         ChangeTo(List(Assert(FalseLiteral, Some("__VERIFIER_error"))))
-      }
-      case d: DirectCall if d.target.procName == "__VERIFIER_assert" => {
+
+      case d: DirectCall if d.target.procName == "__VERIFIER_assert" =>
         val arg = d.actualParams(LocalVar("R0_in", BitVecType(64)))
         ChangeTo(List(Assert(UnaryExpr(BoolNOT, BinaryExpr(EQ, arg, BitVecLiteral(0, 64))), Some("__VERIFIER_assert"))))
-      }
-      case d: DirectCall if d.target.procName == "__VERIFIER_assume" => {
+
+      case d: DirectCall if d.target.procName == "__VERIFIER_assume" =>
         val arg = d.actualParams(LocalVar("R0_in", BitVecType(64)))
         ChangeTo(List(Assume(UnaryExpr(BoolNOT, BinaryExpr(EQ, arg, BitVecLiteral(0, 64))), Some("__VERIFIER_assume"))))
-      }
+
       case _ => SkipChildren()
     }
   }

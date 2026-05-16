@@ -7,10 +7,13 @@ import util.assertion.*
 import collection.mutable
 
 // This shouldn't be run before indirect calls are resolved
-def stripUnreachableFunctions(p: Program, depth: Int): Unit = {
+def stripUnreachableFunctions(p: Program, depth: Int, reachableFrom: List[Procedure] = List()): Unit = {
   val procedureCalleeNames = p.procedures.map(f => f -> f.calls).toMap
 
   val toVisit: mutable.LinkedHashSet[(Int, Procedure)] = mutable.LinkedHashSet((0, p.mainProcedure))
+
+  toVisit.addAll(reachableFrom.map(x => (0, x)))
+
   var reachableFound = true
   val reachableNames = mutable.HashMap[Procedure, Int]()
   while (toVisit.nonEmpty) {
@@ -57,7 +60,13 @@ def getStripUnreachableFunctionsTransform(depth: Int): Transform =
     "StripUnreachableFunctions",
     (ctx, man) => {
       val before = ctx.program.procedures.size
-      stripUnreachableFunctions(ctx.program, depth)
+
+      // keep subroutines with a specifcation
+      stripUnreachableFunctions(
+        ctx.program,
+        depth,
+        ctx.specification.subroutines.flatMap(b => ctx.program.procedures.find(_.procName == b.name)).toList
+      )
       Logger.info(
         s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
       )

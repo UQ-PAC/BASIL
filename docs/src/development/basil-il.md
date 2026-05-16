@@ -2,7 +2,7 @@
 # Basil Intermediate Language (IL)
 
 Basil IL is the canonical textual representation of the basil IR datastructure.
-It can be serialised and laoded back into IR, and aims to be terse and human readable but precise and unambiguous.
+It can be serialised and loaded back into IR, and aims to be terse and human readable but precise and unambiguous.
 
 Below is an example for a procedure extracted from CNTLM.
 

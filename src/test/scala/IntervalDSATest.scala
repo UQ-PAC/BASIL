@@ -234,7 +234,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
           trimEarly = main.isDefined,
           mainProcedureName = main.getOrElse("main")
         ),
-        simplify = true,
+        simplify = SimplifyMode.Simplify,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
@@ -248,7 +248,7 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
       BASILConfig(
         context = Some(context),
         loading = ILLoadingConfig(inputFile = "", relfFile = None),
-        simplify = true,
+        simplify = SimplifyMode.Simplify,
         staticAnalysis = None,
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",
@@ -625,6 +625,8 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     val locals = res.dsa.get.local
     assert(locals.values.forall(_.glIntervals.size == 1))
 
+    println(locals.values.filterNot(IntervalDSA.checksStackMaintained).map(_.proc.procName).toSet)
+
     assert(
       locals.values.filterNot(g => stackCollapsed.contains(g.proc.procName)).forall(IntervalDSA.checksStackMaintained)
     )
@@ -664,6 +666,12 @@ class IntervalDSATest extends AnyFunSuite with test_util.CaptureOutput {
     assert(dsg.glIntervals.size == 1)
     assert(!IntervalDSA.checksStackMaintained(dsg))
     assert(!IntervalDSA.checksGlobalsMaintained(dsg))
+  }
+
+  test("recursion with callee") {
+    val path = "src/test/dsa/recursion/gcc/recursion"
+    val config = DSConfig(DSAPhase.TD, true, false, false, true)
+    val results = runTest(path, None, config)
   }
 
 }

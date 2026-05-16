@@ -55,12 +55,13 @@ private object CaseIR {
   case class MemoryAssign(lhs: Variable, rhs: Expr, label: Option[String] = None) extends SingleAssign
   case class MemoryStore(mem: Memory, index: Expr, value: Expr, endian: Endian, size: Int, label: Option[String] = None) extends Statement
   case class MemoryLoad(lhs: Variable, mem: Memory, index: Expr, endian: Endian, size: Int, label: Option[String] = None) extends SingleAssign
+  case class Havoc(vars: Set[Variable], label: Option[String] = None) extends Statement
   case class NOP(label: Option[String] = None) extends Statement
   case class Assert(body: Expr, comment: Option[String] = None, label: Option[String] = None) extends Statement
   case class Assume(body: Expr, comment: Option[String] = None, label: Option[String] = None, checkSecurity: Boolean = false) extends Statement
   case class Unreachable(label: Option[String] = None) extends Jump
   case class Return(label: Option[String] = None, outParams : Map[LocalVar, Expr] = SortedMap()) extends Jump
-  case class GoTo (targets: Set[Block], label: Option[String]) extends Jump
+  case class GoTo(targets: Set[Block], label: Option[String]) extends Jump
   case class DirectCall(target: Procedure, label: Option[String] = None, outParams: Map[LocalVar, Variable] = SortedMap(), actualParams: Map[LocalVar, Expr] = SortedMap()) extends Call with Assign
   case class IndirectCall(target: Variable, label: Option[String] = None) extends Call
 
@@ -79,6 +80,7 @@ private object CaseIR {
     case ir.DirectCall(a,b,c,d) => DirectCall(a,d,b,c)
     case ir.IndirectCall(a,b) => IndirectCall(a,b)
     case ir.MemoryAssign(lhs, rhs, l) => MemoryAssign(lhs, rhs, l)
+    case ir.Havoc(vars, label) => Havoc(vars, label)
   }
 
   // format: on

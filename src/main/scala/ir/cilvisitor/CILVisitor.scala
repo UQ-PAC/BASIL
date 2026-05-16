@@ -148,8 +148,8 @@ class CILVisitorImpl(val v: CILVisitor) {
   def visit_stmt(s: Statement): List[Statement] = {
     def continue(n: Statement) = n match {
       case d: DirectCall =>
-        val actuals = d.actualParams.map(i => i._1 -> visit_expr(i._2))
-        val outs = d.outParams.map(i => i._1 -> visit_lvar(i._2))
+        val actuals = d.actualParams.map((i1, i2) => i1 -> visit_expr(i2))
+        val outs = d.outParams.map((i1, i2) => i1 -> visit_lvar(i2))
         d.outParams = outs
         d.actualParams = actuals
         d
@@ -174,22 +174,32 @@ class CILVisitorImpl(val v: CILVisitor) {
         m.rhs = visit_expr(m.rhs)
         m.lhs = visit_lvar(m.lhs)
         m
-      case m: SimulAssign => {
+      case m: SimulAssign =>
         var changed = false
-        val ns = m.assignments.map { case (lhs, rhs) =>
+        val ns = m.assignments.map { (lhs, rhs) =>
           val (nl, nr) = (visit_lvar(lhs), visit_expr(rhs))
           changed = changed || nl != lhs || nr != rhs
           (nl, nr)
         }
         if changed then m.assignments = ns
         m
-      }
       case s: Assert =>
         s.body = visit_expr(s.body)
         s
       case s: Assume =>
         s.body = visit_expr(s.body)
         s
+      case h: Havoc =>
+        val result: Map[Variable, Variable] = h.vars.map { (u: Variable) =>
+          u -> visit_lvar(u)
+        }.toMap
+        result.foreach { (oldVar, newVar) =>
+          if (oldVar != newVar) {
+            h.removeVariable(oldVar)
+            h.addVariable(newVar)
+          }
+        }
+        h
       case n: NOP => n
     }
     doVisitList(v, v.vstmt(s), s, continue)
@@ -202,8 +212,12 @@ class CILVisitorImpl(val v: CILVisitor) {
         r match {
           case Nil => b.statements.remove(s)
           case n :: tl =>
-            b.statements.replace(s, n)
-            b.statements.insertAllAfter(Some(n), tl)
+            if (n ne s) {
+              b.statements.replace(s, n)
+              b.statements.insertAllAfter(Some(n), tl)
+            } else {
+              b.statements.insertAllAfter(Some(n), tl)
+            }
         }
       }
       b.replaceJump(visit_jump(b.jump))
@@ -216,7 +230,7 @@ class CILVisitorImpl(val v: CILVisitor) {
   def visit_proc(p: Procedure): List[Procedure] = {
     def continue(p: Procedure) = {
       v.enter_scope(p.formalInParam)
-      for (b <- p.blocks) {
+      for (b <- p.blocks.toList) {
         p.replaceBlock(b, visit_block(b))
       }
       v.leave_scope()
@@ -258,4 +272,5 @@ def visit_stmt(v: CILVisitor, e: Statement): List[Statement] = CILVisitorImpl(v)
 def visit_jump(v: CILVisitor, e: Jump): Jump = CILVisitorImpl(v).visit_jump(e)
 def visit_expr(v: CILVisitor, e: Expr): Expr = CILVisitorImpl(v).visit_expr(e)
 def visit_rvar(v: CILVisitor, e: Variable): Variable = CILVisitorImpl(v).visit_rvar(e)
+def visit_lvar(v: CILVisitor, e: Variable): Variable = CILVisitorImpl(v).visit_lvar(e)
 def visit_mem(v: CILVisitor, e: Memory): Memory = CILVisitorImpl(v).visit_mem(e)

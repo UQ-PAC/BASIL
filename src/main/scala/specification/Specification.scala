@@ -1,9 +1,10 @@
 package specification
 
 import boogie.*
-import ir.*
+import ir.Expr
 import ir.dsl.given
 
+case class LoopInvariant(header: String, inv: List[Expr], comment: Option[String] = None)
 trait SymbolTableEntry {
   val name: String
   val size: Int

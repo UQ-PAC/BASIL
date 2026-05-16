@@ -35,6 +35,7 @@ trait GammaDomain(initialState: VarGammaMap) extends PredMapDomain[Variable, Lat
       case c: MemoryStore => m
       case c: Assume => m
       case c: Assert => m
+      case h: Havoc => m ++ h.vars.map(v => v -> topTerm).toMap
       case c: IndirectCall => top
       case c: DirectCall => top
       case c: GoTo => m
@@ -115,6 +116,7 @@ class ReachabilityConditions extends PredicateEncodingDomain[Predicate] {
       case m: MemoryStore => b
       case a: Assume => b
       case a: Assert => b
+      case _: Havoc => b
       case i: IndirectCall => b
       case c: DirectCall => b
       case g: GoTo => if g.targets.size == 1 then b else Predicate.False
@@ -138,6 +140,13 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
   import Predicate.*
 
   private var atTop = Set[Block]()
+
+  private def expectPredicate(orig: Expr): Predicate = {
+    exprToPredicate(orig) match {
+      case Some(p) => p
+      case None => top
+    }
+  }
 
   def join(a: Predicate, b: Predicate, pos: Block): Predicate =
     if a.size + b.size > 100 then atTop += pos
@@ -163,14 +172,17 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
           .simplify
       case a: MemoryLoad => b.remove(BVTerm.Var(a.lhs), True).remove(GammaTerm.Var(a.lhs), True).simplify
       case m: MemoryStore => b
-      case a: Assume => {
+      case a: Assume =>
         if (a.checkSecurity) {
           and(b, expectPredicate(a.body), lowExpr(a.body)).simplify
         } else {
           and(b, expectPredicate(a.body)).simplify
         }
-      }
       case a: Assert => and(b, expectPredicate(a.body)).simplify
+      case h: Havoc =>
+        h.vars.foldLeft(b) { (a, v) =>
+          a.remove(BVTerm.Var(v), True).remove(GammaTerm.Var(v), True).simplify
+        }
       case i: IndirectCall => top
       case c: DirectCall =>
         c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>
@@ -193,13 +205,6 @@ class PredicateDomain(summaries: Procedure => ProcedureSummary) extends Predicat
   override def fromPred(p: Predicate): Predicate = p
 }
 
-private def expectPredicate(orig: Expr): Predicate = {
-  exprToPredicate(orig) match {
-    case Some(p) => p
-    case None => throw Exception(s"Expected to be able to construct predicate for: $orig")
-  }
-}
-
 /**
  * An abstract domain which computes conditions (as predicates) for assertions (including the check that gammas are low on branches) to be violated.
  *
@@ -210,6 +215,13 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
 
   private var atTop = Set[Block]()
 
+  private def expectPredicate(orig: Expr): Predicate = {
+    exprToPredicate(orig) match {
+      case Some(p) => p
+      case None => not(top)
+    }
+  }
+
   def join(a: Predicate, b: Predicate, pos: Block): Predicate =
     if a.size + b.size > 100 then atTop += pos
     if atTop.contains(pos) then top else or(a, b).simplify
@@ -219,37 +231,39 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
 
   def transfer(b: Predicate, c: Command): Predicate = {
     c match {
-      case SimulAssign(assigns, _) => {
+      case SimulAssign(assigns, _) =>
         val terms = assigns.map((l, r) => (BVTerm.Var(l), exprToBVTerm(r)))
         val gammas = assigns.map((l, r) => (GammaTerm.Var(l), exprToGammaTerm(r)))
         val nb = terms.foldLeft(b) { case (acc, (l, r)) =>
           r match {
             case Some(rhs) => acc.replace(l, rhs)
-            case None => acc.remove(l, Predicate.True) // TODO verify soundness
+            case None => acc.remove(l, top)
           }
         }
         gammas.foldLeft(nb) { case (acc, (l, r)) =>
           r match {
             case Some(rhs) => acc.replace(l, rhs)
-            case None => acc.remove(l, Predicate.True) // TODO verify soundness
+            case None => acc.remove(l, top)
           }
         }
-      }
       case a: MemoryAssign =>
         b.replace(BVTerm.Var(a.lhs), exprToBVTerm(a.rhs).get)
           .replace(GammaTerm.Var(a.lhs), exprToGammaTerm(a.rhs).get)
           .simplify
-      case a: MemoryLoad => b.remove(BVTerm.Var(a.lhs), False).remove(GammaTerm.Var(a.lhs), False).simplify
+      case a: MemoryLoad => b.remove(BVTerm.Var(a.lhs), top).remove(GammaTerm.Var(a.lhs), top).simplify
       case m: MemoryStore => b
-      case a: Assume => {
+      case a: Assume =>
         if (a.checkSecurity) {
           or(and(b, expectPredicate(a.body)), not(lowExpr(a.body))).simplify
         } else {
           and(b, expectPredicate(a.body)).simplify
         }
-      }
       case a: Assert => or(b, not(expectPredicate(a.body))).simplify
-      case i: IndirectCall => bot
+      case i: IndirectCall => top
+      case h: Havoc =>
+        h.vars.foldLeft(b) { (p, v) =>
+          p.remove(BVTerm.Var(v), top).remove(GammaTerm.Var(v), top).simplify
+        }
       case c: DirectCall =>
         not(c.actualParams.foldLeft(Conj(summaries(c.target).requires.map(_.pred).toSet).simplify) { case (p, (v, e)) =>
           p.replace(BVTerm.Var(v), exprToBVTerm(e).get).replace(GammaTerm.Var(v), exprToGammaTerm(e).get).simplify
@@ -261,11 +275,12 @@ class WpDualDomain(summaries: Procedure => ProcedureSummary) extends PredicateEn
     }
   }
 
-  override def init(b: Block): Predicate = bot
+  // We annotate the return block as unreachable as we only want to know conditions for paths that reach failing assertions.
+  override def init(b: Block): Predicate = if b.isReturn then False else bot
 
-  def top: Predicate = True
-  def bot: Predicate = False
+  def top: Predicate = False
+  def bot: Predicate = True
 
-  def toPred(x: Predicate): Predicate = x
-  override def fromPred(p: Predicate): Predicate = p
+  def toPred(x: Predicate): Predicate = not(x)
+  override def fromPred(p: Predicate): Predicate = not(p)
 }

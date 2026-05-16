@@ -28,7 +28,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     val outPath = s"$path.bpl"
     val args = Array("-o", s"$outPath", "-i", s"$path.adt", "-r", s"$path.relf", "-s", s"$path.spec", "--analyse")
 
-    Main.main(args)
+    basil.main.Main.main(args)
 
     val boogieResult = Seq("boogie", "/smoke", "/timeLimit:10", "/useArrayAxioms", outPath).!!
 
@@ -80,7 +80,7 @@ class IrreducibleLoop extends AnyFunSuite with CaptureOutput {
     val outPath = s"$path.bpl"
     val args = Array("-o", s"$outPath", "-i", s"$path.adt", "-r", s"$path.relf", "-s", s"$path.spec")
 
-    Main.main(args)
+    basil.main.Main.main(args)
 
     val boogieResult = Seq("boogie", "/useArrayAxioms", "/timeLimit:10", outPath).!!
     Logger.debug("Boogie result: " + boogieResult)
