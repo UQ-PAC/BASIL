@@ -259,7 +259,7 @@ class BasilIRPrettyPrinter(
 
     val uninterp = getUninterp(p)
     val ufdecls = uninterp.map { case (n, pt, rt) =>
-      s"declare-fun ${Sigil.BASIR.globalVar}$n : (${pt.map(vtype).mkString(", ")}) -> ${vtype(rt)}"
+      s"val ${Sigil.BASIR.globalVar}$n : ${pt.map(vtype).mkString("-> ")} -> ${vtype(rt)}"
     }
 
     Prog(
