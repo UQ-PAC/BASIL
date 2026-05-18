@@ -7,6 +7,7 @@ import translating.{ELFBind, ELFNDX, ELFSymType, ELFSymbol, ELFVis, ReadELFData}
 import util.Logger
 
 import java.io.ByteArrayInputStream
+import scala.collection.mutable
 import scala.util.DynamicVariable
 import scala.util.chaining.scalaUtilChainingOps
 
@@ -166,6 +167,8 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
   }
 
   def getGlobals(): Set[SpecGlobal] =
+    val symbolNames = mutable.Map[String, Int]()
+
     gtirb.symbolEntriesByUuid.view.flatMap {
       case (symid, (size, "OBJECT", "GLOBAL" | "LOCAL", "DEFAULT", idx)) =>
 
@@ -173,7 +176,16 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
         val addr = symid.getReferentAddress
         addr match {
           case Some(addr) =>
-            Some(SpecGlobal(symid.get.name, (size * 8).toInt, None, addr))
+            val name = symid.get.name
+            val newName = if (!symbolNames.contains(name)) {
+              symbolNames(name) = 1
+              name
+            } else {
+              val symbolNameCount = symbolNames(name)
+              symbolNames(name) = symbolNameCount + 1
+              s"$name#$symbolNameCount"
+            }
+            Some(SpecGlobal(newName, (size * 8).toInt, None, addr))
 
           // if the referent is not a real block, then this is a
           // forwarding target symbol. discard, because we generate

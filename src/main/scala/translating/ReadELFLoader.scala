@@ -7,6 +7,7 @@ import specification.*
 import util.{ILLoadingConfig, Logger}
 
 import scala.collection.immutable.{SortedMap, SortedSet}
+import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
 /** https://refspecs.linuxfoundation.org/elf/elf.pdf
@@ -91,11 +92,21 @@ object ReadELFLoader {
       .toMap
     val mainAddress = ctx.symbolTable.asScala.flatMap(s => getFunctionAddress(s, config.mainProcedureName))
 
+    val symbolNames = mutable.Map[String, Int]()
     val symbolTable = ctx.symbolTable.asScala.flatMap(s => visitSymbolTable(s)).toList
-    val globalVariables = symbolTable.collect {
+    val globalVariables = symbolTable.flatMap {
       case ELFSymbol(_, value, size, ELFSymType.OBJECT, ELFBind.GLOBAL | ELFBind.LOCAL, ELFVis.DEFAULT, ndx, name)
           if ndx != ELFNDX.UND =>
-        SpecGlobal(name, size * 8, None, value)
+        val newName = if (!symbolNames.contains(name)) {
+          symbolNames(name) = 1
+          name
+        } else {
+          val symbolNameCount = symbolNames(name)
+          symbolNames(name) = symbolNameCount + 1
+          s"$name#$symbolNameCount"
+        }
+        Some(SpecGlobal(newName, size * 8, None, value))
+      case _ => None
     }.toSet
 
     val functionEntries = symbolTable.collect {
