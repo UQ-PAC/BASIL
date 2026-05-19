@@ -13,9 +13,9 @@ private val localSigils = false
   Santises variables names
 
   BinCaml requires that there are no dots in variable names
-*/ 
-def santise_var_name(name: String): String = 
-    return name.replace(".", "")
+ */
+def santise_var_name(name: String): String =
+  return name.replace(".", "")
 
 object PrettyPrinter {
 
@@ -580,11 +580,11 @@ class BasilIRPrettyPrinter(
   override def vrvar(e: Variable): PPProg[Variable] =
     val namefixed = santise_var_name(e.name)
     e match {
-    case l: LocalVar =>
-      val sigil = if localSigils then Sigil.BASIR.localVar else ""
-      BST(s"${sigil}${namefixed}:${vtype(e.getType)}")
-    case l: Global => BST(s"${Sigil.BASIR.globalVar}${namefixed}:${vtype(e.getType)}")
-  }
+      case l: LocalVar =>
+        val sigil = if localSigils then Sigil.BASIR.localVar else ""
+        BST(s"${sigil}${namefixed}:${vtype(e.getType)}")
+      case l: Global => BST(s"${Sigil.BASIR.globalVar}${namefixed}:${vtype(e.getType)}")
+    }
   override def vlvar(e: Variable): PPProg[Variable] = {
     val namefixed = santise_var_name(e.name)
     e match {
