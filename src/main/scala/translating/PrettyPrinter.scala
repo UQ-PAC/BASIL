@@ -15,7 +15,7 @@ private val localSigils = false
   BinCaml requires that there are no dots in variable names
  */
 def santise_var_name(name: String): String =
-  return name.replace(".", "")
+  return name.replace(".", "__")
 
 object PrettyPrinter {
 
