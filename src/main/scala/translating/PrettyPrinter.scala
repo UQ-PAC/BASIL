@@ -9,6 +9,14 @@ import scala.collection.mutable
 
 private val localSigils = false
 
+/*
+  Santises variables names
+
+  BinCaml requires that there are no dots in variable names
+*/ 
+def santise_var_name(name: String): String = 
+    return name.replace(".", "")
+
 object PrettyPrinter {
 
   type PrettyPrintable = Program | Procedure | Statement | Jump | Command | Block | Expr | IRContext
@@ -569,18 +577,21 @@ class BasilIRPrettyPrinter(
     case m: MapType => s"(${vtype(m.param)} -> ${vtype(m.result)})"
   }
 
-  override def vrvar(e: Variable): PPProg[Variable] = e match {
+  override def vrvar(e: Variable): PPProg[Variable] =
+    val namefixed = santise_var_name(e.name)
+    e match {
     case l: LocalVar =>
       val sigil = if localSigils then Sigil.BASIR.localVar else ""
-      BST(s"${sigil}${e.name}:${vtype(e.getType)}")
-    case l: Global => BST(s"${Sigil.BASIR.globalVar}${e.name}:${vtype(e.getType)}")
+      BST(s"${sigil}${namefixed}:${vtype(e.getType)}")
+    case l: Global => BST(s"${Sigil.BASIR.globalVar}${namefixed}:${vtype(e.getType)}")
   }
   override def vlvar(e: Variable): PPProg[Variable] = {
+    val namefixed = santise_var_name(e.name)
     e match {
       case l: LocalVar =>
         val sigil = if localSigils then Sigil.BASIR.localVar else ""
-        BST(s"var $sigil${e.name}: ${vtype(e.getType)}")
-      case l: Global => BST(s"${Sigil.BASIR.globalVar}${e.name}: ${vtype(e.getType)}")
+        BST(s"var $sigil${namefixed}: ${vtype(e.getType)}")
+      case l: Global => BST(s"${Sigil.BASIR.globalVar}${namefixed}: ${vtype(e.getType)}")
     }
   }
 
