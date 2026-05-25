@@ -93,7 +93,7 @@ object ReadELFLoader {
     val mainAddress = ctx.symbolTable.asScala.flatMap(s => getFunctionAddress(s, config.mainProcedureName))
 
     val symbolNames = mutable.Map[String, Int]()
-    val symbolTable = ctx.symbolTable.asScala.flatMap(s => visitSymbolTable(s)).toList
+    val symbolTable = ctx.symbolTable.asScala.flatMap(s => visitSymbolTable(s)).toList.sortBy(_.value)
     val globalVariables = symbolTable.flatMap {
       case ELFSymbol(_, value, size, ELFSymType.OBJECT, ELFBind.GLOBAL | ELFBind.LOCAL, ELFVis.DEFAULT, ndx, name)
           if ndx != ELFNDX.UND =>

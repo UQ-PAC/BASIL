@@ -166,39 +166,45 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     (offs.toMap, exts.toSet)
   }
 
-  def getGlobals(): Set[SpecGlobal] =
+  def getGlobals(): Set[SpecGlobal] = {
+    val globals: List[SpecGlobal] = gtirb.symbolEntriesByUuid.view
+      .flatMap {
+        case (symid, (size, "OBJECT", "GLOBAL" | "LOCAL", "DEFAULT", idx)) =>
+
+          // val addr = symid.getReferentUuid.map(_.get.address)
+          val addr = symid.getReferentAddress
+          addr match {
+            case Some(addr) =>
+              Some(SpecGlobal(symid.get.name, (size * 8).toInt, None, addr))
+
+            // if the referent is not a real block, then this is a
+            // forwarding target symbol. discard, because we generate
+            // the SpecGlobal from the forwarding source symbol.
+            case None =>
+              assert(
+                gtirb.symbolForwardingInverse.contains(symid),
+                "a symbol with a referent that has no data block should be a forwarding target"
+              )
+              None
+          }
+        case _ => None
+      }
+      .toList
+      .sortBy(_.address)
     val symbolNames = mutable.Map[String, Int]()
-
-    gtirb.symbolEntriesByUuid.view.flatMap {
-      case (symid, (size, "OBJECT", "GLOBAL" | "LOCAL", "DEFAULT", idx)) =>
-
-        // val addr = symid.getReferentUuid.map(_.get.address)
-        val addr = symid.getReferentAddress
-        addr match {
-          case Some(addr) =>
-            val name = symid.get.name
-            val newName = if (!symbolNames.contains(name)) {
-              symbolNames(name) = 1
-              name
-            } else {
-              val symbolNameCount = symbolNames(name)
-              symbolNames(name) = symbolNameCount + 1
-              s"$name#$symbolNameCount"
-            }
-            Some(SpecGlobal(newName, (size * 8).toInt, None, addr))
-
-          // if the referent is not a real block, then this is a
-          // forwarding target symbol. discard, because we generate
-          // the SpecGlobal from the forwarding source symbol.
-          case None =>
-            assert(
-              gtirb.symbolForwardingInverse.contains(symid),
-              "a symbol with a referent that has no data block should be a forwarding target"
-            )
-            None
-        }
-      case _ => None
+    globals.map { specGlobal =>
+      val name = specGlobal.name
+      val newName = if (!symbolNames.contains(name)) {
+        symbolNames(name) = 1
+        name
+      } else {
+        val symbolNameCount = symbolNames(name)
+        symbolNames(name) = symbolNameCount + 1
+        s"$name#$symbolNameCount"
+      }
+      specGlobal.copy(name = newName)
     }.toSet
+  }
 
   def getFunctionEntries(): Set[FuncEntry] =
     gtirb.symbolEntriesByUuid.view.collect {
