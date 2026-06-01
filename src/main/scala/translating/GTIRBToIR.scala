@@ -532,7 +532,7 @@ class GTIRBToIR(
       case EdgeLabel(false, false, Type_Branch, _) =>
         // indirect jump to external subroutine, another block in procedure, or non-returning call to another procedure
         if (proxies.contains(edge.targetUuid)) {
-          handleProxyBlockEdge(block, edge)
+          handleProxyBlockEdge(block, edge, procedures)
         } else if (uuidToBlock.contains(edge.targetUuid)) {
           // resolved indirect jump
           val target = uuidToBlock(edge.targetUuid)
@@ -601,7 +601,7 @@ class GTIRBToIR(
           val label = handlePCAssign(block)
           (Some(DirectCall(target, label)), Unreachable())
         } else if (proxies.contains(edge.targetUuid)) {
-          handleProxyBlockEdge(block, edge)
+          handleProxyBlockEdge(block, edge, procedures)
         } else {
           throw Exception(
             s"edge from ${block.label} to ${b64encode(edge.targetUuid)} does not point to a known procedure entrance"
@@ -614,7 +614,7 @@ class GTIRBToIR(
     }
   }
 
-  private def handleProxyBlockEdge(block: Block, edge: Edge): (Option[Call], Jump) = {
+  private def handleProxyBlockEdge(block: Block, edge: Edge, procedures: ArrayBuffer[Procedure]): (Option[Call], Jump) = {
     val proxySymbols = nodeUUIDToSymbols.getOrElse(edge.targetUuid, mutable.Set())
     if (proxySymbols.isEmpty) {
       // indirect call with no further information
