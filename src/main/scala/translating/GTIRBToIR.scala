@@ -905,7 +905,13 @@ class GTIRBToIR(
         val assume = Assume(tempIf.cond, checkSecurity = true)
         val call = DirectCall(target)
         val body: ArrayBuffer[Statement] = ArrayBuffer(assume).appendedAll(tempIf.thenStmts).append(call)
-        Block(newLabel, None, body, Unreachable())
+        // check if target procedure is returning
+        val returning = if (target.blocks.exists(b => b.jump.isInstanceOf[Return])) {
+          GoTo(procedure.returnBlock)
+        } else {
+          Unreachable()
+        }
+        Block(newLabel, None, body, returning)
       } else {
         newBlockCondition(block, uuidToBlock(branch.targetUuid), tempIf.cond, tempIf.thenStmts)
       }
