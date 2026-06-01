@@ -614,7 +614,11 @@ class GTIRBToIR(
     }
   }
 
-  private def handleProxyBlockEdge(block: Block, edge: Edge, procedures: ArrayBuffer[Procedure]): (Option[Call], Jump) = {
+  private def handleProxyBlockEdge(
+    block: Block,
+    edge: Edge,
+    procedures: ArrayBuffer[Procedure]
+  ): (Option[Call], Jump) = {
     val proxySymbols = nodeUUIDToSymbols.getOrElse(edge.targetUuid, mutable.Set())
     if (proxySymbols.isEmpty) {
       // indirect call with no further information
@@ -885,11 +889,26 @@ class GTIRBToIR(
       case i: TempIf => i
       case i => throw Exception(s"last statement of block ${block.label} is not an if statement: $i")
     }
-
-    val trueBlock = newBlockCondition(block, uuidToBlock(branch.targetUuid), tempIf.cond, tempIf.thenStmts)
     val falseBlock =
       newBlockCondition(block, uuidToBlock(fallthrough.targetUuid), UnaryExpr(BoolNOT, tempIf.cond), tempIf.elseStmts)
 
+    val trueBlock =
+      if (
+        entranceUUIDtoProcedure.contains(branch.targetUuid) && entranceUUIDtoProcedure(branch.targetUuid) != procedure
+      ) {
+        // Conditional branch is jumping to the start of another procedure - weird
+        // Create DirectCall instead of GoTo as a starting point
+        // A more sophisticated approach would be to detect this weird case and inline the other procedure if it's just
+        // a single block with no other calls but that's more of a hassle
+        val target = entranceUUIDtoProcedure(branch.targetUuid)
+        val newLabel = s"${block.label}_goto_${target.name}"
+        val assume = Assume(tempIf.cond, checkSecurity = true)
+        val call = DirectCall(target)
+        val body: ArrayBuffer[Statement] = ArrayBuffer(assume).appendedAll(tempIf.thenStmts).append(call)
+        Block(newLabel, None, body, Unreachable())
+      } else {
+        newBlockCondition(block, uuidToBlock(branch.targetUuid), tempIf.cond, tempIf.thenStmts)
+      }
     val newBlocks = ArrayBuffer(trueBlock, falseBlock)
     procedure.addBlocks(newBlocks)
     block.statements.remove(tempIf)
