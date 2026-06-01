@@ -149,18 +149,23 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
    * Returns relocations as a tuple of relocation offsets and external functions.
    */
   def getRelocations(): (Map[BigInt, BigInt], Set[ExternalFunction]) = {
-    def getSectionBytes(sectionName: String) =
-      gtirb.sectionsByName(sectionName).byteIntervals.head.contents
+    def getSectionBytes(sectionName: String): List[Elf64Rela] = {
+      if (gtirb.sectionsByName.contains(sectionName)) {
+        gtirb.sectionsByName(sectionName).byteIntervals.head.contents.pipe(parseRelaTab)
+      } else {
+        List()
+      }
+    }
 
-    val relaDyns = getSectionBytes(".rela.dyn").pipe(parseRelaTab)
-    val relaPlts = getSectionBytes(".rela.plt").pipe(parseRelaTab)
+    val relaDyns = getSectionBytes(".rela.dyn")
+    val relaPlts = getSectionBytes(".rela.plt")
 
     val relas = (relaDyns ++ relaPlts)
       .groupBy(x => parseAarch64RelaType(x.r_type))
       .withDefaultValue(Nil)
 
     val offs = relas(R_AARCH64_RELATIVE).map(parseRela(R_AARCH64_RELATIVE, _))
-    val exts = (relas(R_AARCH64_GLOB_DAT) ++ relas(R_AARCH64_JUMP_SLOT)).map(parseRelaExtFunc(_))
+    val exts = (relas(R_AARCH64_GLOB_DAT) ++ relas(R_AARCH64_JUMP_SLOT)).map(parseRelaExtFunc)
 
     (offs.toMap, exts.toSet)
   }
