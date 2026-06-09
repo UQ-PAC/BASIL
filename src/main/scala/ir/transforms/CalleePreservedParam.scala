@@ -9,19 +9,17 @@ object CalleePreservedParam {
   var counter = util.Counter()
 
   /**
-   * Asusming single-return and parameter form 
+   * Assuming single-return and parameter form
    */
 
-  val preserved = (19 to 29).map(i => s"R$i").toSet // required by ABI
-  val callReturnStackPreserved = Set("R30", "R31") // not strictly required
+  private val preserved = (19 to 29).map(i => s"R$i").toSet // required by ABI
+  private val callReturnStackPreserved = Set("R30", "R31") // not strictly required
 
-  def isPreservedParam(v: LocalVar) = {
+  private def isPreservedParam(v: LocalVar) = {
     // abi assumption
     v.varName match {
-      case s"${reg}_in" => callReturnStackPreserved.contains(reg)
-      case s"${reg}_out" => callReturnStackPreserved.contains(reg)
-      case s"${reg}_in" => preserved.contains(reg)
-      case s"${reg}_out" => preserved.contains(reg)
+      case s"${reg}_in" => callReturnStackPreserved.contains(reg) || preserved.contains(reg)
+      case s"${reg}_out" => callReturnStackPreserved.contains(reg) || preserved.contains(reg)
       case _ => false
     }
   }
