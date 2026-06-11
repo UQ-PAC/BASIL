@@ -8,7 +8,6 @@ import util.Logger
 
 import java.io.ByteArrayInputStream
 import scala.util.DynamicVariable
-import scala.util.chaining.scalaUtilChainingOps
 
 /**
  * Responsible for interpreting the GTIRB's symbol information
@@ -149,16 +148,11 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
    * Returns relocations as a tuple of relocation offsets and external functions.
    */
   def getRelocations(): (Map[BigInt, BigInt], Set[ExternalFunction]) = {
-    def getSectionBytes(sectionName: String): List[Elf64Rela] = {
-      if (gtirb.sectionsByName.contains(sectionName)) {
-        gtirb.sectionsByName(sectionName).byteIntervals.head.contents.pipe(parseRelaTab)
-      } else {
-        List()
-      }
-    }
+    def getSectionBytes(sectionName: String) =
+      gtirb.sectionsByName.get(sectionName).map(_.byteIntervals.head.contents)
 
-    val relaDyns = getSectionBytes(".rela.dyn")
-    val relaPlts = getSectionBytes(".rela.plt")
+    val relaDyns = getSectionBytes(".rela.dyn").toList.flatMap(parseRelaTab)
+    val relaPlts = getSectionBytes(".rela.plt").toList.flatMap(parseRelaTab)
 
     val relas = (relaDyns ++ relaPlts)
       .groupBy(x => parseAarch64RelaType(x.r_type))
@@ -194,18 +188,18 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     }.toSet
 
   def getFunctionEntries(): Set[FuncEntry] =
-    gtirb.symbolEntriesByUuid.view.collect {
-      case (symid, (size, "FUNC", "GLOBAL", "DEFAULT", idx)) if idx != 0 =>
-
-        val nameSymbol = symid.get
-        val funcUuid = symid.getFunction.get
-        val entries = funcUuid.getEntries
-
-        assert(entries.size == 1, "function with non-singular entry")
-        val entry = entries.head
-        val addr = entry.get.address
-
-        FuncEntry(nameSymbol.name, (size * 8).toInt, addr)
+    gtirb.symbolEntriesByUuid.view.flatMap {
+      case (symid, (size, "FUNC", "GLOBAL", "DEFAULT", idx)) if idx != 0 => {
+        for {
+          funcUuid <- symid.getFunction
+          entry <- funcUuid.getEntries.head.getOption
+        } yield {
+          val nameSymbol = symid.get
+          val addr = entry.address
+          FuncEntry(nameSymbol.name, (size * 8).toInt, addr)
+        }
+      }
+      case _ => None
     }.toSet
 
   def getMainAddress(mainProcedureName: String): BigInt =
