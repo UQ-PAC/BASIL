@@ -188,19 +188,21 @@ class GTIRBReadELF(protected val gtirb: GTIRBResolver) {
     }.toSet
 
   def getFunctionEntries(): Set[FuncEntry] =
-    gtirb.symbolEntriesByUuid.view.map {
-      case (symid, (size, "FUNC", "GLOBAL", "DEFAULT", idx)) if idx != 0 => {
-        for {
-          funcUuid <- symid.getFunction
-          nameSymbol = symid.get
-          entry <- funcUuid.getEntries.head.getOption
-          addr = entry.address
-        } yield(FuncEntry(nameSymbol.name, (size * 8).toInt, addr))
+    gtirb.symbolEntriesByUuid.view
+      .map {
+        case (symid, (size, "FUNC", "GLOBAL", "DEFAULT", idx)) if idx != 0 => {
+          for {
+            funcUuid <- symid.getFunction
+            nameSymbol = symid.get
+            entry <- funcUuid.getEntries.head.getOption
+            addr = entry.address
+          } yield (FuncEntry(nameSymbol.name, (size * 8).toInt, addr))
+        }
+
+        case _ => None
       }
-
-
-      case _ => None
-    }.toSet.collect { case Some(e) => e}
+      .toSet
+      .collect { case Some(e) => e }
 
   def getMainAddress(mainProcedureName: String): BigInt =
     gtirb.symbolsByName(mainProcedureName).getReferentAddress.get
