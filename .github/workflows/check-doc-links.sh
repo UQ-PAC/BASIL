@@ -28,7 +28,8 @@ args=(
   --index-files index.html
   --exclude '/scala-lang\.org/api/'
   --exclude '#L\d+$'
-  --exclude 'https://hdl\.handle\.net/1911/96345'
+  --exclude '^https://hdl\.handle\.net'
+  --exclude '^https://people\.cs\.rutgers\.edu/~'
   --exclude 'inkuire-big\.svg$'
   --exclude 'fonts/dejavu\.css$'
   --insecure
