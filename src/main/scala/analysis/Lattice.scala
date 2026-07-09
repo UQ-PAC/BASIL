@@ -5,31 +5,77 @@ import ir.eval.BitVectorEval
 import util.StaticAnalysisLogger
 import util.assertion.*
 
-/** Basic lattice
-  */
+/**
+ * Lattice operations on the given type `T`. This is intended to be used
+ * as a [type-class]. Notably, this means that the T class should *not*
+ * directly extend [[Lattice]][T]. Rather, a separate class should be created
+ * to extend `Lattice[T]` (this is automated if you use the [given syntax]).
+ * Placing the lattice methods outside of the class itself gives us a lot
+ * more flexibility.
+ *
+ * To access the methods within this trait, you should add a
+ * "using" clause like `(using l: Lattice[DesiredType])` to the end of the
+ * parameter list of a method or class. Then, you will have access to an `l`
+ * variable containing the [[Lattice]] methods. See [given syntax] docs for
+ * more details, including how to define given instances.
+ *
+ * [type-class]: https://docs.scala-lang.org/scala3/book/ca-type-classes.html
+ * [given syntax]: https://docs.scala-lang.org/scala3/reference/contextual/previous-givens.html
+ *
+ * To invoke a method or class constructor which has a "using" clause, you will
+ * need to either:
+ *
+ * - (1) explicitly pass a value for the using parameter by suffixing `(using l)`
+ *   to the method/constructor call (where `l` is a value of the correct type), or
+ * - (2) have a `given` clause in scope which declares a [[Lattice]] value with a
+ *   compatible type. When a `given` clause appears in a different file, it may
+ *   need to be imported with `import package_name.given` - the compiler should
+ *   help you with this. Note that not all subtypes of [[Lattice]] are declared
+ *   as `given`. If you need to use a non-given instance, you can either use
+ *   (1) or, if the instance is canonical for its type, you can add a new
+ *   `given Lattice[TheType] = ...` statement.
+ */
 trait Lattice[T]:
 
   type Element = T
 
   /** The bottom element of this lattice.
     */
-  val bottom: T
+  def bottom: T
 
-  /** The top element of this lattice. Default: not implemented.
+  /** The top element of this lattice.
     */
-  def top: T = ???
+  def top: T
 
   /** The least upper bound of `x` and `y`.
     */
   def lub(x: T, y: T): T
 
-  /** The greatest lower bound of `x` and `y`
+  /** The greatest lower bound of `x` and `y`.
     */
-  def glb(x: T, y: T): T = ???
+  def glb(x: T, y: T): T
 
   /** Returns true whenever `x` <= `y`.
     */
   def leq(x: T, y: T): Boolean = lub(x, y) == y // rarely used, but easy to implement :-)
+
+  /**
+   * These convenience methods give easy access to the `join` and `meet` functions through
+   * the `.meet` and `.join` syntax.
+   *
+   * These methods are provided by the [[Lattice]] trait and can be used whenever a
+   * [[Lattice]] (with the correct type) is in scope.
+   */
+  extension (x: T)
+    def join(y: T) = lub(x, y)
+    def meet(y: T) = glb(x, y)
+
+object Lattice {
+
+  /** Summons a [[Lattice]] instance for the required type. By using this method,
+   *  the [[Lattice]] methods can be accessed by, for example, `Lattice().top`. */
+  def apply[T](using l: Lattice[T]) = l
+}
 
 trait StridedWrappedInterval
 
@@ -54,9 +100,9 @@ class SASILattice extends Lattice[StridedWrappedInterval] {
   val lowestPossibleValue: BigInt = 0
   val highestPossibleValue: BigInt = Long.MaxValue - 1
 
-  override val bottom: StridedWrappedInterval = SIBottom
+  val bottom: StridedWrappedInterval = SIBottom
 
-  override def top: StridedWrappedInterval = SITop
+  val top: StridedWrappedInterval = SITop
 
   //  def gamma(x: StridedWrappedInterval): Set[BitVecLiteral] = x match {
   //    case SIBottom => Set.empty
@@ -123,8 +169,10 @@ class SASILattice extends Lattice[StridedWrappedInterval] {
     }
   }
 
+  def glb(r: StridedWrappedInterval, t: StridedWrappedInterval): Nothing = ???
+
   /** S1[L1, U1] join S2[L2, U2] -> gcd(S1, S2)[min(L1, L2), max(U1, U2)] */
-  override def lub(r: StridedWrappedInterval, t: StridedWrappedInterval): StridedWrappedInterval = {
+  def lub(r: StridedWrappedInterval, t: StridedWrappedInterval): StridedWrappedInterval = {
     (r, t) match {
       case (SIBottom, t) => t
       case (t, SIBottom) => t
@@ -273,13 +321,15 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
     override def toString = "VSTop"
   }
 
-  override val bottom: ValueSet[T] = VSBottom
+  val bottom: ValueSet[T] = VSBottom
 
-  override def top: ValueSet[T] = VSTop
+  val top: ValueSet[T] = VSTop
 
   val lattice: SASILattice = SASILattice()
 
-  override def lub(x: ValueSet[T], y: ValueSet[T]): ValueSet[T] = {
+  def glb(x: ValueSet[T], y: ValueSet[T]): Nothing = ???
+
+  def lub(x: ValueSet[T], y: ValueSet[T]): ValueSet[T] = {
     (x, y) match {
       case (VSBottom, t) => t
       case (t, VSBottom) => t
@@ -485,11 +535,11 @@ case object MAYBE_BOOL3 extends Bool3 {
   */
 class Bool3Lattice extends Lattice[Bool3] {
 
-  override val bottom: Bool3 = BOTTOM_BOOL3
+  val bottom: Bool3 = BOTTOM_BOOL3
 
-  override def top: Bool3 = MAYBE_BOOL3
+  val top: Bool3 = MAYBE_BOOL3
 
-  override def lub(x: Bool3, y: Bool3): Bool3 = {
+  def lub(x: Bool3, y: Bool3): Bool3 = {
     (x, y) match {
       case (BOTTOM_BOOL3, t) => t
       case (t, BOTTOM_BOOL3) => t
@@ -498,6 +548,8 @@ class Bool3Lattice extends Lattice[Bool3] {
       case _ => x
     }
   }
+
+  def glb(x: Bool3, y: Bool3): Nothing = ???
 }
 
 enum Flags {
@@ -526,9 +578,9 @@ case class FlagMap(m: Map[Flags, Bool3]) extends Flag {
   */
 class FlagLattice extends Lattice[Flag] {
 
-  override val bottom: Flag = BOTTOM_Flag
+  val bottom: Flag = BOTTOM_Flag
 
-  override def top: Flag = FlagMap(
+  val top: Flag = FlagMap(
     Map(
       Flags.CF -> MAYBE_BOOL3,
       Flags.ZF -> MAYBE_BOOL3,
@@ -541,7 +593,8 @@ class FlagLattice extends Lattice[Flag] {
 
   val lattice: Bool3Lattice = Bool3Lattice()
 
-  override def lub(x: Flag, y: Flag): Flag = {
+  def glb(x: Flag, y: Flag): Nothing = ???
+  def lub(x: Flag, y: Flag): Flag = {
     (x, y) match {
       case (BOTTOM_Flag, t) => t
       case (t, BOTTOM_Flag) => t
@@ -563,16 +616,22 @@ class FlagLattice extends Lattice[Flag] {
   */
 class PowersetLattice[A] extends Lattice[Set[A]] {
   val bottom: Set[A] = Set.empty
+  def top: Nothing = ???
   def lub(x: Set[A], y: Set[A]): Set[A] = x.union(y)
+  def glb(x: Set[A], y: Set[A]): Nothing = ???
 }
+
+given [A]: Lattice[Set[A]] = PowersetLattice[A]()
 
 // Single element lattice (using Option)
 class SingleElementLattice[T] extends Lattice[Option[T]] {
   val bottom: Option[T] = None
+  def top: Nothing = ???
   def lub(x: Option[T], y: Option[T]): Option[T] = (x, y) match {
     case (None, None) => None
     case _ => Some(x.getOrElse(y.get))
   }
+  def glb(x: Option[T], y: Option[T]): Nothing = ???
 }
 
 sealed trait LiftedElement[+T]
@@ -588,7 +647,9 @@ case object LiftedBottom extends LiftedElement[Nothing] {
 class LiftLattice[T, +L <: Lattice[T]](val sublattice: L) extends Lattice[LiftedElement[T]] {
 
   val bottom: LiftedElement[T] = LiftedBottom
+  def top: Nothing = ???
 
+  def glb(x: LiftedElement[T], y: LiftedElement[T]): Nothing = ???
   def lub(x: LiftedElement[T], y: LiftedElement[T]): LiftedElement[T] =
     (x, y) match {
       case (LiftedBottom, t) => t
@@ -621,6 +682,7 @@ class TwoElementLattice extends Lattice[TwoElement]:
   override val bottom: TwoElement = TwoElementBottom
   override val top: TwoElement = TwoElementTop
 
+  def glb(x: TwoElement, y: TwoElement): Nothing = ???
   def lub(x: TwoElement, y: TwoElement): TwoElement = (x, y) match {
     case (TwoElementBottom, TwoElementBottom) => TwoElementBottom
     case _ => TwoElementTop
@@ -638,8 +700,9 @@ class FlatLattice[X] extends Lattice[FlatElement[X]] {
 
   val bottom: FlatElement[X] = Bottom
 
-  override val top: FlatElement[X] = Top
+  val top: FlatElement[X] = Top
 
+  def glb(x: FlatElement[X], y: FlatElement[X]): Nothing = ???
   def lub(x: FlatElement[X], y: FlatElement[X]): FlatElement[X] = (x, y) match {
     case (a, Bottom) => a
     case (Bottom, b) => b
@@ -656,8 +719,9 @@ class FlatLatticeWithDefault[X](val f: () => X) extends Lattice[FlatElement[X]] 
 
   val bottom: FlatElement[X] = FlatEl(f())
 
-  override val top: FlatElement[X] = Top
+  val top: FlatElement[X] = Top
 
+  def glb(x: FlatElement[X], y: FlatElement[X]): Nothing = ???
   def lub(x: FlatElement[X], y: FlatElement[X]): FlatElement[X] = (x, y) match {
     case (a, Bottom) => a
     case (Bottom, b) => b
@@ -670,9 +734,11 @@ class FlatLatticeWithDefault[X](val f: () => X) extends Lattice[FlatElement[X]] 
 
 class TupleLattice[+L1 <: Lattice[T1], +L2 <: Lattice[T2], T1, T2](val lattice1: L1, val lattice2: L2)
     extends Lattice[(T1, T2)] {
-  override val bottom: (T1, T2) = (lattice1.bottom, lattice2.bottom)
+  val bottom: (T1, T2) = (lattice1.bottom, lattice2.bottom)
 
-  override def lub(x: (T1, T2), y: (T1, T2)): (T1, T2) = {
+  def glb(x: (T1, T2), y: (T1, T2)): Nothing = ???
+
+  def lub(x: (T1, T2), y: (T1, T2)): (T1, T2) = {
     val (x1, x2) = x
     val (y1, y2) = y
     (lattice1.lub(x1, y1), lattice2.lub(x2, y2))
@@ -684,7 +750,7 @@ class TupleLattice[+L1 <: Lattice[T1], +L2 <: Lattice[T2], T1, T2](val lattice1:
     lattice1.leq(x1, y1) && lattice2.leq(x2, y2)
   }
 
-  override def top: (T1, T2) = (lattice1.top, lattice2.top)
+  def top: (T1, T2) = (lattice1.top, lattice2.top)
 }
 
 /** A lattice of maps from a set of elements of type `A` to a lattice with element `L'. Bottom is the default value.
@@ -693,6 +759,9 @@ class MapLattice[A, T, +L <: Lattice[T]](val sublattice: L) extends Lattice[Map[
   val bottom: Map[A, T] = Map().withDefaultValue(sublattice.bottom)
   def lub(x: Map[A, T], y: Map[A, T]): Map[A, T] =
     x.keys.foldLeft(y)((m, a) => m + (a -> sublattice.lub(x(a), y(a)))).withDefaultValue(sublattice.bottom)
+
+  def glb(x: Map[A, T], y: Map[A, T]): Nothing = ???
+  def top: Nothing = ???
 }
 
 /** Constant propagation lattice.

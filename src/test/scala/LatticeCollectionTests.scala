@@ -1,4 +1,4 @@
-import analysis.{LatticeMap, LatticeSet}
+import analysis.{LatticeMap, LatticeSet, given}
 import org.scalacheck.{Arbitrary, Gen, Shrink}
 import org.scalatest.*
 import org.scalatest.funsuite.*
@@ -9,13 +9,11 @@ class LatticeCollectionTests extends AnyFunSuite with org.scalatestplus.scalache
   type D = Int
   type L = LatticeSet[Int]
 
-  private implicit val latticeSetTerm: LatticeSet[V] = LatticeSet.Bottom()
-
   val genFinSet: Gen[Set[V]] = Gen.nonEmptyContainerOf[Set, V](Arbitrary.arbitrary)
 
   val genLatticeSet: Gen[LatticeSet[V]] = Gen.frequency(
-    (1, LatticeSet.Top()),
-    (1, LatticeSet.Bottom()),
+    (1, LatticeSet.Top[V]()),
+    (1, LatticeSet.Bottom[V]()),
     (20, for { s <- genFinSet } yield LatticeSet.FiniteSet(s)),
     (20, for { s <- genFinSet } yield LatticeSet.DiffSet(s))
   )
@@ -31,8 +29,8 @@ class LatticeCollectionTests extends AnyFunSuite with org.scalatestplus.scalache
   )
 
   val genLatticeMap: Gen[LatticeMap[D, L]] = Gen.frequency(
-    (1, LatticeMap.Top()),
-    (1, LatticeMap.Bottom()),
+    (1, LatticeMap.Top[D, L]()),
+    (1, LatticeMap.Bottom[D, L]()),
     (20, for { m <- (genNoTopFinMap) } yield LatticeMap.TopMap(m)),
     (20, for { m <- (genNoBotFinMap) } yield LatticeMap.BottomMap(m))
   )
@@ -47,7 +45,7 @@ class LatticeCollectionTests extends AnyFunSuite with org.scalatestplus.scalache
   }
 
   @annotation.nowarn
-  implicit def shrinkLatticeMap[D, L](implicit s: Shrink[L]): Shrink[LatticeMap[D, L]] = Shrink {
+  implicit def shrinkLatticeMap(implicit s: Shrink[L]): Shrink[LatticeMap[D, L]] = Shrink {
     case LatticeMap.Top() => Stream()
     case LatticeMap.Bottom() => Stream()
     case LatticeMap.TopMap(m) => (for (m2 <- Shrink.shrink(m)) yield LatticeMap.topMap(m2))
