@@ -1,4 +1,4 @@
-# BASIL (Boogie Analysis for Secure Information-Flow Logics)
+# BASIL (Binary Analysis for Secure Information-Flow Logics)
 
 BASIL generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 
 binaries that have been lifted intermediate formats. It takes as input the `.gts` format produced by 

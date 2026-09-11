@@ -13,7 +13,7 @@ trait JFlexCupModule extends JavaModule {
   def jflexDep = mvn"de.jflex:jflex:1.9.1"
   def javaCupDep = mvn"com.github.vbmacher:java-cup:11b-20160615-3"
   def javaCupRuntimeDep = mvn"com.github.vbmacher:java-cup-runtime:11b-20160615-3"
-  def javaCupSourceUrl: T[String] = "http://www2.cs.tum.edu/projects/cup/releases/java-cup-src-11b-20160615.tar.gz"
+  def javaCupSourceUrl: T[String] = "https://repo1.maven.org/maven2/com/github/vbmacher/java-cup/11b-20160615-3/java-cup-11b-20160615-3-sources.jar"
 
   def mvnDeps = Task {
     super.mvnDeps() ++ Seq(javaCupRuntimeDep)
@@ -51,10 +51,17 @@ trait JFlexCupModule extends JavaModule {
       PathRef(Task.dest)
     }
     def cupSources = Task {
-      val file = Task.dest / "cup-src.tar.gz"
+      val file = Task.dest / "cup-src.jar"
+      val innerTar = Task.dest / "java-cup-src-11b-20160615.tar.gz"
       os.write(file, requests.get(javaCupSourceUrl()))
-      os.proc("tar", "xzf", file).call(cwd = Task.dest)
+      Jvm.callJdkTool(
+        toolName = "jar",
+        args = Seq("-xf", file.toString),
+        javaHome = None,
+      )
+      os.proc("tar", "xzf", innerTar).call(cwd = Task.dest)
       os.remove.all(Task.dest / "src" / "java_cup" / "anttask")
+      os.remove(innerTar)
       os.remove(file)
       PathRef(Task.dest / "src")
     }

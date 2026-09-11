@@ -532,35 +532,7 @@ class GTIRBToIR(
       case EdgeLabel(false, false, Type_Branch, _) =>
         // indirect jump to external subroutine, another block in procedure, or non-returning call to another procedure
         if (proxies.contains(edge.targetUuid)) {
-          val proxySymbols = nodeUUIDToSymbols.getOrElse(edge.targetUuid, mutable.Set())
-          if (proxySymbols.isEmpty) {
-            // indirect call with no further information
-            val target = block.statements.last match {
-              case LocalAssign(lhs: GlobalVar, rhs: GlobalVar, _) if lhs.name == "_PC" => rhs
-              case _ =>
-                throw Exception(s"no assignment to program counter found before indirect call in block ${block.label}")
-            }
-            val label = handlePCAssign(block)
-            (Some(IndirectCall(target, label)), Unreachable())
-          } else if (proxySymbols.size > 1) {
-            // TODO requires further consideration once encountered
-            throw Exception(
-              s"multiple uuidToSymbol ${proxySymbols.map(_.name).mkString(", ")} associated with proxy block ${edge.targetUuid}, target of indirect call from block ${block.label}"
-            )
-          } else {
-            // indirect call to external procedure with name
-            val externalName = proxySymbols.head.name
-            val target = if (externalProcedures.contains(externalName)) {
-              externalProcedures(externalName)
-            } else {
-              val proc = Procedure(externalName)
-              externalProcedures += (externalName -> proc)
-              procedures += proc
-              proc
-            }
-            val label = handlePCAssign(block)
-            (Some(DirectCall(target, label)), Unreachable())
-          }
+          handleProxyBlockEdge(block, edge, procedures)
         } else if (uuidToBlock.contains(edge.targetUuid)) {
           // resolved indirect jump
           val target = uuidToBlock(edge.targetUuid)
@@ -574,12 +546,12 @@ class GTIRBToIR(
           } else {
             // TODO - jump is to a block in the middle of another procedure - need to either split or merge procedures
             throw Exception(
-              s"indirect jump from ${block.label} to ${edge.targetUuid} points to a block in the middle of another procedure"
+              s"indirect jump from ${block.label} to ${b64encode(edge.targetUuid)} points to a block in the middle of another procedure"
             )
           }
         } else {
           throw Exception(
-            s"edge from ${block.label} to ${edge.targetUuid} does not point to a known block or proxy block"
+            s"edge from ${block.label} to ${b64encode(edge.targetUuid)} does not point to a known block or proxy block"
           )
         }
       case EdgeLabel(false, true, Type_Branch, _) =>
@@ -601,7 +573,7 @@ class GTIRBToIR(
           val label = handlePCAssign(block)
           (None, GoTo(mutable.Set(target), label))
         } else {
-          throw Exception(s"edge from ${block.label} to ${edge.targetUuid} does not point to a known block")
+          throw Exception(s"edge from ${block.label} to ${b64encode(edge.targetUuid)} does not point to a known block")
         }
       case EdgeLabel(false, _, Type_Return, _) =>
         // return statement, value of 'direct' is just whether DDisasm has resolved the return target
@@ -619,7 +591,7 @@ class GTIRBToIR(
           val target = uuidToBlock(edge.targetUuid)
           (None, GoTo(mutable.Set(target)))
         } else {
-          throw Exception(s"edge from ${block.label} to ${edge.targetUuid} does not point to a known block")
+          throw Exception(s"edge from ${block.label} to ${b64encode(edge.targetUuid)} does not point to a known block")
         }
       case EdgeLabel(false, true, Type_Call, _) =>
         // call that will not return according to DDisasm even though R30 may be set
@@ -628,15 +600,53 @@ class GTIRBToIR(
           val target = entranceUUIDtoProcedure(edge.targetUuid)
           val label = handlePCAssign(block)
           (Some(DirectCall(target, label)), Unreachable())
+        } else if (proxies.contains(edge.targetUuid)) {
+          handleProxyBlockEdge(block, edge, procedures)
         } else {
           throw Exception(
-            s"edge from ${block.label} to ${edge.targetUuid} does not point to a known procedure entrance"
+            s"edge from ${block.label} to ${b64encode(edge.targetUuid)} does not point to a known procedure entrance"
           )
         }
 
       // case EdgeLabel(false, false, Type_Call, _) => probably what a blr instruction should be
 
       case _ => throw Exception(s"cannot handle ${edge.getLabel} from block ${block.label}")
+    }
+  }
+
+  private def handleProxyBlockEdge(
+    block: Block,
+    edge: Edge,
+    procedures: ArrayBuffer[Procedure]
+  ): (Option[Call], Jump) = {
+    val proxySymbols = nodeUUIDToSymbols.getOrElse(edge.targetUuid, mutable.Set())
+    if (proxySymbols.isEmpty) {
+      // indirect call with no further information
+      val target = block.statements.last match {
+        case LocalAssign(lhs: GlobalVar, rhs: GlobalVar, _) if lhs.name == "_PC" => rhs
+        case _ =>
+          throw Exception(s"no assignment to program counter found before indirect call in block ${block.label}")
+      }
+      val label = handlePCAssign(block)
+      (Some(IndirectCall(target, label)), Unreachable())
+    } else if (proxySymbols.size > 1) {
+      // TODO requires further consideration once encountered
+      throw Exception(
+        s"multiple uuidToSymbol ${proxySymbols.map(_.name).mkString(", ")} associated with proxy block ${b64encode(edge.targetUuid)}, target of indirect call from block ${block.label}"
+      )
+    } else {
+      // indirect call to external procedure with name
+      val externalName = proxySymbols.head.name
+      val target = if (externalProcedures.contains(externalName)) {
+        externalProcedures(externalName)
+      } else {
+        val proc = Procedure(externalName)
+        externalProcedures += (externalName -> proc)
+        procedures += proc
+        proc
+      }
+      val label = handlePCAssign(block)
+      (Some(DirectCall(target, label)), Unreachable())
     }
   }
 
@@ -879,11 +889,32 @@ class GTIRBToIR(
       case i: TempIf => i
       case i => throw Exception(s"last statement of block ${block.label} is not an if statement: $i")
     }
-
-    val trueBlock = newBlockCondition(block, uuidToBlock(branch.targetUuid), tempIf.cond, tempIf.thenStmts)
     val falseBlock =
       newBlockCondition(block, uuidToBlock(fallthrough.targetUuid), UnaryExpr(BoolNOT, tempIf.cond), tempIf.elseStmts)
 
+    val trueBlock =
+      if (
+        entranceUUIDtoProcedure.contains(branch.targetUuid) && entranceUUIDtoProcedure(branch.targetUuid) != procedure
+      ) {
+        // Conditional branch is jumping to the start of another procedure - weird
+        // Create DirectCall instead of GoTo as a starting point
+        // A more sophisticated approach would be to detect this weird case and inline the other procedure if it's just
+        // a single block with no other calls but that's more of a hassle
+        val target = entranceUUIDtoProcedure(branch.targetUuid)
+        val newLabel = s"${block.label}_goto_${target.name}"
+        val assume = Assume(tempIf.cond, checkSecurity = true)
+        val call = DirectCall(target)
+        val body: ArrayBuffer[Statement] = ArrayBuffer(assume).appendedAll(tempIf.thenStmts).append(call)
+        // check if target procedure is returning
+        val returning = if (target.blocks.exists(b => b.jump.isInstanceOf[Return])) {
+          GoTo(procedure.returnBlock)
+        } else {
+          Unreachable()
+        }
+        Block(newLabel, None, body, returning)
+      } else {
+        newBlockCondition(block, uuidToBlock(branch.targetUuid), tempIf.cond, tempIf.thenStmts)
+      }
     val newBlocks = ArrayBuffer(trueBlock, falseBlock)
     procedure.addBlocks(newBlocks)
     block.statements.remove(tempIf)
