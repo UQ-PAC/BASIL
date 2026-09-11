@@ -75,7 +75,7 @@ object `package` extends ScalaModule with BasilDocs with BasilVersion with Scala
       "https://maven.pkg.github.com/UQ-PAC/aslp",
       // this token will expire in one year. if downloading the lifter dependency fails,
       // re-generate a read:packages token.
-      authentication = Some(Authentication("rina-bot1", "iH2Yg4xigOuRtBRoTrQWS85I26vgDuZ29Mgt_phg".reverse))
+      authentication = Some(Authentication("rina-bot1", "1dmjd3Ljnnzi205vfCczp9CEaNE5XVPQrl3e_phg".reverse))
       // XXX: .reverse is used to subvert Github's secret detection, which will invalidate the
       // token if it sees it being committed....
     )
