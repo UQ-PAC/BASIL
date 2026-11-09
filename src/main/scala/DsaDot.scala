@@ -3,11 +3,12 @@ import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, Stat
 object DsaDot {
   def main(args: Array[String]): Unit = {
     val path = args(1)
+    val relf = args(2)
 
     val result = RunUtils.loadAndTranslate(
       BASILConfig(
         loading =
-          ILLoadingConfig(inputFile = path + ".gts", relfFile = Some(path + ".relf"), specFile = None, dumpIL = None),
+          ILLoadingConfig(inputFile = path, relfFile = Some(relf), specFile = None, dumpIL = None),
         staticAnalysis = Some(StaticAnalysisConfig()),
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out"
